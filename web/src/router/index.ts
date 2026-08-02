@@ -50,13 +50,11 @@ export const routes: RouteRecordRaw[] = [
   // Statistiques : serveur + modération réunies en onglets (StatsHubPage).
   { path: "/stats", name: "stats", component: () => import("../components/pages/StatsHubPage.vue") },
   { path: "/modstats", redirect: "/stats" },
-  // Logs TECHNIQUES (bot / worker / API / websocket). Les anciens ecrans
-  // "Journaux metier" et "Audit" ont ete retires : ils faisaient doublon avec
-  // les journaux par entite (/journal/*). Redirections conservees pour les
-  // favoris existants.
+  // Logs TECHNIQUES (bot / worker / API / websocket). Seul ecran de logs
+  // restant cote web : les journaux d'activite Discord se consultent dans
+  // les salons du serveur, pas ici. Ces logs-la n'y sont jamais publies —
+  // erreurs, crashs, etat des services — d'ou leur maintien.
   { path: "/system-logs", name: "system-logs", component: () => import("../components/pages/SystemLogsPage.vue") },
-  { path: "/logs", redirect: "/journal/messages" },
-  { path: "/audit", redirect: "/journal/membres" },
   { path: "/name-history", name: "name-history", component: () => import("../components/pages/NameHistoryPage.vue") },
 
   // ── Modération ──
@@ -97,19 +95,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/temp-roles", name: "temp-roles", component: () => import("../components/pages/TempRolesPage.vue") },
   { path: "/members", name: "members", component: () => import("../components/pages/MembersPage.vue") },
   { path: "/watched-users", redirect: "/members" },
-
-  // Un journal par nature d'evenement (cf. EVENT_CATEGORIES). Tous servis par
-  // le meme composant, qui lit la categorie dans le chemin.
-  {
-    path: "/journal",
-    name: "journal",
-    component: () => import("@/components/pages/EventLogPage.vue"),
-  },
-  {
-    path: "/journal/:category",
-    name: "journal-category",
-    component: () => import("@/components/pages/EventLogPage.vue"),
-  },
 
   // ── Jeux ──
   // Univers Nexus : backend distinct (nexus-api) derriere la passerelle
