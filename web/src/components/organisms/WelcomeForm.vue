@@ -206,8 +206,8 @@ async function onSave() {
         <label>Couleur (hex)
           <input v-model="draft.welcome_embed_color" type="color" />
         </label>
-        <label>Image (URL)
-          <AppInput v-model="draft.welcome_image_url" placeholder="https://..." />
+        <label>Image
+          <ImagePicker v-model="draft.welcome_image_url" />
         </label>
         <label class="full">Message
           <AppTextarea v-model="draft.welcome_message" :rows="6" />
@@ -372,8 +372,8 @@ async function onSave() {
         <label>Titre
           <AppInput v-model="draft.anniversary_title" />
         </label>
-        <label>Image (URL)
-          <AppInput v-model="draft.anniversary_image_url" />
+        <label>Image
+          <ImagePicker v-model="draft.anniversary_image_url" />
         </label>
         <label class="full">Message
           <AppTextarea v-model="draft.anniversary_message" :rows="6" />
@@ -399,8 +399,8 @@ async function onSave() {
         <label>Titre
           <AppInput v-model="draft.leave_title" />
         </label>
-        <label>Image (URL)
-          <AppInput v-model="draft.leave_image_url" />
+        <label>Image
+          <ImagePicker v-model="draft.leave_image_url" />
         </label>
         <label>Couleur embed (hex)
           <AppInput v-model="draft.leave_embed_color" placeholder="e74c3c" />
@@ -425,8 +425,8 @@ async function onSave() {
         <label>Titre
           <AppInput v-model="draft.rejoin_title" />
         </label>
-        <label>Image (URL)
-          <AppInput v-model="draft.rejoin_image_url" />
+        <label>Image
+          <ImagePicker v-model="draft.rejoin_image_url" />
         </label>
         <label class="full">Message
           <AppTextarea v-model="draft.rejoin_message" :rows="6" />
