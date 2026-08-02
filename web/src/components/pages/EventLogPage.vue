@@ -23,6 +23,15 @@ import { categoryFromPath, eventLogService } from "@/services/eventLogService";
 import { eventIcon, eventLabel, eventVariant } from "@/utils/variants";
 import type { AuditLog } from "@/types";
 import AdminPageShell from "../layouts/AdminPageShell.vue";
+import EventCard from "../molecules/EventCard.vue";
+
+/// Types d'evenement rendus sous forme de carte, comme leur equivalent
+/// Discord. La liste grandira a chaque module migre depuis son salon de logs.
+const TYPES_CARTE = new Set(["sanction_applied"]);
+
+function estCarte(e: AuditLog): boolean {
+  return TYPES_CARTE.has(e.event_type);
+}
 
 const PAGE_SIZE = 50;
 
@@ -195,7 +204,15 @@ function summary(log: AuditLog): string {
       <p v-else-if="!entries.length" class="el-hint">Aucun evenement pour ces criteres.</p>
 
       <ul v-else class="el-list">
-        <li v-for="e in entries" :key="e.id" class="el-item">
+        <!--
+          Les evenements porteurs d'une carte (sanctions, et les modules
+          migres ensuite) sont rendus comme sur Discord : barre coloree,
+          emoji, motif. Les autres gardent la ligne compacte, plus dense,
+          adaptee a un flux qu'on parcourt.
+        -->
+        <li v-for="e in entries" :key="e.id" :class="estCarte(e) ? 'el-item-carte' : 'el-item'">
+          <EventCard v-if="estCarte(e)" :log="e" />
+          <template v-else>
           <span class="el-badge" :class="`v-${eventVariant(e.event_type)}`">
             {{ eventIcon(e.event_type) }}
           </span>
@@ -243,6 +260,7 @@ function summary(log: AuditLog): string {
             </div>
           </div>
           <time class="el-date">{{ fmtDate(e.created_at) }}</time>
+          </template>
         </li>
       </ul>
 
@@ -326,6 +344,11 @@ function summary(log: AuditLog): string {
   padding: var(--space-xs) var(--space-sm);
   border-radius: var(--radius-md);
   cursor: pointer;
+}
+
+/* La carte porte deja son cadre : l'element de liste ne fait que l'espacer. */
+.el-item-carte {
+  list-style: none;
 }
 
 .el-list {

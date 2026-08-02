@@ -102,6 +102,16 @@ export const EVENT_CATEGORIES: EventCategory[] = [
     rbacKey: "logs.journal.anomalies",
     eventTypes: ["anomaly_detected"],
   },
+  {
+    // Sanctions posées par un modérateur ou par l'automod. Remplace le salon
+    // Discord `sanctions_log_channel_id` : même contenu, même code couleur,
+    // mais consultable, filtrable et daté.
+    key: "moderation",
+    label: "Modération",
+    slug: "moderation",
+    rbacKey: "logs.journal.moderation",
+    eventTypes: ["sanction_applied"],
+  },
 ];
 
 export interface EventLogQuery {
