@@ -144,6 +144,11 @@ export function eventVariant(type: string): BadgeVariant {
 
 export function eventLabel(type: string): string {
   const labels: Record<string, string> = {
+    // Cartes migrées depuis les salons de logs Discord
+    sanction_applied: "Sanction",
+    automod_flagged: "Détection automod",
+    voice_session_open: "Salon vocal ouvert",
+    age_verification_ban: "Ban vérification d'âge",
     // Messages
     message_delete: "Message supprimé",
     message_edit: "Message édité",

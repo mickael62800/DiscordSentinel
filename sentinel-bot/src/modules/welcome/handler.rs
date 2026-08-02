@@ -1012,6 +1012,28 @@ pub async fn handle_age_modal(
             }
         }
 
+        // Journal web : trace systematique, independante du salon Discord
+        // optionnel ci-dessous. Un ban automatique doit laisser une trace meme
+        // quand personne n'a configure de salon de logs.
+        crate::modules::audit::send_event(
+            ctx,
+            crate::modules::audit::audit_event::simple(
+                guild_id.to_string(),
+                "age_verification_ban",
+            )
+            .with_target(user_id, &modal.user.name)
+            .with_details(serde_json::json!({
+                "action": "Ban verification d'age",
+                "action_kind": "age_ban",
+                "emoji": "\u{1f51e}",
+                "actor": "Verification d'age",
+                "reason": format!("Age declare : {age} ans (minimum {})", config.age_minimum),
+                "duration": format!("{years} an(s)"),
+                "color": 0xE74C3Cu32,
+            })),
+        )
+        .await;
+
         // Log staff : card informant qu'un membre a ete banni par la verification
         // d'age (salon configurable `age_ban_log_channel_id`, sinon rien). Best-effort.
         if let Some(channel) = age_ban_log_channel {

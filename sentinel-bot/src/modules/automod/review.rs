@@ -51,6 +51,31 @@ pub(super) async fn send_review_card(
 ) {
     let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
+    // Journal web : la detection y est enregistree AVANT toute la logique de
+    // vote, et sans dependre d'elle.
+    //
+    // La carte Discord reste posee — elle porte les boutons de decision, ce
+    // n'est pas qu'un log. Le web en est le miroir consultable : on y retrouve
+    // l'historique, filtrable et date, meme quand la carte Discord a ete
+    // supprimee ou que le salon de revue n'est plus configure.
+    crate::modules::audit::send_event(
+        ctx,
+        crate::modules::audit::audit_event::simple(guild_id.clone(), "automod_flagged")
+            .with_target(msg.author.id, &msg.author.name)
+            .with_channel(msg.channel_id, None)
+            .with_details(serde_json::json!({
+                "action": format!("Automod - {}", action_label(suggested_action)),
+                "action_kind": action_key(suggested_action),
+                "emoji": action_emoji(suggested_action),
+                "reason": reason,
+                "score": score,
+                "flags": flags,
+                "content": tronquer(&msg.content, 300),
+                "auto_note": auto_note,
+            })),
+    )
+    .await;
+
     // Mode VOTE : si vote_enabled, on delegue a la carte de vote des
     // moderateurs (au lieu de la validation 1-clic). On capture aussi
     // `discussion_enabled` pour le bouton « Ouvrir une discussion » du 1-clic.
@@ -1078,4 +1103,48 @@ pub(super) fn sanitize_embed_content(content: &str, max_len: usize) -> String {
         .replace("||", "| |")
         .replace("@everyone", "@-everyone")
         .replace("@here", "@-here")
+}
+
+/// Libelle affichable de l'action suggeree.
+fn action_label(a: &Action) -> &'static str {
+    match a {
+        Action::None => "signalement",
+        Action::Warn => "avertissement",
+        Action::Delete => "suppression",
+        Action::Mute => "sourdine",
+        Action::Ban => "bannissement",
+    }
+}
+
+/// Cle stable pour le stockage et le filtrage. Distincte du libelle, qui peut
+/// etre reformule sans casser les evenements deja enregistres.
+fn action_key(a: &Action) -> &'static str {
+    match a {
+        Action::None => "none",
+        Action::Warn => "warn",
+        Action::Delete => "delete",
+        Action::Mute => "mute",
+        Action::Ban => "ban",
+    }
+}
+
+fn action_emoji(a: &Action) -> &'static str {
+    match a {
+        Action::None => "🔍",
+        Action::Warn => "⚠️",
+        Action::Delete => "🗑️",
+        Action::Mute => "🔇",
+        Action::Ban => "🔨",
+    }
+}
+
+/// Extrait du message, borne. Le journal montre de quoi il s'agit sans
+/// recopier un pave, et sans qu'un message tres long fasse gonfler la base.
+fn tronquer(contenu: &str, max: usize) -> String {
+    let propre = contenu.trim();
+    if propre.chars().count() <= max {
+        return propre.to_string();
+    }
+    let coupe: String = propre.chars().take(max).collect();
+    format!("{coupe}…")
 }

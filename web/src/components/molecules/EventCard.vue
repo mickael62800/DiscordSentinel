@@ -36,6 +36,36 @@ const raison = computed(() => texte("reason"));
 const duree = computed(() => texte("duration"));
 const acteur = computed(() => texte("actor"));
 
+/// Score de l'automod. `null` plutôt que 0 : un score absent et un score nul
+/// ne veulent pas dire la même chose.
+const score = computed(() => {
+  const v = d.value.score;
+  return typeof v === "number" ? v : null;
+});
+
+/// Signaux levés, réduits aux seuls actifs. Le rendu Discord listait déjà les
+/// flags déclenchés, pas la liste complète avec des « non » partout.
+const signaux = computed(() => {
+  const f = d.value.flags;
+  if (!f || typeof f !== "object") return [];
+  const noms: Record<string, string> = {
+    spam: "spam",
+    insult: "insulte",
+    profanity: "juron",
+    link: "lien",
+    phishing: "hameçonnage",
+  };
+  return Object.entries(f as Record<string, unknown>)
+    .filter(([, v]) => v === true)
+    .map(([k]) => noms[k] ?? k);
+});
+
+/// Extrait du message incriminé, déjà borné côté bot.
+const extrait = computed(() => texte("content"));
+
+/// Action automatique déjà appliquée au moment de la détection.
+const noteAuto = computed(() => texte("auto_note"));
+
 const horodatage = computed(() =>
   new Date(props.log.created_at).toLocaleString("fr-FR", {
     dateStyle: "short",
@@ -55,11 +85,20 @@ const horodatage = computed(() =>
         <time class="ec-date" :datetime="log.created_at">{{ horodatage }}</time>
       </div>
 
-      <p class="ec-ligne">
+      <p v-if="acteur || raison || duree" class="ec-ligne">
         <span v-if="acteur">Par <strong>{{ acteur }}</strong></span>
-        <span v-if="raison" class="ec-sep">· Raison : {{ raison }}</span>
+        <span v-if="raison" class="ec-sep">· {{ raison }}</span>
         <span v-if="duree" class="ec-sep">· Durée : {{ duree }}</span>
       </p>
+
+      <p v-if="score !== null || signaux.length" class="ec-signaux">
+        <span v-if="score !== null" class="ec-score">score {{ score.toFixed(1) }}</span>
+        <span v-for="s in signaux" :key="s" class="ec-flag">{{ s }}</span>
+      </p>
+
+      <blockquote v-if="extrait" class="ec-extrait">{{ extrait }}</blockquote>
+
+      <p v-if="noteAuto" class="ec-auto">{{ noteAuto }}</p>
     </div>
   </article>
 </template>
@@ -111,4 +150,44 @@ const horodatage = computed(() =>
 }
 
 .ec-sep { margin-left: 6px; }
+
+.ec-signaux {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.ec-score, .ec-flag {
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.ec-score {
+  font-variant-numeric: tabular-nums;
+  border-color: var(--barre);
+  color: var(--text-primary);
+}
+
+/* Le message incriminé : cité, jamais présenté comme du texte de l'interface. */
+.ec-extrait {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-left: 2px solid var(--border);
+  background: var(--bg-primary);
+  border-radius: var(--radius-xs);
+  font-size: 13px;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.ec-auto {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--accent-warm, #e67e22);
+}
 </style>

@@ -27,7 +27,12 @@ import EventCard from "../molecules/EventCard.vue";
 
 /// Types d'evenement rendus sous forme de carte, comme leur equivalent
 /// Discord. La liste grandira a chaque module migre depuis son salon de logs.
-const TYPES_CARTE = new Set(["sanction_applied"]);
+const TYPES_CARTE = new Set([
+  "sanction_applied",
+  "automod_flagged",
+  "voice_session_open",
+  "age_verification_ban",
+]);
 
 function estCarte(e: AuditLog): boolean {
   return TYPES_CARTE.has(e.event_type);
