@@ -107,6 +107,7 @@ fn route_roles() -> &'static HashMap<(&'static str, &'static str), Role> {
         m.insert(("DELETE", "/api/logs/{category}"), Role::Admin);
         m.insert(("DELETE", "/api/infractions/{id}"), Role::Moderator);
         m.insert(("PATCH", "/api/rules/{id}"), Role::Admin);
+        m.insert(("POST", "/api/rules"), Role::Admin);
         m.insert(("POST", "/api/bots/config"), Role::Admin);
         m.insert(("DELETE", "/api/bots/config"), Role::Admin);
         m.insert(("DELETE", "/api/purge/infractions"), Role::Owner);

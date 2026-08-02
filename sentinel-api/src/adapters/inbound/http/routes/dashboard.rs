@@ -40,7 +40,18 @@ fn dashboard_inner() -> Router<AppState> {
             "/infractions/{id}",
             delete(handlers::moderation::infractions::delete_infraction),
         )
-        .route("/rules", get(handlers::audit::dashboard::get_all_rules))
+        // GET liste les regles, POST en cree/met a jour une.
+        //
+        // Le POST existait deja mais uniquement a la RACINE (`routes::bot`),
+        // ou seul le bot l'atteint : nginx ne relaie que `/api/`. Le
+        // back-office postait donc sur `/rules` et recevait un 405 d'nginx,
+        // qui servait le SPA au lieu de l'API. L'enregistrement d'un poids
+        // n'a jamais pu fonctionner depuis le navigateur.
+        .route(
+            "/rules",
+            get(handlers::audit::dashboard::get_all_rules)
+                .post(handlers::moderation::rules::create_rule),
+        )
         .route(
             "/rules/{id}",
             patch(handlers::audit::dashboard::toggle_rule),

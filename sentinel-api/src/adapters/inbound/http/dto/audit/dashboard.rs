@@ -179,15 +179,25 @@ impl From<Rule> for DashboardRuleDto {
             other => other,
         };
 
-        // Déterminer l'action principale basée sur les seuils
-        let action = if rule.threshold_ban > 0.0 {
+        // Ce que declenche ce flag SEUL, en comparant son poids a ses propres
+        // seuils.
+        //
+        // L'ancienne version testait `threshold_ban > 0.0` : vrai pour toute
+        // regle, puisque le seuil de bannissement vaut 9 par defaut. Chaque
+        // regle s'affichait donc « BANNISSEMENT », y compris un anti-spam de
+        // poids 1.5 qui ne declenche rien du tout. Le badge le plus alarmant
+        // etait le seul jamais montre — donc sans information.
+        let action = if rule.weight >= rule.threshold_ban {
             "ban"
-        } else if rule.threshold_mute > 0.0 {
+        } else if rule.weight >= rule.threshold_mute {
             "mute"
-        } else if rule.threshold_delete > 0.0 {
+        } else if rule.weight >= rule.threshold_delete {
             "delete"
-        } else {
+        } else if rule.weight >= rule.threshold_warn {
             "warn"
+        } else {
+            // Le flag ne suffit pas seul : il lui faut un autre signal.
+            "none"
         };
 
         let description = format!(

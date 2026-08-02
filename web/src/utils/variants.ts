@@ -30,6 +30,8 @@ export function actionVariant(action: string): BadgeVariant {
       return "warning";
     case "warn":
       return "info";
+    case "none":
+      return "default";
     case "unban":
     case "unmute":
       return "success";
@@ -95,6 +97,9 @@ export function actionLabel(action: string): string {
     delete: "Suppression",
     warn: "Avertissement",
     lockdown: "Verrouillage",
+    // Le flag ne suffit pas seul a franchir un seuil : il lui faut un autre
+    // signal sur le meme message.
+    none: "Seul : rien",
   };
   return labels[action] ?? action;
 }

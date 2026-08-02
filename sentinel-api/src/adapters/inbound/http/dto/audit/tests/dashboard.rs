@@ -60,12 +60,23 @@ fn sample_action() -> ModerationAction {
 }
 
 fn sample_rule(flag_type: FlagType, warn: f64, delete: f64, mute: f64, ban: f64) -> Rule {
+    sample_rule_pondere(flag_type, 2.5, warn, delete, mute, ban)
+}
+
+fn sample_rule_pondere(
+    flag_type: FlagType,
+    weight: f64,
+    warn: f64,
+    delete: f64,
+    mute: f64,
+    ban: f64,
+) -> Rule {
     let now = Utc::now();
     Rule {
         id: Uuid::new_v4(),
         guild_id: "g42".into(),
         flag_type,
-        weight: 2.5,
+        weight,
         threshold_warn: warn,
         threshold_delete: delete,
         threshold_mute: mute,
@@ -154,32 +165,49 @@ fn dashboard_infraction_from_action_marks_action_source() {
     assert_eq!(dto.duration, Some(7200));
 }
 
+// L'action affichee decrit ce que ce flag declenche SEUL : son poids
+// compare a ses propres seuils. Elle ne dit pas quels seuils existent —
+// c'etait le defaut de la version precedente, qui affichait « ban » pour
+// toute regle puisque le seuil de bannissement vaut 9 par defaut.
+
 #[test]
-fn dashboard_rule_action_ban_when_threshold_ban_set() {
-    let r = sample_rule(FlagType::Spam, 1.0, 2.0, 3.0, 4.0);
-    let dto = DashboardRuleDto::from(r);
-    assert_eq!(dto.action, "ban");
+fn action_ban_quand_le_poids_atteint_le_seuil_de_ban() {
+    let r = sample_rule_pondere(FlagType::Illicit, 9.0, 2.0, 4.0, 6.0, 9.0);
+    assert_eq!(DashboardRuleDto::from(r).action, "ban");
 }
 
 #[test]
-fn dashboard_rule_action_mute_when_no_ban() {
-    let r = sample_rule(FlagType::Insult, 1.0, 2.0, 3.0, 0.0);
-    let dto = DashboardRuleDto::from(r);
-    assert_eq!(dto.action, "mute");
+fn action_mute_quand_le_poids_atteint_le_seuil_de_mute() {
+    let r = sample_rule_pondere(FlagType::Phishing, 7.0, 2.0, 4.0, 6.0, 9.0);
+    assert_eq!(DashboardRuleDto::from(r).action, "mute");
 }
 
 #[test]
-fn dashboard_rule_action_delete_when_only_delete_set() {
-    let r = sample_rule(FlagType::Link, 1.0, 2.0, 0.0, 0.0);
-    let dto = DashboardRuleDto::from(r);
-    assert_eq!(dto.action, "delete");
+fn action_delete_quand_le_poids_atteint_le_seuil_de_suppression() {
+    let r = sample_rule_pondere(FlagType::Insult, 5.0, 2.0, 4.0, 6.0, 9.0);
+    assert_eq!(DashboardRuleDto::from(r).action, "delete");
 }
 
 #[test]
-fn dashboard_rule_action_warn_when_no_thresholds() {
-    let r = sample_rule(FlagType::Nsfw, 0.0, 0.0, 0.0, 0.0);
-    let dto = DashboardRuleDto::from(r);
-    assert_eq!(dto.action, "warn");
+fn action_warn_quand_le_poids_atteint_le_seuil_d_avertissement() {
+    let r = sample_rule_pondere(FlagType::Spam, 3.0, 2.0, 4.0, 6.0, 9.0);
+    assert_eq!(DashboardRuleDto::from(r).action, "warn");
+}
+
+#[test]
+fn action_none_quand_le_flag_ne_suffit_pas_seul() {
+    // Le cas qui motivait la correction : un anti-spam de poids 1.5 sous un
+    // seuil d'avertissement a 2 ne declenche RIEN seul. Il s'affichait
+    // pourtant « BANNISSEMENT ».
+    let r = sample_rule_pondere(FlagType::Spam, 1.5, 2.0, 4.0, 6.0, 9.0);
+    assert_eq!(DashboardRuleDto::from(r).action, "none");
+}
+
+#[test]
+fn action_ban_meme_si_les_seuils_intermediaires_sont_nuls() {
+    // Seuils a zero : tout poids positif les franchit, y compris le ban.
+    let r = sample_rule_pondere(FlagType::Nsfw, 0.5, 0.0, 0.0, 0.0, 0.0);
+    assert_eq!(DashboardRuleDto::from(r).action, "ban");
 }
 
 #[test]

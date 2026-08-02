@@ -22,7 +22,7 @@ export const rulesService = {
     ] as const) {
       if (v < 0 || v > 100) throw new Error(`Le seuil ${n} doit etre entre 0 et 100`);
     }
-    return httpPost("/rules", {
+    return httpPost("/api/rules", {
       guild_id: params.guild_id,
       flag_type: params.flag_type,
       weight: params.weight,
