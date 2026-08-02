@@ -27,7 +27,10 @@ const MAX_LIMIT: i64 = 30;
 pub struct ListQuery {
     pub limit: Option<i64>,
     /// Back-office : inclure les brouillons et les nouvelles programmees.
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "crate::adapters::inbound::http::helpers::bool_souple"
+    )]
     pub all: bool,
 }
 

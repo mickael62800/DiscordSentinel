@@ -1,5 +1,5 @@
 use axum::Json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// Capture (clone) des champs d'un DTO AVANT de le consommer par `.into()`,
 /// pour pouvoir les reutiliser ensuite (typiquement dans un broadcast).
@@ -69,3 +69,60 @@ pub fn single_dto<T, D: From<T> + Serialize>(entity: T) -> Json<D> {
 #[cfg(test)]
 #[path = "tests/helpers.rs"]
 mod tests;
+
+/// Deserialise un booleen de query string en acceptant les formes usuelles.
+///
+/// `serde` n'accepte que `true` / `false`. Or une query string n'a pas de
+/// types : `?all=1` est la convention la plus repandue, et c'est celle
+/// qu'emploie le back-office. Le resultat etait un 400 sur toute la page
+/// « vie de la communaute », sans indice sur le champ fautif.
+///
+/// Accepte : `true`, `false`, `1`, `0`, `yes`, `no`, `on`, `off`, et le champ
+/// present mais vide (`?all=`), qui vaut `true` — c'est ainsi qu'un drapeau
+/// s'ecrit dans une URL.
+///
+/// Toute autre valeur reste une erreur : `?all=peut-etre` doit se voir.
+pub fn bool_souple<'de, D>(d: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    let brut = String::deserialize(d)?;
+    match brut.trim().to_ascii_lowercase().as_str() {
+        "true" | "1" | "yes" | "on" | "" => Ok(true),
+        "false" | "0" | "no" | "off" => Ok(false),
+        autre => Err(D::Error::custom(format!(
+            "booleen attendu (true/false/1/0), recu « {autre} »"
+        ))),
+    }
+}
+
+#[cfg(test)]
+mod tests_bool_souple {
+    use super::*;
+
+    fn lire(valeur: &str) -> Result<bool, String> {
+        let json = serde_json::Value::String(valeur.to_string());
+        bool_souple(json).map_err(|e: serde_json::Error| e.to_string())
+    }
+
+    #[test]
+    fn accepte_les_formes_vraies() {
+        for v in ["true", "1", "yes", "on", "TRUE", ""] {
+            assert_eq!(lire(v), Ok(true), "{v}");
+        }
+    }
+
+    #[test]
+    fn accepte_les_formes_fausses() {
+        for v in ["false", "0", "no", "off", "OFF"] {
+            assert_eq!(lire(v), Ok(false), "{v}");
+        }
+    }
+
+    #[test]
+    fn valeur_incoherente_reste_une_erreur() {
+        // Un drapeau mal ecrit doit se voir, pas etre devine.
+        assert!(lire("peut-etre").is_err());
+    }
+}

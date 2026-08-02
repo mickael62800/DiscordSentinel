@@ -31,7 +31,10 @@ pub struct ListQuery {
     pub limit: Option<i64>,
     /// Back-office uniquement : inclure les annonces fermees et expirees,
     /// pour pouvoir moderer.
-    #[serde(default)]
+    #[serde(
+        default,
+        deserialize_with = "crate::adapters::inbound::http::helpers::bool_souple"
+    )]
     pub all: bool,
 }
 
