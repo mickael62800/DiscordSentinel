@@ -227,6 +227,7 @@ async fn full_analyze_spam_creates_infraction() {
         flags: DetectionFlags {
             spam: true,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         },
@@ -280,6 +281,7 @@ async fn full_analyze_spam_plus_insult_escalates() {
         flags: DetectionFlags {
             spam: true,
             insult: true,
+            profanity: false,
             link: false,
             phishing: false,
         },
@@ -320,6 +322,7 @@ async fn full_analyze_no_flags_returns_none() {
         flags: DetectionFlags {
             spam: false,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         },
@@ -353,6 +356,7 @@ async fn full_analyze_with_context_messages() {
         flags: DetectionFlags {
             spam: true,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         },

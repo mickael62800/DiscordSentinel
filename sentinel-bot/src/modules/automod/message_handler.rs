@@ -177,6 +177,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                     let flags = detectors::DetectionFlags {
                         spam: false,
                         insult: false,
+                        profanity: false,
                         link: false,
                         phishing: false,
                     };
@@ -325,6 +326,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 let flags = detectors::DetectionFlags {
                     spam: true,
                     insult: false,
+                    profanity: false,
                     link: false,
                     phishing: false,
                 };
@@ -379,6 +381,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 let flags = detectors::DetectionFlags {
                     spam: true,
                     insult: false,
+                    profanity: false,
                     link: false,
                     phishing: false,
                 };
@@ -420,6 +423,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
             let flags = detectors::DetectionFlags {
                 spam: true,
                 insult: false,
+                profanity: false,
                 link: false,
                 phishing: false,
             };

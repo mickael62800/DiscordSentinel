@@ -139,6 +139,7 @@ fn sample_inf(action: Action) -> Infraction {
         flags: DetectionFlags {
             spam: false,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         },

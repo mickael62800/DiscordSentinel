@@ -8,6 +8,7 @@ fn flags(spam: bool, insult: bool, link: bool, phishing: bool) -> DetectionFlags
     DetectionFlags {
         spam,
         insult,
+        profanity: false,
         link,
         phishing,
     }

@@ -154,6 +154,7 @@ fn sample_infraction(guild_id: &str, user_id: &str, action: Action) -> Infractio
         flags: DetectionFlags {
             spam: false,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         },

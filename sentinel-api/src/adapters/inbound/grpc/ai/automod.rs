@@ -50,6 +50,7 @@ impl AutomodService for AutomodGrpc {
         let flags = req.flags.map(proto_to_flags).unwrap_or(DetectionFlags {
             spam: false,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         });
@@ -172,6 +173,7 @@ fn proto_to_flags(p: proto::DetectionFlags) -> DetectionFlags {
     DetectionFlags {
         spam: p.spam,
         insult: p.insult,
+        profanity: p.profanity,
         link: p.link,
         phishing: p.phishing,
     }

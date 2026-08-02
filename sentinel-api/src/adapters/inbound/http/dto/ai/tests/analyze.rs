@@ -17,6 +17,7 @@ fn make_dto(content: String, n_context: usize) -> AnalyzeRequestDto {
         flags: DetectionFlags {
             spam: false,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         },

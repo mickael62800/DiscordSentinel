@@ -410,6 +410,7 @@ impl ManageInfractionsUseCase for RichInfUc {
                 flags: crate::domain::entities::moderation::detection_flags::DetectionFlags {
                     spam: false,
                     insult: false,
+                    profanity: false,
                     link: false,
                     phishing: false,
                 },

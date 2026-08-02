@@ -55,6 +55,7 @@ impl From<InfractionRow> for Infraction {
             flags: serde_json::from_value(row.flags).unwrap_or(DetectionFlags {
                 spam: false,
                 insult: false,
+                profanity: false,
                 link: false,
                 phishing: false,
             }),

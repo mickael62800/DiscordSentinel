@@ -161,6 +161,9 @@ pub(crate) fn parse_scoring_config(
     if let Some(v) = get("score_weight_insult") {
         cfg.weight_insult = v;
     }
+    if let Some(v) = get("score_weight_profanity") {
+        cfg.weight_profanity = v;
+    }
     if let Some(v) = get("score_weight_link") {
         cfg.weight_link = v;
     }

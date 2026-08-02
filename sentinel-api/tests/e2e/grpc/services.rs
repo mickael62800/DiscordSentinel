@@ -234,6 +234,7 @@ async fn automod_analyze_returns_action_for_flagged_message() {
             flags: Some(automod_proto::DetectionFlags {
                 spam: true,
                 insult: false,
+                profanity: false,
                 link: false,
                 phishing: false,
             }),

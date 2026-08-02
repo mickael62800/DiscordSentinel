@@ -1,17 +1,54 @@
 use regex::Regex;
 use std::sync::LazyLock;
 
-/// Liste de patterns d'insultes (FR + EN).
-/// Utilise des regex pour capturer les variantes (espaces, leet speak basique).
-static PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+/// Gravité d'un terme détecté.
+///
+/// La distinction est linguistique, pas morale : elle sépare ce qui VISE
+/// quelqu'un de ce qui ponctue une phrase.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Gravite {
+    /// Juron d'exclamation. « putain c'était bien », « merde j'ai oublié ».
+    /// Ne vise personne : le mot exprime la surprise ou l'agacement.
+    Juron,
+    /// Insulte ciblée ou terme dégradant. « nique ta mère », « connard ».
+    Ciblee,
+}
+
+/// Jurons d'exclamation.
+///
+/// Ces mots étaient traités comme des insultes, au même poids. En français ils
+/// ponctuent massivement une phrase sans agresser personne : « merde j'ai
+/// oublié » se faisait SUPPRIMER. Les séparer leur donne leur propre poids
+/// sans désarmer la détection des vraies insultes — ce qu'un simple réglage de
+/// poids ne pouvait pas faire, les deux partageant le même flag.
+static JURONS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     let raw = [
         // Français
-        r"(?i)\b(con(nard|nasse)?|putain|merde|encul[eé]|fdp|ntm|nique|batard|b[aâ]tard|pd|p[eé]d[eé]|salop(e|ard)?|bordel|ta\s*gueule|ferme[\s-]*la|d[eé]gage)\b",
+        r"(?i)\b(putain|merde|merdique|bordel|pur[eé]e|punaise|zut|crotte)\b",
         // Anglais
-        r"(?i)\b(fuck(ing|er|ed)?|shit(ty)?|bitch|asshole|bastard|dick(head)?|cunt|stfu|idiot|moron|retard(ed)?|dumb(ass)?)\b",
-        // Variantes avec astérisque (f*ck, sh*t, b*tch…)
-        r"(?i)\bf[*]ck(ing|er|ed)?\b",
+        r"(?i)\b(shit(ty)?|damn|crap)\b",
         r"(?i)\bsh[*]t(ty)?\b",
+    ];
+    raw.iter()
+        .map(|p| Regex::new(p).expect("regex invalide"))
+        .collect()
+});
+
+/// Insultes ciblées et termes dégradants.
+///
+/// `con` reste ici : « t'es con » vise quelqu'un. Sa forme exclamative existe
+/// (« con de moteur ») mais reste minoritaire.
+///
+/// `nique` sans complément est ambigu (« ça nique tout ») ; le garder coûte
+/// moins qu'une insulte manquée.
+static CIBLEES: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    let raw = [
+        // Français
+        r"(?i)\b(con(nard|nasse)?|encul[eé]|fdp|ntm|nique|batard|b[aâ]tard|pd|p[eé]d[eé]|salop(e|ard)?|ta\s*gueule|ferme[\s-]*la|d[eé]gage)\b",
+        // Anglais
+        r"(?i)\b(fuck(ing|er|ed)?|bitch|asshole|bastard|dick(head)?|cunt|stfu|idiot|moron|retard(ed)?|dumb(ass)?)\b",
+        // Variantes avec astérisque (f*ck, b*tch…)
+        r"(?i)\bf[*]ck(ing|er|ed)?\b",
         r"(?i)\bb[*]tch\b",
     ];
     raw.iter()
@@ -51,33 +88,57 @@ fn normalize_leet(content: &str) -> String {
         .collect()
 }
 
-/// Retourne `true` si le message contient une insulte détectée.
-/// Vérifie les patterns statiques sur le contenu original ET normalisé (leet speak),
-/// puis les mots personnalisés de la config.
-pub fn detect(content: &str, custom_words: &[String]) -> bool {
-    // Vérification sur le contenu original
-    if PATTERNS.iter().any(|re| re.is_match(content)) {
-        return true;
-    }
+/// Un des motifs correspond-il, sur le contenu brut ou sa forme normalisée ?
+///
+/// La forme normalisée (leet speak) n'est reparcourue que si elle diffère :
+/// sinon on paierait deux fois le même balayage de regex sur le chemin chaud.
+fn correspond(motifs: &[Regex], content: &str, normalized: &str) -> bool {
+    motifs.iter().any(|re| re.is_match(content))
+        || (normalized != content && motifs.iter().any(|re| re.is_match(normalized)))
+}
 
-    // Vérification sur le contenu normalisé (leet speak)
+/// Gravité du terme le plus grave présent dans le message, s'il y en a un.
+///
+/// Une insulte ciblée l'emporte sur un juron : « putain t'es con » est une
+/// insulte, pas une exclamation.
+///
+/// Les mots personnalisés de la configuration comptent comme CIBLÉS. Un
+/// administrateur qui prend la peine d'ajouter un mot veut le voir sanctionné,
+/// pas toléré.
+pub fn detect_gravite(content: &str, custom_words: &[String]) -> Option<Gravite> {
     let normalized = normalize_leet(content);
-    if normalized != content && PATTERNS.iter().any(|re| re.is_match(&normalized)) {
-        return true;
+
+    if correspond(&CIBLEES, content, &normalized) {
+        return Some(Gravite::Ciblee);
     }
 
-    // Mots personnalisés (case-insensitive, substring match)
     if !custom_words.is_empty() {
         let content_lower = content.to_lowercase();
         if custom_words
             .iter()
             .any(|w| content_lower.contains(w.as_str()))
         {
-            return true;
+            return Some(Gravite::Ciblee);
         }
     }
 
-    false
+    if correspond(&JURONS, content, &normalized) {
+        return Some(Gravite::Juron);
+    }
+
+    None
+}
+
+/// Retourne `true` si le message contient une insulte CIBLÉE.
+///
+/// Les jurons d'exclamation ne comptent plus ici : ils ont leur propre flag.
+pub fn detect(content: &str, custom_words: &[String]) -> bool {
+    matches!(detect_gravite(content, custom_words), Some(Gravite::Ciblee))
+}
+
+/// Retourne `true` pour un juron d'exclamation SANS insulte ciblée.
+pub fn detect_juron(content: &str, custom_words: &[String]) -> bool {
+    matches!(detect_gravite(content, custom_words), Some(Gravite::Juron))
 }
 
 #[cfg(test)]
@@ -100,11 +161,13 @@ mod tests {
     }
     #[test]
     fn fr_putain() {
-        assert!(detect("putain de merde", &[]));
+        // Juron desormais, plus une insulte : le terme reste detecte, mais
+        // dans la categorie qui ne vise personne.
+        assert!(detect_juron("putain de merde", &[]));
     }
     #[test]
     fn fr_merde() {
-        assert!(detect("c'est de la merde", &[]));
+        assert!(detect_juron("c'est de la merde", &[]));
     }
     #[test]
     fn fr_encule() {
@@ -140,7 +203,7 @@ mod tests {
     }
     #[test]
     fn fr_bordel() {
-        assert!(detect("bordel de merde", &[]));
+        assert!(detect_juron("bordel de merde", &[]));
     }
     #[test]
     fn fr_ta_gueule() {
@@ -167,7 +230,7 @@ mod tests {
     }
     #[test]
     fn en_shit() {
-        assert!(detect("this is shit", &[]));
+        assert!(detect_juron("this is shit", &[]));
     }
     #[test]
     fn en_bitch() {
@@ -229,7 +292,7 @@ mod tests {
     }
     #[test]
     fn leet_shit_dollar() {
-        assert!(detect("$hit", &[]));
+        assert!(detect_juron("$hit", &[]));
     }
     #[test]
     fn leet_asshole_at() {
@@ -241,11 +304,11 @@ mod tests {
     }
     #[test]
     fn leet_merde_3() {
-        assert!(detect("m3rde", &[]));
+        assert!(detect_juron("m3rde", &[]));
     }
     #[test]
     fn leet_putain_4() {
-        assert!(detect("put4in", &[]));
+        assert!(detect_juron("put4in", &[]));
     }
     #[test]
     fn leet_encule_3() {
@@ -359,5 +422,110 @@ mod tests {
     #[test]
     fn normalize_clean_unchanged() {
         assert_eq!(normalize_leet("hello"), "hello");
+    }
+}
+
+#[cfg(test)]
+mod tests_gravite {
+    use super::*;
+
+    fn g(s: &str) -> Option<Gravite> {
+        detect_gravite(s, &[])
+    }
+
+    // ── Jurons d'exclamation : ne visent personne ──
+
+    #[test]
+    fn jurons_francais_sont_classes_juron() {
+        for m in [
+            "putain c'etait bien hier",
+            "merde j'ai oublie",
+            "bordel de nom",
+            "zut alors",
+            "punaise il fait froid",
+        ] {
+            assert_eq!(g(m), Some(Gravite::Juron), "{m}");
+        }
+    }
+
+    #[test]
+    fn jurons_anglais_sont_classes_juron() {
+        assert_eq!(g("shit i forgot"), Some(Gravite::Juron));
+        assert_eq!(g("damn that was close"), Some(Gravite::Juron));
+    }
+
+    // ── Insultes ciblees : visent quelqu'un ──
+
+    #[test]
+    fn insultes_ciblees_restent_ciblees() {
+        for m in [
+            "nique ta mere",
+            "connard",
+            "ta gueule",
+            "fdp",
+            "t'es qu'un batard",
+            "espece de salope",
+            "degage d'ici",
+        ] {
+            assert_eq!(g(m), Some(Gravite::Ciblee), "{m}");
+        }
+    }
+
+    #[test]
+    fn con_vise_quelqu_un_donc_ciblee() {
+        // « t'es con » qualifie une personne. On assume : le mot sert bien plus
+        // souvent a qualifier quelqu'un qu'a ponctuer une phrase.
+        assert_eq!(g("t'es con toi"), Some(Gravite::Ciblee));
+    }
+
+    // ── Arbitrage entre les deux ──
+
+    #[test]
+    fn une_insulte_ciblee_l_emporte_sur_un_juron() {
+        // Le cas qui decide de la sanction : le message contient les deux,
+        // c'est bien une insulte.
+        assert_eq!(g("putain t'es con"), Some(Gravite::Ciblee));
+        assert_eq!(g("merde nique ta mere"), Some(Gravite::Ciblee));
+    }
+
+    #[test]
+    fn message_anodin_ne_leve_rien() {
+        for m in ["bonjour tout le monde", "on se voit demain ?", "il est bete ce jeu"] {
+            assert_eq!(g(m), None, "{m}");
+        }
+    }
+
+    // ── Mots personnalises ──
+
+    #[test]
+    fn mot_personnalise_compte_comme_ciblee() {
+        // Un administrateur qui ajoute un mot veut le voir sanctionne, pas
+        // tolere comme un juron.
+        let custom = vec!["nabot".to_string()];
+        assert_eq!(detect_gravite("sale nabot", &custom), Some(Gravite::Ciblee));
+    }
+
+    // ── Contournement ──
+
+    #[test]
+    fn leet_speak_reste_detecte_dans_la_bonne_categorie() {
+        assert_eq!(g("c0nnard"), Some(Gravite::Ciblee));
+        assert_eq!(g("m3rde"), Some(Gravite::Juron));
+    }
+
+    // ── Compatibilite des deux fonctions publiques ──
+
+    #[test]
+    fn detect_ne_retient_plus_que_les_insultes_ciblees() {
+        assert!(detect("connard", &[]));
+        assert!(!detect("merde j'ai oublie", &[]));
+    }
+
+    #[test]
+    fn detect_juron_exclut_les_insultes_ciblees() {
+        assert!(detect_juron("merde j'ai oublie", &[]));
+        // Deja couvert par `detect` : ne pas lever les deux flags a la fois,
+        // sinon le message compterait double dans le score.
+        assert!(!detect_juron("putain t'es con", &[]));
     }
 }

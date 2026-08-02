@@ -18,6 +18,7 @@ fn sample_infraction(action: Action, duration: Option<u64>) -> Infraction {
         flags: DetectionFlags {
             spam: false,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         },

@@ -17,6 +17,7 @@ fn flags() -> DetectionFlags {
     DetectionFlags {
         spam: false,
         insult: false,
+        profanity: false,
         link: false,
         phishing: false,
     }

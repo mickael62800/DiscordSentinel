@@ -66,7 +66,10 @@ impl Default for DetectorConfig {
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct DetectionFlags {
     pub spam: bool,
+    /// Insulte CIBLEE uniquement.
     pub insult: bool,
+    /// Juron d'exclamation, sans insulte ciblee.
+    pub profanity: bool,
     pub link: bool,
     pub phishing: bool,
 }
@@ -91,6 +94,8 @@ pub fn analyze(content: &str, config: &DetectorConfig) -> DetectionFlags {
                         config.unicode_max_invisible,
                     ))),
         insult: config.insult_enabled && insult::detect(content, &config.insult_custom_words),
+        profanity: config.insult_enabled
+            && insult::detect_juron(content, &config.insult_custom_words),
         link: config.link_enabled
             && link::detect(
                 content,
@@ -151,8 +156,18 @@ mod tests {
 
     #[test]
     fn spam_with_insult() {
+        // « merde » repete : spam + juron. Ce n'est plus une insulte ciblee,
+        // c'est justement ce que la separation apporte.
         let f = analyze("merde merde merde merde merde", &default_config());
+        assert!(f.spam && f.profanity && !f.insult);
+    }
+
+    #[test]
+    fn spam_avec_insulte_ciblee() {
+        let f = analyze("connard connard connard connard connard", &default_config());
         assert!(f.spam && f.insult);
+        // Les deux flags ne se cumulent pas : le message compterait double.
+        assert!(!f.profanity);
     }
 
     #[test]

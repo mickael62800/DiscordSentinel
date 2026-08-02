@@ -270,9 +270,12 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
         );
 
         // 4. Convertir en DetectionFlags pour le scoring
+        // Analyse d'IMAGE : aucun flag textuel n'a de sens ici, le score vient
+        // entierement des classifications de vision.
         let flags = DetectionFlags {
             spam: false,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         };

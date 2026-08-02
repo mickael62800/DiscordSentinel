@@ -5,6 +5,10 @@ use crate::domain::enums::moderation::flag_type::FlagType;
 /// Poids par défaut quand aucune règle n'est configurée pour un flag.
 const DEFAULT_WEIGHT_SPAM: f64 = 3.0;
 const DEFAULT_WEIGHT_INSULT: f64 = 5.0;
+/// Juron d'exclamation. Volontairement SOUS le seuil d'avertissement (2.0) :
+/// « merde j'ai oublie » ne doit rien declencher seul. Combine a un autre
+/// signal, il pese quand meme dans la balance.
+const DEFAULT_WEIGHT_PROFANITY: f64 = 1.0;
 const DEFAULT_WEIGHT_LINK: f64 = 1.0;
 const DEFAULT_WEIGHT_PHISHING: f64 = 7.0;
 // IA Vision
@@ -39,6 +43,7 @@ const DEFAULT_MUTE_DURATION: u64 = 600;
 pub struct ScoringConfig {
     pub weight_spam: f64,
     pub weight_insult: f64,
+    pub weight_profanity: f64,
     pub weight_link: f64,
     pub weight_phishing: f64,
     pub weight_nsfw: f64,
@@ -58,6 +63,7 @@ impl Default for ScoringConfig {
         Self {
             weight_spam: DEFAULT_WEIGHT_SPAM,
             weight_insult: DEFAULT_WEIGHT_INSULT,
+            weight_profanity: DEFAULT_WEIGHT_PROFANITY,
             weight_link: DEFAULT_WEIGHT_LINK,
             weight_phishing: DEFAULT_WEIGHT_PHISHING,
             weight_nsfw: DEFAULT_WEIGHT_NSFW,
@@ -81,6 +87,7 @@ impl ScoringConfig {
         match flag {
             FlagType::Spam => self.weight_spam,
             FlagType::Insult => self.weight_insult,
+            FlagType::Profanity => self.weight_profanity,
             FlagType::Link => self.weight_link,
             FlagType::Phishing => self.weight_phishing,
             FlagType::Nsfw => self.weight_nsfw,

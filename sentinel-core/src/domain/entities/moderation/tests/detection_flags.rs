@@ -5,6 +5,7 @@ fn test_no_active_flags() {
     let flags = DetectionFlags {
         spam: false,
         insult: false,
+        profanity: false,
         link: false,
         phishing: false,
     };
@@ -16,6 +17,7 @@ fn test_all_active_flags() {
     let flags = DetectionFlags {
         spam: true,
         insult: true,
+        profanity: false,
         link: true,
         phishing: true,
     };
@@ -28,6 +30,7 @@ fn test_single_flag_spam() {
     let flags = DetectionFlags {
         spam: true,
         insult: false,
+        profanity: false,
         link: false,
         phishing: false,
     };

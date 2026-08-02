@@ -5,7 +5,12 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectionFlags {
     pub spam: bool,
+    /// Insulte CIBLEE uniquement.
     pub insult: bool,
+    /// Juron d'exclamation. `default` : les charges utiles anterieures a la
+    /// separation n'ont pas ce champ et doivent rester lisibles.
+    #[serde(default)]
+    pub profanity: bool,
     pub link: bool,
     #[serde(default)]
     pub phishing: bool,
@@ -19,6 +24,9 @@ impl DetectionFlags {
         }
         if self.insult {
             flags.push(FlagType::Insult);
+        }
+        if self.profanity {
+            flags.push(FlagType::Profanity);
         }
         if self.link {
             flags.push(FlagType::Link);

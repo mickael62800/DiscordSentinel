@@ -7,6 +7,7 @@ fn make_flags(spam: bool, insult: bool, link: bool) -> DetectionFlags {
     DetectionFlags {
         spam,
         insult,
+        profanity: false,
         link,
         phishing: false,
     }
@@ -93,6 +94,7 @@ fn test_phishing_default_triggers_mute() {
     let flags = DetectionFlags {
         spam: false,
         insult: false,
+        profanity: false,
         link: false,
         phishing: true,
     };
@@ -106,6 +108,7 @@ fn test_phishing_plus_spam_triggers_ban() {
     let flags = DetectionFlags {
         spam: true,
         insult: false,
+        profanity: false,
         link: false,
         phishing: true,
     };

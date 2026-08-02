@@ -327,6 +327,11 @@ pub(crate) async fn handle_reopen_button(
             .get("insult")
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
+        profanity: review
+            .flags
+            .get("profanity")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
         link: review
             .flags
             .get("link")

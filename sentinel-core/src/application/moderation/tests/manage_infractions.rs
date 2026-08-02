@@ -26,6 +26,7 @@ fn sample(id: &str) -> Infraction {
         flags: DetectionFlags {
             spam: false,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         },

@@ -109,6 +109,7 @@ impl ApiClient {
             flags: Some(proto::DetectionFlags {
                 spam: request.flags.spam,
                 insult: request.flags.insult,
+                profanity: request.flags.profanity,
                 link: request.flags.link,
                 phishing: request.flags.phishing,
             }),

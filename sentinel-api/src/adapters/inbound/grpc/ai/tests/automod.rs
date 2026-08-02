@@ -5,6 +5,7 @@ fn proto_to_flags_round_trip_all_true() {
     let p = proto::DetectionFlags {
         spam: true,
         insult: true,
+        profanity: false,
         link: true,
         phishing: true,
     };
@@ -17,6 +18,7 @@ fn proto_to_flags_round_trip_mixed() {
     let p = proto::DetectionFlags {
         spam: true,
         insult: false,
+        profanity: false,
         link: true,
         phishing: false,
     };
@@ -227,6 +229,7 @@ async fn analyze_message_maps_flags_from_proto() {
         flags: Some(proto::DetectionFlags {
             spam: true,
             insult: false,
+            profanity: false,
             link: true,
             phishing: false,
         }),

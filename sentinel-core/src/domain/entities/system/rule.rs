@@ -79,6 +79,7 @@ impl Rule {
         match flag_type {
             FlagType::Spam => 3.0,
             FlagType::Insult => 5.0,
+            FlagType::Profanity => 1.0,
             FlagType::Link => 1.0,
             FlagType::Phishing => 7.0,
             FlagType::Nsfw => 8.0,

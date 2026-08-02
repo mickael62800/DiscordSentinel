@@ -4,7 +4,16 @@ use serde::Serialize;
 #[serde(rename_all = "snake_case")]
 pub enum FlagType {
     Spam,
+    /// Insulte CIBLEE : adressee a quelqu'un, ou terme degradant.
     Insult,
+    /// Juron d'exclamation : « putain », « merde », « bordel ».
+    ///
+    /// Flag distinct d'`Insult` et non simple nuance de poids : le
+    /// back-office regle un poids par flag, et c'est precisement le fait de
+    /// pouvoir les regler separement qui est recherche. En francais ces mots
+    /// ponctuent une phrase sans viser personne — les compter comme une
+    /// insulte faisait supprimer « merde j'ai oublie ».
+    Profanity,
     Link,
     Phishing,
     // IA Vision
@@ -22,6 +31,7 @@ impl FlagType {
         match self {
             FlagType::Spam => "spam",
             FlagType::Insult => "insult",
+            FlagType::Profanity => "profanity",
             FlagType::Link => "link",
             FlagType::Phishing => "phishing",
             FlagType::Nsfw => "nsfw",
@@ -37,6 +47,7 @@ impl FlagType {
         match s {
             "spam" => FlagType::Spam,
             "insult" => FlagType::Insult,
+            "profanity" => FlagType::Profanity,
             "link" => FlagType::Link,
             "phishing" => FlagType::Phishing,
             "nsfw" => FlagType::Nsfw,

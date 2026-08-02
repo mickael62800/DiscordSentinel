@@ -60,9 +60,16 @@ message EvaluateFloodResponse {
 
 message DetectionFlags {
   bool spam = 1;
+  // Insulte CIBLEE uniquement.
   bool insult = 2;
   bool link = 3;
   bool phishing = 4;
+  // Juron d'exclamation, sans insulte ciblee.
+  //
+  // Numero 5, jamais reutilise : un bot d'une version anterieure omet
+  // simplement le champ, que proto3 lit alors comme `false`. Aucune rupture
+  // pendant un deploiement ou bot et API ne sont pas de la meme version.
+  bool profanity = 5;
 }
 
 message ContextMessage {

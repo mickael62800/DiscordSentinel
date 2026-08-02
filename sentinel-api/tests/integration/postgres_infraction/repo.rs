@@ -40,6 +40,7 @@ fn sample_infraction(guild: &str, user: &str, action: Action, score: f64) -> Inf
         flags: DetectionFlags {
             spam: true,
             insult: false,
+            profanity: false,
             link: false,
             phishing: false,
         },
@@ -309,6 +310,7 @@ async fn save_preserves_detection_flags() {
     inf.flags = DetectionFlags {
         spam: true,
         insult: true,
+        profanity: false,
         link: false,
         phishing: true,
     };

@@ -840,6 +840,7 @@ async fn post_vision_unavailable_card(
     let flags = detectors::DetectionFlags {
         spam: false,
         insult: false,
+        profanity: false,
         link: false,
         phishing: false,
     };
