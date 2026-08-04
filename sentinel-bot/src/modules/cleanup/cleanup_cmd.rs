@@ -82,7 +82,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     // Verifier la permission ADMINISTRATOR
-    if !has_administrator(ctx, command).await {
+    if !has_administrator(command) {
         reply_error(
             ctx,
             command,
@@ -187,23 +187,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 /// Verifie si l'utilisateur a la permission ADMINISTRATOR.
-async fn has_administrator(ctx: &Context, command: &CommandInteraction) -> bool {
-    let guild_id = match command.guild_id {
-        Some(id) => id,
-        None => return false,
-    };
-
-    match guild_id.member(&ctx.http, command.user.id).await {
-        Ok(member) => {
-            if let Some(guild) = guild_id.to_guild_cached(&ctx.cache) {
-                let permissions = guild.member_permissions(&member);
-                permissions.administrator()
-            } else {
-                false
-            }
-        }
-        Err(_) => false,
-    }
+///
+/// Lit les permissions fournies par Discord dans le payload d'interaction
+/// (`command.member.permissions`), independantes du cache. L'ancienne version
+/// passait par `to_guild_cached`, qui renvoie None quand la guild n'est pas en
+/// cache -> la commande echouait pour tout le monde. Fail-closed si absent.
+fn has_administrator(command: &CommandInteraction) -> bool {
+    command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| p.administrator())
+        .unwrap_or(false)
 }
 
 /// Reponse d'erreur ephemere.

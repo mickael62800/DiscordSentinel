@@ -201,7 +201,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     // Verifier la permission MANAGE_MESSAGES
-    if !has_manage_messages(ctx, command).await {
+    if !has_manage_messages(command) {
         reply_error(
             ctx,
             command,
@@ -526,34 +526,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 /// Verifie si l'utilisateur a la permission MANAGE_MESSAGES.
-async fn has_manage_messages(ctx: &Context, command: &CommandInteraction) -> bool {
-    let guild_id = match command.guild_id {
-        Some(id) => id,
-        None => return false,
-    };
-
-    match guild_id.member(&ctx.http, command.user.id).await {
-        Ok(member) => {
-            if let Some(guild) = guild_id.to_guild_cached(&ctx.cache) {
-                // Permissions EFFECTIVES sur le salon de la commande (overrides de
-                // salon inclus), pas seulement au niveau serveur -> un mod prive de
-                // MANAGE_MESSAGES dans CE salon ne peut plus le purger.
-                match guild.channels.get(&command.channel_id) {
-                    Some(channel) => {
-                        let perms = guild.user_permissions_in(channel, &member);
-                        perms.manage_messages() || perms.administrator()
-                    }
-                    None => {
-                        let permissions = guild.member_permissions(&member);
-                        permissions.manage_messages() || permissions.administrator()
-                    }
-                }
-            } else {
-                false
-            }
-        }
-        Err(_) => false,
-    }
+///
+/// On lit les permissions EFFECTIVES que Discord fournit directement dans le
+/// payload d'interaction (`command.member.permissions`) : elles sont deja
+/// calculees pour le salon ou la commande a ete invoquee (overrides inclus) et
+/// ne dependent PAS du cache. L'ancienne version passait par `to_guild_cached`,
+/// qui renvoie None quand la guild n'est pas (encore) en cache -> la commande
+/// echouait alors pour TOUT LE MONDE. Fail-closed si l'info est absente.
+fn has_manage_messages(command: &CommandInteraction) -> bool {
+    command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| p.manage_messages() || p.administrator())
+        .unwrap_or(false)
 }
 
 /// Retourne le timestamp Unix actuel.
