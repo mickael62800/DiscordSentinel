@@ -317,9 +317,8 @@ async function updatePosted() {
 <style scoped>
 .eb-layout {
   display: grid;
-  /* Apercu : partage l'espace restant avec le formulaire et grandit avec la
-     fenetre (minmax evite qu'il ecrase le formulaire sur petit ecran). */
-  grid-template-columns: 200px minmax(0, 1fr) minmax(380px, 1fr);
+  /* Colonne d'apercu dimensionnee pour un embed Discord (440px + padding). */
+  grid-template-columns: 200px minmax(0, 1fr) 470px;
   gap: 16px;
   align-items: start;
 }
@@ -360,8 +359,10 @@ input[type="color"] { height: 38px; padding: 3px; cursor: pointer; width: 100%; 
   display: flex; gap: 12px; justify-content: space-between;
   background: #2b2d31; border-left: 4px solid var(--accent);
   border-radius: 6px; padding: 12px 14px;
-  /* Prend toute la largeur disponible ; la hauteur grandit avec le contenu. */
-  width: 100%;
+  /* Largeur fidele a un embed Discord : 440px fixes (la hauteur grandit avec
+     le contenu). max-width evite un debordement horizontal sur mobile. */
+  width: 440px;
+  max-width: 100%;
 }
 .eb-embed-body { min-width: 0; flex: 1; }
 .eb-author { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 6px; }
