@@ -46,6 +46,7 @@ interface FormState {
   recurrence_minute: number;
   recurrence_day_of_week: number | null;
   recurrence_day_of_month: number | null;
+  recurrence_month: number;
   scheduled_at: string;
   end_date: string;
   content_type: ContentType;
@@ -54,6 +55,7 @@ interface FormState {
   embed_color_hex: string;
   embed_image_url: string;
   embed_thumbnail_url: string;
+  text_position: "above" | "below";
   mention_everyone: boolean;
   mention_here: boolean;
   selected_role_ids: string[];
@@ -70,6 +72,7 @@ function emptyForm(): FormState {
     recurrence_minute: 0,
     recurrence_day_of_week: 0,
     recurrence_day_of_month: 1,
+    recurrence_month: 1,
     scheduled_at: "",
     end_date: "",
     content_type: "text",
@@ -78,6 +81,7 @@ function emptyForm(): FormState {
     embed_color_hex: "#5865f2",
     embed_image_url: "",
     embed_thumbnail_url: "",
+    text_position: "below",
     mention_everyone: false,
     mention_here: false,
     selected_role_ids: [],
@@ -95,6 +99,10 @@ const channelPickerOpen = ref(false);
 const rolePickerOpen = ref(false);
 
 const dowLabels = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+const monthLabels = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+];
 
 const mode = computed<"create" | "edit">(() => (props.target ? "edit" : "create"));
 
@@ -111,6 +119,7 @@ watch(
         recurrence_minute: a.recurrence_minute,
         recurrence_day_of_week: a.recurrence_day_of_week,
         recurrence_day_of_month: a.recurrence_day_of_month,
+        recurrence_month: a.recurrence_month ?? 1,
         scheduled_at: a.scheduled_at ? a.scheduled_at.slice(0, 16) : "",
         end_date: a.end_date ? a.end_date.slice(0, 16) : "",
         content_type: a.content_type,
@@ -119,6 +128,7 @@ watch(
         embed_color_hex: a.embed_color != null ? `#${a.embed_color.toString(16).padStart(6, "0")}` : "#5865f2",
         embed_image_url: a.embed_image_url ?? "",
         embed_thumbnail_url: a.embed_thumbnail_url ?? "",
+        text_position: a.text_position === "above" ? "above" : "below",
         mention_everyone: a.mention_everyone,
         mention_here: a.mention_here,
         selected_role_ids: [...a.mention_role_ids],
@@ -218,7 +228,11 @@ function buildBody(): CreateAnnouncementBody {
     recurrence_hour: f.recurrence_hour,
     recurrence_minute: f.recurrence_minute,
     recurrence_day_of_week: f.recurrence_type === "weekly" ? f.recurrence_day_of_week : null,
-    recurrence_day_of_month: f.recurrence_type === "monthly" ? f.recurrence_day_of_month : null,
+    recurrence_day_of_month:
+      f.recurrence_type === "monthly" || f.recurrence_type === "yearly"
+        ? f.recurrence_day_of_month
+        : null,
+    recurrence_month: f.recurrence_type === "yearly" ? f.recurrence_month : null,
     scheduled_at:
       f.recurrence_type === "once" && f.scheduled_at ? new Date(f.scheduled_at).toISOString() : null,
     end_date: f.end_date ? new Date(f.end_date).toISOString() : null,
@@ -228,6 +242,7 @@ function buildBody(): CreateAnnouncementBody {
     embed_color: f.content_type === "embed" && !Number.isNaN(colorInt) ? colorInt : null,
     embed_image_url: f.content_type === "embed" ? f.embed_image_url || null : null,
     embed_thumbnail_url: f.content_type === "embed" ? f.embed_thumbnail_url || null : null,
+    text_position: f.text_position,
     mention_everyone: f.mention_everyone,
     mention_here: f.mention_here,
     mention_role_ids: f.selected_role_ids,
@@ -287,6 +302,7 @@ async function save() {
           <option value="daily">Quotidienne</option>
           <option value="weekly">Hebdomadaire</option>
           <option value="monthly">Mensuelle</option>
+          <option value="yearly">Annuelle (une fois par an)</option>
         </AppSelect>
       </label>
     </div>
@@ -313,6 +329,19 @@ async function save() {
       Jour du mois (1-31, clamp si mois plus court)
       <NumberInputWithUnit v-model.number="form.recurrence_day_of_month" :min="1" :max="31" />
     </label>
+
+    <div v-if="form.recurrence_type === 'yearly'" class="grid-2">
+      <label>
+        Mois
+        <AppSelect v-model.number="form.recurrence_month">
+          <option v-for="(m, i) in monthLabels" :key="i" :value="i + 1">{{ m }}</option>
+        </AppSelect>
+      </label>
+      <label>
+        Jour du mois (1-31, clamp si mois plus court)
+        <NumberInputWithUnit v-model.number="form.recurrence_day_of_month" :min="1" :max="31" />
+      </label>
+    </div>
 
     <label v-if="form.recurrence_type === 'once'">
       Date et heure de l'annonce
@@ -346,8 +375,15 @@ async function save() {
         </label>
       </div>
       <label>
-        Image (grande, en bas)
+        Image (envoyée en grand, dans un message séparé)
         <ImagePicker v-model="form.embed_image_url" />
+      </label>
+      <label v-if="form.embed_image_url">
+        Position du texte par rapport à l'image
+        <AppSelect v-model="form.text_position">
+          <option value="below">Texte en dessous (image en haut)</option>
+          <option value="above">Texte au-dessus (image en bas)</option>
+        </AppSelect>
       </label>
       <label>
         Vignette (petite, à droite)

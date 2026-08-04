@@ -134,6 +134,13 @@ function recurrenceLabel(a: ScheduledAnnouncement): string {
       return `Tous les ${dowLabels[a.recurrence_day_of_week ?? 0]} à ${time}`;
     case "monthly":
       return `Le ${a.recurrence_day_of_month ?? "?"} de chaque mois à ${time}`;
+    case "yearly": {
+      const mois = [
+        "janvier", "février", "mars", "avril", "mai", "juin",
+        "juillet", "août", "septembre", "octobre", "novembre", "décembre",
+      ][(a.recurrence_month ?? 1) - 1];
+      return `Chaque année le ${a.recurrence_day_of_month ?? "?"} ${mois} à ${time}`;
+    }
   }
 }
 

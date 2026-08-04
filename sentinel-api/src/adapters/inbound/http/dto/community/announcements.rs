@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use sentinel_core::domain::entities::community::announcement::{
     AnnouncementButton, AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType,
-    RecurrenceType, RunStatus, ScheduledAnnouncement,
+    RecurrenceType, RunStatus, ScheduledAnnouncement, TextPosition,
 };
 
 #[derive(Debug, Deserialize)]
@@ -17,6 +17,8 @@ pub struct CreateAnnouncementDto {
     pub recurrence_minute: u8,
     pub recurrence_day_of_week: Option<u8>,
     pub recurrence_day_of_month: Option<u8>,
+    #[serde(default)]
+    pub recurrence_month: Option<u8>,
     pub scheduled_at: Option<DateTime<Utc>>,
     pub end_date: Option<DateTime<Utc>>,
     pub content_type: String,
@@ -26,6 +28,9 @@ pub struct CreateAnnouncementDto {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
+    /// "above" | "below" (defaut). Position du texte / a l'image.
+    #[serde(default)]
+    pub text_position: Option<String>,
     #[serde(default)]
     pub mention_everyone: bool,
     #[serde(default)]
@@ -48,6 +53,8 @@ pub struct UpdateAnnouncementDto {
     pub recurrence_minute: u8,
     pub recurrence_day_of_week: Option<u8>,
     pub recurrence_day_of_month: Option<u8>,
+    #[serde(default)]
+    pub recurrence_month: Option<u8>,
     pub scheduled_at: Option<DateTime<Utc>>,
     pub end_date: Option<DateTime<Utc>>,
     pub content_type: String,
@@ -57,6 +64,9 @@ pub struct UpdateAnnouncementDto {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
+    /// "above" | "below" (defaut). Position du texte / a l'image.
+    #[serde(default)]
+    pub text_position: Option<String>,
     #[serde(default)]
     pub mention_everyone: bool,
     #[serde(default)]
@@ -86,6 +96,7 @@ pub struct AnnouncementDto {
     pub recurrence_minute: u8,
     pub recurrence_day_of_week: Option<u8>,
     pub recurrence_day_of_month: Option<u8>,
+    pub recurrence_month: Option<u8>,
     pub scheduled_at: Option<DateTime<Utc>>,
     pub start_date: DateTime<Utc>,
     pub end_date: Option<DateTime<Utc>>,
@@ -95,6 +106,7 @@ pub struct AnnouncementDto {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
+    pub text_position: String,
     pub mention_everyone: bool,
     pub mention_here: bool,
     pub mention_role_ids: Vec<String>,
@@ -120,6 +132,7 @@ impl From<ScheduledAnnouncement> for AnnouncementDto {
             recurrence_minute: a.recurrence_minute,
             recurrence_day_of_week: a.recurrence_day_of_week,
             recurrence_day_of_month: a.recurrence_day_of_month,
+            recurrence_month: a.recurrence_month,
             scheduled_at: a.scheduled_at,
             start_date: a.start_date,
             end_date: a.end_date,
@@ -129,6 +142,7 @@ impl From<ScheduledAnnouncement> for AnnouncementDto {
             embed_color: a.embed_color,
             embed_image_url: a.embed_image_url,
             embed_thumbnail_url: a.embed_thumbnail_url,
+            text_position: a.text_position.as_str().to_string(),
             mention_everyone: a.mention_everyone,
             mention_here: a.mention_here,
             mention_role_ids: a.mention_role_ids,
@@ -174,10 +188,15 @@ impl From<AnnouncementRun> for AnnouncementRunDto {
 pub fn parse_recurrence(s: &str) -> Result<RecurrenceType, String> {
     RecurrenceType::from_str(s).ok_or_else(|| {
         format!(
-            "recurrence_type invalide: {} (attendu once/daily/weekly/monthly)",
+            "recurrence_type invalide: {} (attendu once/daily/weekly/monthly/yearly)",
             s
         )
     })
+}
+
+/// Position du texte : "above"/"below". Absent ou vide => below (defaut).
+pub fn parse_text_position(s: Option<&str>) -> TextPosition {
+    s.and_then(TextPosition::from_str).unwrap_or_default()
 }
 
 pub fn parse_content_type(s: &str) -> Result<ContentType, String> {

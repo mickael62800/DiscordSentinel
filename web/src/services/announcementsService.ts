@@ -1,7 +1,8 @@
 import { httpDelete, httpGet, httpPatch, httpPost } from "@/api/http";
 
-export type RecurrenceType = "once" | "daily" | "weekly" | "monthly";
+export type RecurrenceType = "once" | "daily" | "weekly" | "monthly" | "yearly";
 export type ContentType = "text" | "embed";
+export type TextPosition = "above" | "below";
 export type RunStatus = "pending" | "success" | "partial" | "error";
 
 export interface ScheduledAnnouncement {
@@ -14,6 +15,7 @@ export interface ScheduledAnnouncement {
   recurrence_minute: number;
   recurrence_day_of_week: number | null;
   recurrence_day_of_month: number | null;
+  recurrence_month: number | null;
   scheduled_at: string | null;
   start_date: string;
   end_date: string | null;
@@ -23,6 +25,7 @@ export interface ScheduledAnnouncement {
   embed_color: number | null;
   embed_image_url: string | null;
   embed_thumbnail_url: string | null;
+  text_position: TextPosition;
   mention_everyone: boolean;
   mention_here: boolean;
   mention_role_ids: string[];
@@ -100,6 +103,7 @@ export interface CreateAnnouncementBody {
   recurrence_minute?: number;
   recurrence_day_of_week?: number | null;
   recurrence_day_of_month?: number | null;
+  recurrence_month?: number | null;
   scheduled_at?: string | null;
   end_date?: string | null;
   content_type: ContentType;
@@ -108,6 +112,7 @@ export interface CreateAnnouncementBody {
   embed_color?: number | null;
   embed_image_url?: string | null;
   embed_thumbnail_url?: string | null;
+  text_position?: TextPosition;
   mention_everyone?: boolean;
   mention_here?: boolean;
   mention_role_ids?: string[];

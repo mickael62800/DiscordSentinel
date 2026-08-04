@@ -17,10 +17,10 @@ fn once_returns_scheduled_at_if_future() {
         0,
         None,
         None,
+        None,
         Some(target),
         None,
-        now,
-    );
+        now);
     assert_eq!(next, Some(target));
 }
 
@@ -34,10 +34,10 @@ fn once_returns_none_if_past() {
         0,
         None,
         None,
+        None,
         Some(target),
         None,
-        now,
-    );
+        now);
     assert_eq!(next, None);
 }
 
@@ -46,28 +46,28 @@ fn once_returns_none_if_past() {
 #[test]
 fn daily_today_if_hour_not_passed() {
     let now = dt(2026, 5, 2, 10, 0);
-    let next = compute_next_run_at(RecurrenceType::Daily, 14, 0, None, None, None, None, now);
+    let next = compute_next_run_at(RecurrenceType::Daily, 14, 0, None, None, None, None, None, now);
     assert_eq!(next, Some(dt(2026, 5, 2, 14, 0)));
 }
 
 #[test]
 fn daily_tomorrow_if_hour_passed() {
     let now = dt(2026, 5, 2, 16, 0);
-    let next = compute_next_run_at(RecurrenceType::Daily, 14, 0, None, None, None, None, now);
+    let next = compute_next_run_at(RecurrenceType::Daily, 14, 0, None, None, None, None, None, now);
     assert_eq!(next, Some(dt(2026, 5, 3, 14, 0)));
 }
 
 #[test]
 fn daily_with_minute() {
     let now = dt(2026, 5, 2, 14, 30);
-    let next = compute_next_run_at(RecurrenceType::Daily, 14, 45, None, None, None, None, now);
+    let next = compute_next_run_at(RecurrenceType::Daily, 14, 45, None, None, None, None, None, now);
     assert_eq!(next, Some(dt(2026, 5, 2, 14, 45)));
 }
 
 #[test]
 fn daily_minute_passed() {
     let now = dt(2026, 5, 2, 14, 45);
-    let next = compute_next_run_at(RecurrenceType::Daily, 14, 30, None, None, None, None, now);
+    let next = compute_next_run_at(RecurrenceType::Daily, 14, 30, None, None, None, None, None, now);
     // 14h30 deja passe -> demain
     assert_eq!(next, Some(dt(2026, 5, 3, 14, 30)));
 }
@@ -90,8 +90,8 @@ fn weekly_same_day_if_hour_not_passed() {
         None,
         None,
         None,
-        now,
-    );
+        None,
+        now);
     assert_eq!(next, Some(dt(2026, 5, 4, 14, 0)));
 }
 
@@ -106,8 +106,8 @@ fn weekly_next_week_if_same_day_hour_passed() {
         None,
         None,
         None,
-        now,
-    );
+        None,
+        now);
     // -> lundi prochain
     assert_eq!(next, Some(dt(2026, 5, 11, 14, 0)));
 }
@@ -124,8 +124,8 @@ fn weekly_advances_to_target_dow() {
         None,
         None,
         None,
-        now,
-    );
+        None,
+        now);
     // Vendredi 8 mai
     assert_eq!(next, Some(dt(2026, 5, 8, 14, 0)));
 }
@@ -142,8 +142,8 @@ fn weekly_wraps_to_next_week() {
         None,
         None,
         None,
-        now,
-    );
+        None,
+        now);
     // Lundi 11 mai
     assert_eq!(next, Some(dt(2026, 5, 11, 14, 0)));
 }
@@ -161,8 +161,8 @@ fn monthly_same_month_if_day_not_passed() {
         Some(15),
         None,
         None,
-        now,
-    );
+        None,
+        now);
     assert_eq!(next, Some(dt(2026, 5, 15, 14, 0)));
 }
 
@@ -177,8 +177,8 @@ fn monthly_next_month_if_day_passed() {
         Some(15),
         None,
         None,
-        now,
-    );
+        None,
+        now);
     assert_eq!(next, Some(dt(2026, 6, 15, 14, 0)));
 }
 
@@ -194,8 +194,8 @@ fn monthly_31_in_february_clamps_to_28() {
         Some(31),
         None,
         None,
-        now,
-    );
+        None,
+        now);
     assert_eq!(next, Some(dt(2026, 2, 28, 14, 0)));
 }
 
@@ -210,8 +210,8 @@ fn monthly_31_in_february_leap_year_clamps_to_29() {
         Some(31),
         None,
         None,
-        now,
-    );
+        None,
+        now);
     assert_eq!(next, Some(dt(2024, 2, 29, 14, 0)));
 }
 
@@ -226,8 +226,8 @@ fn monthly_year_wrap() {
         Some(15),
         None,
         None,
-        now,
-    );
+        None,
+        now);
     assert_eq!(next, Some(dt(2027, 1, 15, 14, 0)));
 }
 
@@ -244,9 +244,9 @@ fn end_date_blocks_future_runs() {
         None,
         None,
         None,
+        None,
         Some(end),
-        now,
-    );
+        now);
     assert_eq!(next, None);
 }
 
@@ -261,9 +261,9 @@ fn end_date_allows_runs_before_end() {
         None,
         None,
         None,
+        None,
         Some(end),
-        now,
-    );
+        now);
     assert_eq!(next, Some(dt(2026, 5, 2, 14, 0)));
 }
 

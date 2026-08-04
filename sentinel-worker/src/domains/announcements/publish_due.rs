@@ -44,6 +44,13 @@ struct RenderedAnnouncement {
     content_text: String,
     embed: Option<RenderedEmbed>,
     mentions_prefix: String,
+    // Champs transportes tels quels vers le bot (le worker ne fait que relayer).
+    #[serde(default)]
+    buttons: serde_json::Value,
+    #[serde(default)]
+    auto_reactions: serde_json::Value,
+    #[serde(default)]
+    text_position: Option<String>,
 }
 
 /// Spawn la boucle d'annonces : aligne sur HH:00:00 UTC, puis tick

@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::ports::outbound::community::announcement_repository::AnnouncementRepository;
 use sentinel_core::domain::entities::community::announcement::{
     AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType, RecurrenceType, RunStatus,
-    ScheduledAnnouncement,
+    ScheduledAnnouncement, TextPosition,
 };
 use sentinel_core::domain::errors::DomainError;
 
@@ -32,6 +32,7 @@ struct AnnouncementRow {
     recurrence_minute: i16,
     recurrence_day_of_week: Option<i16>,
     recurrence_day_of_month: Option<i16>,
+    recurrence_month: Option<i16>,
     scheduled_at: Option<DateTime<Utc>>,
     start_date: DateTime<Utc>,
     end_date: Option<DateTime<Utc>>,
@@ -41,6 +42,7 @@ struct AnnouncementRow {
     embed_color: Option<i32>,
     embed_image_url: Option<String>,
     embed_thumbnail_url: Option<String>,
+    text_position: String,
     mention_everyone: bool,
     mention_here: bool,
     mention_role_ids: serde_json::Value,
@@ -69,6 +71,7 @@ impl From<AnnouncementRow> for ScheduledAnnouncement {
             recurrence_minute: r.recurrence_minute as u8,
             recurrence_day_of_week: r.recurrence_day_of_week.map(|v| v as u8),
             recurrence_day_of_month: r.recurrence_day_of_month.map(|v| v as u8),
+            recurrence_month: r.recurrence_month.map(|v| v as u8),
             scheduled_at: r.scheduled_at,
             start_date: r.start_date,
             end_date: r.end_date,
@@ -78,6 +81,7 @@ impl From<AnnouncementRow> for ScheduledAnnouncement {
             embed_color: r.embed_color,
             embed_image_url: r.embed_image_url,
             embed_thumbnail_url: r.embed_thumbnail_url,
+            text_position: TextPosition::from_str(&r.text_position).unwrap_or_default(),
             mention_everyone: r.mention_everyone,
             mention_here: r.mention_here,
             mention_role_ids: role_ids,
@@ -123,10 +127,10 @@ impl From<RunRow> for AnnouncementRun {
 const SELECT_ANNOUNCEMENT: &str = r#"
     SELECT id, guild_id, name, enabled,
         recurrence_type, recurrence_hour, recurrence_minute,
-        recurrence_day_of_week, recurrence_day_of_month, scheduled_at,
+        recurrence_day_of_week, recurrence_day_of_month, recurrence_month, scheduled_at,
         start_date, end_date,
         content_type, content_text, embed_title, embed_color,
-        embed_image_url, embed_thumbnail_url,
+        embed_image_url, embed_thumbnail_url, text_position,
         mention_everyone, mention_here, mention_role_ids,
         channel_ids, buttons, auto_reactions,
         created_by, created_at, updated_at,
@@ -141,10 +145,10 @@ impl AnnouncementRepository for PgAnnouncementRepository {
             r#"INSERT INTO scheduled_announcements (
                 id, guild_id, name, enabled,
                 recurrence_type, recurrence_hour, recurrence_minute,
-                recurrence_day_of_week, recurrence_day_of_month, scheduled_at,
+                recurrence_day_of_week, recurrence_day_of_month, recurrence_month, scheduled_at,
                 start_date, end_date,
                 content_type, content_text, embed_title, embed_color,
-                embed_image_url, embed_thumbnail_url,
+                embed_image_url, embed_thumbnail_url, text_position,
                 mention_everyone, mention_here, mention_role_ids,
                 channel_ids, buttons, auto_reactions,
                 created_by, created_at, updated_at,
@@ -152,7 +156,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
                 $13, $14, $15, $16, $17, $18, $19, $20, $21, $22,
-                $23, $24, $25, $26, $27, $28, $29
+                $23, $24, $25, $26, $27, $28, $29, $30, $31
             )"#,
         )
         .bind(a.id)
@@ -164,6 +168,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(a.recurrence_minute as i16)
         .bind(a.recurrence_day_of_week.map(|v| v as i16))
         .bind(a.recurrence_day_of_month.map(|v| v as i16))
+        .bind(a.recurrence_month.map(|v| v as i16))
         .bind(a.scheduled_at)
         .bind(a.start_date)
         .bind(a.end_date)
@@ -173,6 +178,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(a.embed_color)
         .bind(&a.embed_image_url)
         .bind(&a.embed_thumbnail_url)
+        .bind(a.text_position.as_str())
         .bind(a.mention_everyone)
         .bind(a.mention_here)
         .bind(serde_json::to_value(&a.mention_role_ids).unwrap_or_default())
@@ -201,6 +207,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
                 embed_image_url = $16, embed_thumbnail_url = $17,
                 mention_everyone = $18, mention_here = $19, mention_role_ids = $20,
                 channel_ids = $21, buttons = $22, auto_reactions = $23,
+                recurrence_month = $25, text_position = $26,
                 updated_at = NOW(), next_run_at = $24
             WHERE id = $1"#,
         )
@@ -228,6 +235,8 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(serde_json::to_value(&a.buttons).unwrap_or_default())
         .bind(serde_json::to_value(&a.auto_reactions).unwrap_or_default())
         .bind(a.next_run_at)
+        .bind(a.recurrence_month.map(|v| v as i16))
+        .bind(a.text_position.as_str())
         .execute(&self.pool)
         .await
         .map_err(pg_err)?;

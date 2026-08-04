@@ -71,6 +71,10 @@ struct RenderedAnnouncement {
     buttons: Vec<AnnouncementButton>,
     #[serde(default)]
     auto_reactions: Vec<String>,
+    /// "above" | "below" (defaut). Ou placer le texte par rapport a l'image :
+    /// l'image part alors dans un message separe (affichee en grand).
+    #[serde(default)]
+    text_position: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -264,6 +268,14 @@ async fn post_to_channel(
     // ou mentions_prefix seul (si embed, le contenu va dans la description).
     let mut msg = CreateMessage::new();
 
+    // L'image part dans un message SEPARE (affichee en grand, separee du
+    // texte) : on l'extrait ici et on ne l'ajoute PAS a l'embed.
+    let image_url: Option<String> = payload
+        .embed
+        .as_ref()
+        .and_then(|e| e.image_url.clone())
+        .filter(|u| !u.is_empty());
+
     let prefix = payload.mentions_prefix.trim();
     let body = if let Some(ref embed) = payload.embed {
         let mut e = CreateEmbed::new().description(&embed.description);
@@ -274,11 +286,6 @@ async fn post_to_channel(
         }
         if let Some(c) = embed.color {
             e = e.color(Color::new(c as u32));
-        }
-        if let Some(url) = &embed.image_url {
-            if !url.is_empty() {
-                e = e.image(url.clone());
-            }
         }
         if let Some(url) = &embed.thumbnail_url {
             if !url.is_empty() {
@@ -320,7 +327,23 @@ async fn post_to_channel(
         msg = msg.components(rows);
     }
 
-    match ch_id.send_message(&ctx.http, msg).await {
+    // Si une image est configuree, elle part dans son propre message (en
+    // grand). `text_position` decide de l'ordre : "above" = texte d'abord puis
+    // image ; "below" (defaut) = image d'abord puis texte. Les boutons, les
+    // reactions et le tracking restent sur le message texte/embed.
+    let text_above = payload.text_position.as_deref() == Some("above");
+
+    if let Some(url) = image_url.clone() {
+        if !text_above {
+            // Image AVANT le texte.
+            let img_msg = CreateMessage::new().embed(CreateEmbed::new().image(url));
+            if let Err(e) = ch_id.send_message(&ctx.http, img_msg).await {
+                warn!(error = %e, channel_id = ch_id_str, "Echec envoi image annonce");
+            }
+        }
+    }
+
+    let result = match ch_id.send_message(&ctx.http, msg).await {
         Ok(message) => {
             // Ajoute les reactions automatiques (best-effort, ne bloque pas)
             for emoji_str in &payload.auto_reactions {
@@ -346,7 +369,19 @@ async fn post_to_channel(
                 error: Some(e.to_string()),
             }
         }
+    };
+
+    if let Some(url) = image_url {
+        if text_above {
+            // Image APRES le texte.
+            let img_msg = CreateMessage::new().embed(CreateEmbed::new().image(url));
+            if let Err(e) = ch_id.send_message(&ctx.http, img_msg).await {
+                warn!(error = %e, channel_id = ch_id_str, "Echec envoi image annonce");
+            }
+        }
     }
+
+    result
 }
 
 // ── Handler component interaction ───────────────────────────────────────

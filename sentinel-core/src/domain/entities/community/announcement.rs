@@ -13,6 +13,9 @@ pub enum RecurrenceType {
     Daily,
     Weekly,
     Monthly,
+    /// Une fois par an, a une date (mois + jour) et heure fixes. Pour les
+    /// annonces saisonnieres (ete, hiver, anniversaire du serveur...).
+    Yearly,
 }
 
 impl RecurrenceType {
@@ -22,6 +25,7 @@ impl RecurrenceType {
             Self::Daily => "daily",
             Self::Weekly => "weekly",
             Self::Monthly => "monthly",
+            Self::Yearly => "yearly",
         }
     }
     pub fn from_str(s: &str) -> Option<Self> {
@@ -30,6 +34,36 @@ impl RecurrenceType {
             "daily" => Some(Self::Daily),
             "weekly" => Some(Self::Weekly),
             "monthly" => Some(Self::Monthly),
+            "yearly" => Some(Self::Yearly),
+            _ => None,
+        }
+    }
+}
+
+/// Position du texte par rapport a l'image quand une annonce (ou un message de
+/// bienvenue) porte une image : l'image et le texte partent en DEUX messages
+/// distincts, et ceci decide de l'ordre d'envoi.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TextPosition {
+    /// Texte AU-DESSUS de l'image (texte envoye en premier).
+    Above,
+    /// Texte EN DESSOUS de l'image (image envoyee en premier). Defaut.
+    #[default]
+    Below,
+}
+
+impl TextPosition {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Above => "above",
+            Self::Below => "below",
+        }
+    }
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "above" => Some(Self::Above),
+            "below" => Some(Self::Below),
             _ => None,
         }
     }
@@ -111,6 +145,8 @@ pub struct ScheduledAnnouncement {
     pub recurrence_minute: u8,
     pub recurrence_day_of_week: Option<u8>,
     pub recurrence_day_of_month: Option<u8>,
+    /// Mois (1-12) pour la recurrence annuelle. None sinon.
+    pub recurrence_month: Option<u8>,
     pub scheduled_at: Option<DateTime<Utc>>,
 
     pub start_date: DateTime<Utc>,
@@ -122,6 +158,9 @@ pub struct ScheduledAnnouncement {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
+    /// Ou placer le texte par rapport a l'image (image envoyee en message
+    /// separe). Defaut : texte en dessous (image d'abord).
+    pub text_position: TextPosition,
 
     pub mention_everyone: bool,
     pub mention_here: bool,
@@ -214,12 +253,14 @@ pub struct AnnouncementRun {
 ///
 /// Toutes les comparaisons sont en UTC. La conversion fuseau horaire
 /// (si on en ajoute un jour) doit se faire au niveau presentation.
+#[allow(clippy::too_many_arguments)]
 pub fn compute_next_run_at(
     recurrence_type: RecurrenceType,
     hour: u8,
     minute: u8,
     day_of_week: Option<u8>,
     day_of_month: Option<u8>,
+    month: Option<u8>,
     scheduled_at: Option<DateTime<Utc>>,
     end_date: Option<DateTime<Utc>>,
     after: DateTime<Utc>,
@@ -229,6 +270,7 @@ pub fn compute_next_run_at(
         RecurrenceType::Daily => next_daily(hour, minute, after),
         RecurrenceType::Weekly => next_weekly(day_of_week?, hour, minute, after),
         RecurrenceType::Monthly => next_monthly(day_of_month?, hour, minute, after),
+        RecurrenceType::Yearly => next_yearly(month?, day_of_month?, hour, minute, after),
     };
 
     // Pour 'once', si le scheduled_at est passe, on ne reprogramme pas.
@@ -291,6 +333,28 @@ fn next_monthly(day_of_month: u8, hour: u8, minute: u8, after: DateTime<Utc>) ->
     };
     let next_day = day_of_month.min(last_day_of_month(next_year, next_month));
     at_year_month_day_hour_minute(next_year, next_month, next_day, hour, minute)
+        .expect("jour clampe au dernier jour du mois toujours valide")
+}
+
+fn next_yearly(
+    month: u8,
+    day_of_month: u8,
+    hour: u8,
+    minute: u8,
+    after: DateTime<Utc>,
+) -> DateTime<Utc> {
+    // Candidat cette annee. Clamp du jour au dernier jour du mois vise (ex.
+    // 29 fevrier une annee non bissextile -> 28).
+    let year = after.year();
+    let day = day_of_month.min(last_day_of_month(year, month as u32));
+    if let Some(candidate) = at_year_month_day_hour_minute(year, month as u32, day, hour, minute) {
+        if candidate > after {
+            return candidate;
+        }
+    }
+    // Sinon : l'annee prochaine, meme clamp.
+    let next_day = day_of_month.min(last_day_of_month(year + 1, month as u32));
+    at_year_month_day_hour_minute(year + 1, month as u32, next_day, hour, minute)
         .expect("jour clampe au dernier jour du mois toujours valide")
 }
 

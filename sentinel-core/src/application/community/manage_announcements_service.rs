@@ -116,6 +116,22 @@ impl ManageAnnouncementsService {
                     ));
                 }
             }
+            RecurrenceType::Yearly => {
+                let dom = cmd.recurrence_day_of_month.ok_or_else(|| {
+                    DomainError::ValidationError("day_of_month requis pour yearly".into())
+                })?;
+                if !(1..=31).contains(&dom) {
+                    return Err(DomainError::ValidationError(
+                        "day_of_month doit etre 1-31".into(),
+                    ));
+                }
+                let month = cmd.recurrence_month.ok_or_else(|| {
+                    DomainError::ValidationError("month requis pour yearly".into())
+                })?;
+                if !(1..=12).contains(&month) {
+                    return Err(DomainError::ValidationError("month doit etre 1-12".into()));
+                }
+            }
             RecurrenceType::Daily => {}
         }
         if let (Some(start), Some(end)) = (Some(Utc::now()), cmd.end_date) {
@@ -183,6 +199,7 @@ impl ManageAnnouncementsService {
             mentions_prefix: Self::build_mentions_prefix(a),
             buttons: a.buttons.clone(),
             auto_reactions: a.auto_reactions.clone(),
+            text_position: a.text_position,
         }
     }
 }
@@ -201,6 +218,7 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
             cmd.recurrence_minute,
             cmd.recurrence_day_of_week,
             cmd.recurrence_day_of_month,
+            cmd.recurrence_month,
             cmd.scheduled_at,
             cmd.end_date,
             now,
@@ -221,6 +239,7 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
             recurrence_minute: cmd.recurrence_minute,
             recurrence_day_of_week: cmd.recurrence_day_of_week,
             recurrence_day_of_month: cmd.recurrence_day_of_month,
+            recurrence_month: cmd.recurrence_month,
             scheduled_at: cmd.scheduled_at,
             start_date: now,
             end_date: cmd.end_date,
@@ -230,6 +249,7 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
             embed_color: cmd.embed_color,
             embed_image_url: cmd.embed_image_url,
             embed_thumbnail_url: cmd.embed_thumbnail_url,
+            text_position: cmd.text_position,
             mention_everyone: cmd.mention_everyone,
             mention_here: cmd.mention_here,
             mention_role_ids: cmd.mention_role_ids,
@@ -262,6 +282,7 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
             cmd.recurrence_minute,
             cmd.recurrence_day_of_week,
             cmd.recurrence_day_of_month,
+            cmd.recurrence_month,
             cmd.scheduled_at,
             cmd.end_date,
             Utc::now(),
@@ -278,6 +299,7 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         ann.recurrence_minute = cmd.recurrence_minute;
         ann.recurrence_day_of_week = cmd.recurrence_day_of_week;
         ann.recurrence_day_of_month = cmd.recurrence_day_of_month;
+        ann.recurrence_month = cmd.recurrence_month;
         ann.scheduled_at = cmd.scheduled_at;
         ann.end_date = cmd.end_date;
         ann.content_type = cmd.content_type;
@@ -286,6 +308,7 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         ann.embed_color = cmd.embed_color;
         ann.embed_image_url = cmd.embed_image_url;
         ann.embed_thumbnail_url = cmd.embed_thumbnail_url;
+        ann.text_position = cmd.text_position;
         ann.mention_everyone = cmd.mention_everyone;
         ann.mention_here = cmd.mention_here;
         ann.mention_role_ids = cmd.mention_role_ids;
@@ -377,6 +400,7 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
                 a.recurrence_minute,
                 a.recurrence_day_of_week,
                 a.recurrence_day_of_month,
+                a.recurrence_month,
                 a.scheduled_at,
                 a.end_date,
                 now,
