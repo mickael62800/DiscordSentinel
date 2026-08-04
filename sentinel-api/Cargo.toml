@@ -288,11 +288,6 @@ path = "tests/integration/system_endpoints_http/http.rs"
 name = "integration_oauth_http"
 path = "tests/integration/oauth_http/http.rs"
 
-# rbac HTTP
-[[test]]
-name = "integration_rbac_http"
-path = "tests/integration/rbac_http/http.rs"
-
 [[test]]
 name = "integration_postgres_strikes"
 path = "tests/integration/postgres_strikes/repo.rs"

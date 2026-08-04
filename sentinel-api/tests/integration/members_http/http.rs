@@ -12,7 +12,6 @@ use axum::http::Request;
 use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
-use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
@@ -248,17 +247,6 @@ async fn delete(app: axum::Router, uri: &str) -> StatusCode {
     let resp = app.oneshot(req).await.unwrap();
     resp.status()
 }
-
-async fn send_request(app: axum::Router, req: Request<Body>) -> (StatusCode, serde_json::Value) {
-    let resp = app.oneshot(req).await.unwrap();
-    let s = resp.status();
-    let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (
-        s,
-        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
-    )
-}
-
 // ══════════════════════════════════════════════════════════
 // list_members (Discord API via MockDiscordApi, cache Redis)
 // ══════════════════════════════════════════════════════════
@@ -396,136 +384,4 @@ async fn remove_member_without_rbac_succeeds() {
         uc.removed.lock().unwrap()[0],
         ("111111111111111111".into(), "u1".into())
     );
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn remove_member_with_rbac_viewer_forbidden() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let app = router::build_for_test(build_state(Arc::new(MockMembersUC::new())));
-    let req = test_helpers::request_with_rbac(
-        "DELETE",
-        "/api/members/111111111111111111/u1",
-        "444444444444444444",
-        Some(Role::Viewer),
-        Some("111111111111111111".into()),
-        None,
-    );
-    let (status, json) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert!(json["error"].as_str().unwrap().contains("moderator+"));
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn remove_member_with_rbac_moderator_allowed() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let app = router::build_for_test(build_state(Arc::new(MockMembersUC::new())));
-    let req = test_helpers::request_with_rbac(
-        "DELETE",
-        "/api/members/111111111111111111/u1",
-        "444444444444444444",
-        Some(Role::Moderator),
-        Some("111111111111111111".into()),
-        None,
-    );
-    let (status, _) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::OK);
-}
-
-// ══════════════════════════════════════════════════════════
-// reset_member (transaction sqlx + RBAC)
-// ══════════════════════════════════════════════════════════
-
-async fn seed_rbac_admin(guild_id: &str, user_id: &str) {
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
-    });
-    let p = sqlx::PgPool::connect(&url).await.unwrap();
-    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'A') ON CONFLICT DO NOTHING")
-        .bind(user_id).execute(&p).await.unwrap();
-    sqlx::query(
-        "INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'admin')",
-    )
-    .bind(user_id)
-    .bind(guild_id)
-    .execute(&p)
-    .await
-    .unwrap();
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn reset_member_success_returns_totals() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let guild_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    let user_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    let admin_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    seed_rbac_admin(&guild_id, &admin_id).await;
-
-    let app = router::build_for_test(build_state(Arc::new(MockMembersUC::new())));
-    let req = test_helpers::request_with_rbac(
-        "POST",
-        &format!("/api/members/{guild_id}/{user_id}/reset"),
-        &admin_id,
-        Some(Role::Admin),
-        Some(guild_id.clone()),
-        None,
-    );
-    let (status, json) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::OK);
-    // Les tables listees dans MEMBER_RESET_TABLES doivent etre dans totals
-    for key in [
-        "infractions",
-        "moderation_actions",
-        "strikes",
-        "notes",
-        "manual_watched",
-        "sanction_reminders",
-    ] {
-        assert!(json["totals"].get(key).is_some(), "missing key {key}");
-    }
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn reset_member_with_rbac_moderator_forbidden() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let guild_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    let user_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    let mod_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
-    });
-    let p = sqlx::PgPool::connect(&url).await.unwrap();
-    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'M') ON CONFLICT DO NOTHING")
-        .bind(&mod_id).execute(&p).await.unwrap();
-    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'moderator')")
-        .bind(&mod_id).bind(&guild_id).execute(&p).await.unwrap();
-
-    let app = router::build_for_test(build_state(Arc::new(MockMembersUC::new())));
-    let req = test_helpers::request_with_rbac(
-        "POST",
-        &format!("/api/members/{guild_id}/{user_id}/reset"),
-        &mod_id,
-        Some(Role::Moderator),
-        Some(guild_id),
-        None,
-    );
-    let (status, _) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
 }

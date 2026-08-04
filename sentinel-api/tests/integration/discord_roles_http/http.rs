@@ -158,17 +158,6 @@ async fn delete(app: axum::Router, uri: &str) -> StatusCode {
     let resp = app.oneshot(req).await.unwrap();
     resp.status()
 }
-
-async fn send_request(app: axum::Router, req: Request<Body>) -> (StatusCode, serde_json::Value) {
-    let resp = app.oneshot(req).await.unwrap();
-    let s = resp.status();
-    let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (
-        s,
-        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
-    )
-}
-
 // ══════════════════════════════════════════════════════════
 // list_roles
 // ══════════════════════════════════════════════════════════
@@ -252,40 +241,6 @@ async fn delete_role_without_rbac_passes_through() {
     let status = delete(app, "/api/discord-roles/111111111111111111/555").await;
     assert_eq!(status, StatusCode::OK);
 }
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn delete_role_with_rbac_admin_succeeds() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let app = router::build_for_test(build_state(Arc::new(MockDiscordRoleRepo::new())));
-    let req = test_helpers::request_with_rbac(
-        "DELETE",
-        "/api/discord-roles/111111111111111111/555",
-        "444444444444444444",
-        Some(Role::Admin),
-        Some("111111111111111111".into()),
-        None,
-    );
-    let (status, _) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::OK);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn delete_role_with_rbac_moderator_forbidden() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let app = router::build_for_test(build_state(Arc::new(MockDiscordRoleRepo::new())));
-    let req = test_helpers::request_with_rbac(
-        "DELETE",
-        "/api/discord-roles/111111111111111111/555",
-        "444444444444444444",
-        Some(Role::Moderator),
-        Some("111111111111111111".into()),
-        None,
-    );
-    let (status, json) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert!(json["error"].as_str().unwrap().contains("admin+"));
-}
-
 // ══════════════════════════════════════════════════════════
 // sync_roles
 // ══════════════════════════════════════════════════════════

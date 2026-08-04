@@ -867,41 +867,11 @@ async fn update_theme_success() {
     .await;
     assert_eq!(status, StatusCode::OK);
 }
-
-// ── RBAC injecte ────────────────────────────────────────
-
-async fn send_request(
-    app: axum::Router,
-    req: axum::http::Request<Body>,
-) -> (StatusCode, serde_json::Value) {
-    let resp = app.oneshot(req).await.unwrap();
-    let s = resp.status();
-    let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (
-        s,
-        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
-    )
-}
-
 async fn pool() -> sqlx::PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
     });
     sqlx::PgPool::connect(&url).await.unwrap()
-}
-
-async fn seed_role(pool: &sqlx::PgPool, user_id: &str, guild_id: &str, role: &str) {
-    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'T') ON CONFLICT DO NOTHING")
-        .bind(user_id).execute(pool).await.unwrap();
-    sqlx::query(
-        "INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, $3)",
-    )
-    .bind(user_id)
-    .bind(guild_id)
-    .bind(role)
-    .execute(pool)
-    .await
-    .unwrap();
 }
 
 async fn seed_voice_channel(pool: &sqlx::PgPool, guild_id: &str, channel_id: &str) {
@@ -911,79 +881,6 @@ async fn seed_voice_channel(pool: &sqlx::PgPool, guild_id: &str, channel_id: &st
     )
     .bind(Uuid::new_v4()).bind(guild_id).bind(channel_id).execute(pool).await.unwrap();
 }
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn create_channel_with_rbac_moderator_succeeds() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let p = pool().await;
-    let guild_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    let user_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    seed_role(&p, &user_id, &guild_id, "moderator").await;
-
-    let app = build_app(MockVoiceUC::new());
-    let body = serde_json::json!({
-        "guild_id": guild_id,
-        "owner_id": "444444444444444444",
-        "owner_name": "Owner",
-        "channel_id": "c-new",
-        "channel_name": "New VC",
-        "kind": "private",
-        "visibility": "visible",
-        "queue_enabled": false,
-        "stage_enabled": false
-    });
-    let req = test_helpers::request_with_rbac(
-        "POST",
-        "/api/voice-channels",
-        &user_id,
-        Some(Role::Moderator),
-        Some(guild_id),
-        Some(body),
-    );
-    let (status, _) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::OK);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn delete_channel_with_rbac_viewer_forbidden() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let p = pool().await;
-    let guild_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    let user_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    seed_role(&p, &user_id, &guild_id, "viewer").await;
-    // gate_by_channel_id fait un SELECT sur voice_channels → il faut une row en DB.
-    let channel_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    seed_voice_channel(&p, &guild_id, &channel_id).await;
-
-    let uc = MockVoiceUC::new().with_channel(make_channel(&guild_id, &channel_id));
-    let app = build_app(uc);
-    let req = test_helpers::request_with_rbac(
-        "DELETE",
-        &format!("/api/voice-channels/by-channel/{channel_id}"),
-        &user_id,
-        Some(Role::Viewer),
-        Some(guild_id),
-        None,
-    );
-    let (status, _) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-}
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_channel_closed_deletes_row() {
     let p = pool().await;
@@ -1074,44 +971,6 @@ async fn list_channel_events_empty_returns_array() {
     assert_eq!(status, StatusCode::OK);
     assert!(json.as_array().is_some());
 }
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn transfer_ownership_with_rbac_moderator_succeeds() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let p = pool().await;
-    let guild_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    let user_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    seed_role(&p, &user_id, &guild_id, "moderator").await;
-
-    let channel_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    seed_voice_channel(&p, &guild_id, &channel_id).await;
-    let uc = MockVoiceUC::new().with_channel(make_channel(&guild_id, &channel_id));
-    let app = build_app(uc);
-    let body = serde_json::json!({
-        "new_owner_id": "555555555555555555",
-        "new_owner_name": "NewOwner"
-    });
-    let req = test_helpers::request_with_rbac(
-        "PATCH",
-        &format!("/api/voice-channels/by-channel/{channel_id}/transfer"),
-        &user_id,
-        Some(Role::Moderator),
-        Some(guild_id),
-        Some(body),
-    );
-    let (status, _) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::OK);
-}
-
 // ══════════════════════════════════════════════════════════
 // Tests HTTP — Health (route publique, verifie que le router fonctionne)
 // ══════════════════════════════════════════════════════════

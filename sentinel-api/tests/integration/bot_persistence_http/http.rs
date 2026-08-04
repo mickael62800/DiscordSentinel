@@ -84,17 +84,6 @@ async fn delete(app: axum::Router, uri: &str) -> StatusCode {
     let resp = app.oneshot(req).await.unwrap();
     resp.status()
 }
-
-async fn send_request(app: axum::Router, req: Request<Body>) -> (StatusCode, serde_json::Value) {
-    let resp = app.oneshot(req).await.unwrap();
-    let s = resp.status();
-    let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (
-        s,
-        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
-    )
-}
-
 // ══════════════════════════════════════════════════════════
 // POST /api/name-history
 // ══════════════════════════════════════════════════════════
@@ -222,27 +211,6 @@ async fn create_sponsorship_invalid_sponsor_422() {
     let (status, _) = post_json(app, "/api/sponsorships", body).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn create_sponsorship_with_rbac_viewer_forbidden() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let app = router::build_for_test(base_state());
-    let req = test_helpers::request_with_rbac(
-        "POST",
-        "/api/sponsorships",
-        "444444444444444444",
-        Some(Role::Viewer),
-        Some("111111111111111111".into()),
-        Some(serde_json::json!({
-            "guild_id": "111111111111111111",
-            "sponsor_id": "444444444444444444",
-            "sponsored_id": "555555555555555555"
-        })),
-    );
-    let (status, _) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-}
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_sponsorships_empty() {
     let app = router::build_for_test(base_state());
@@ -317,24 +285,6 @@ async fn delete_temp_role_invalid_role_id_422() {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn delete_temp_role_with_rbac_viewer_forbidden() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let app = router::build_for_test(base_state());
-    let req = test_helpers::request_with_rbac(
-        "DELETE",
-        "/api/temp-roles/111111111111111111/444444444444444444/555555555555555555",
-        "444444444444444444",
-        Some(Role::Viewer),
-        Some("111111111111111111".into()),
-        None,
-    );
-    let (status, json) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert!(json["error"].as_str().unwrap().contains("moderator+"));
-}
-
 // ══════════════════════════════════════════════════════════
 // Pending Moderation Actions
 // ══════════════════════════════════════════════════════════

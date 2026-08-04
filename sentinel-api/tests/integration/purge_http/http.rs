@@ -12,7 +12,6 @@ use axum::http::Request;
 use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
-use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
@@ -143,17 +142,6 @@ async fn delete_json(
         serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
     )
 }
-
-async fn send_request(app: axum::Router, req: Request<Body>) -> (StatusCode, serde_json::Value) {
-    let resp = app.oneshot(req).await.unwrap();
-    let s = resp.status();
-    let b = resp.into_body().collect().await.unwrap().to_bytes();
-    (
-        s,
-        serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
-    )
-}
-
 // ══════════════════════════════════════════════════════════
 // purge_infractions
 // ══════════════════════════════════════════════════════════
@@ -200,66 +188,6 @@ async fn purge_infractions_invalid_guild_422() {
     let (status, _) = delete_json(app, "/api/purge/infractions", body).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn purge_infractions_with_rbac_moderator_forbidden() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let (state, _, _, _) = build_state();
-    let app = router::build_for_test(state);
-    let req = test_helpers::request_with_rbac(
-        "DELETE",
-        "/api/purge/infractions",
-        "444444444444444444",
-        Some(Role::Moderator),
-        Some("111111111111111111".into()),
-        Some(serde_json::json!({"guild_id": "111111111111111111", "days": 30})),
-    );
-    let (status, _) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn purge_infractions_with_rbac_owner_allowed() {
-    use sentinel_core::domain::enums::system::role::Role;
-    // Seed api_user_guilds pour que check_role_for_guild valide owner en DB
-    let pool = sqlx::PgPool::connect(&std::env::var("DATABASE_URL").unwrap_or_else(|_| {
-        "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
-    }))
-    .await
-    .unwrap();
-    let guild_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    let user_id = format!(
-        "{}",
-        Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128
-    );
-    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'O') ON CONFLICT DO NOTHING")
-        .bind(&user_id).execute(&pool).await.unwrap();
-    sqlx::query(
-        "INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'owner')",
-    )
-    .bind(&user_id)
-    .bind(&guild_id)
-    .execute(&pool)
-    .await
-    .unwrap();
-
-    let (state, _, _, _) = build_state();
-    let app = router::build_for_test(state);
-    let req = test_helpers::request_with_rbac(
-        "DELETE",
-        "/api/purge/infractions",
-        &user_id,
-        Some(Role::Owner),
-        Some(guild_id.clone()),
-        Some(serde_json::json!({"guild_id": guild_id, "days": 30})),
-    );
-    let (status, _) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::OK);
-}
-
 // ══════════════════════════════════════════════════════════
 // purge_audit_logs
 // ══════════════════════════════════════════════════════════
@@ -321,23 +249,4 @@ async fn purge_logs_rejects_zero() {
     let (status, json) = delete_json(app, "/api/purge/logs", body).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(json["error"].as_str().unwrap().contains(">= 1"));
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn purge_logs_with_rbac_non_superadmin_forbidden() {
-    use sentinel_core::domain::enums::system::role::Role;
-    // User avec RBAC mais pas dans SUPERADMIN_USER_IDS -> forbidden
-    let (state, _, _, _) = build_state();
-    let app = router::build_for_test(state);
-    let req = test_helpers::request_with_rbac(
-        "DELETE",
-        "/api/purge/logs",
-        "444444444444444444",
-        Some(Role::Owner),
-        None,
-        Some(serde_json::json!({"days": 30})),
-    );
-    let (status, json) = send_request(app, req).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert!(json["error"].as_str().unwrap().contains("superadmin"));
 }

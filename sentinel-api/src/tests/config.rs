@@ -24,8 +24,6 @@ fn cfg(host: &str, port: u16, grpc_port: u16) -> AppConfig {
         discord_oauth_client_secret: String::new(),
         discord_oauth_redirect_uri: String::new(),
         web_front_url: String::new(),
-        rbac_global_gate: false,
-        rbac_global_gate_audit: false,
     }
 }
 

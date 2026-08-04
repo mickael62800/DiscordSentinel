@@ -2237,51 +2237,6 @@ impl sentinel_core::ports::inbound::ai::manage_ai_jobs::ManageAiJobsUseCase for 
     }
 }
 
-pub struct StubInvitations;
-#[async_trait]
-impl sentinel_core::ports::inbound::system::manage_invitations::ManageInvitationsUseCase
-    for StubInvitations
-{
-    async fn create_invitation(
-        &self,
-        _: sentinel_core::ports::inbound::system::manage_invitations::CreateInvitationCommand,
-    ) -> Result<sentinel_core::domain::entities::system::invitation::Invitation, DomainError> {
-        Err(DomainError::Internal("stub".into()))
-    }
-    async fn list_invitations(
-        &self,
-        _: &str,
-    ) -> Result<Vec<sentinel_core::domain::entities::system::invitation::Invitation>, DomainError>
-    {
-        Ok(vec![])
-    }
-    async fn find_invitation(
-        &self,
-        _: &str,
-    ) -> Result<Option<sentinel_core::domain::entities::system::invitation::Invitation>, DomainError>
-    {
-        Ok(None)
-    }
-    async fn revoke_invitation(&self, _: &str) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn check_access(
-        &self,
-        _: &str,
-        _: bool,
-    ) -> Result<sentinel_core::domain::entities::system::invitation::AccessStatus, DomainError> {
-        Err(DomainError::Internal("stub".into()))
-    }
-    async fn redeem_invitation(
-        &self,
-        _: &str,
-        _: &str,
-    ) -> Result<sentinel_core::domain::entities::system::invitation::RedeemedInvitation, DomainError>
-    {
-        Err(DomainError::Internal("stub".into()))
-    }
-}
-
 pub struct StubOAuth;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_oauth::ManageOAuthUseCase for StubOAuth {
@@ -2335,31 +2290,6 @@ impl sentinel_core::ports::inbound::system::manage_quarantine::ManageQuarantineU
         Ok(vec![])
     }
     async fn lift(&self, _: &str, _: &str) -> Result<(), DomainError> {
-        Ok(())
-    }
-}
-
-pub struct StubComponentMinRole;
-#[async_trait]
-impl sentinel_core::ports::inbound::system::manage_component_min_role::ManageComponentMinRoleUseCase
-    for StubComponentMinRole
-{
-    async fn list_overrides(
-        &self,
-        _: &str,
-    ) -> Result<
-        Vec<sentinel_core::domain::entities::system::component_min_role::ComponentMinRoleOverride>,
-        DomainError,
-    > {
-        Ok(vec![])
-    }
-    async fn get_override(&self, _: &str, _: &str) -> Result<Option<String>, DomainError> {
-        Ok(None)
-    }
-    async fn upsert(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn delete(&self, _: &str, _: &str) -> Result<(), DomainError> {
         Ok(())
     }
 }
@@ -2519,30 +2449,6 @@ impl sentinel_core::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCa
     }
 }
 
-pub struct StubComponentVisibility;
-#[async_trait]
-impl sentinel_core::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase
-    for StubComponentVisibility
-{
-    async fn list(
-        &self,
-        _: &str,
-    ) -> Result<
-        Vec<sentinel_core::domain::entities::system::component_visibility::VisibilityEntry>,
-        DomainError,
-    > {
-        Ok(vec![])
-    }
-    async fn upsert_batch(
-        &self,
-        _: &str,
-        _: Vec<sentinel_core::domain::entities::system::component_visibility::VisibilityEntry>,
-        _: &str,
-    ) -> Result<usize, DomainError> {
-        Ok(0)
-    }
-}
-
 pub struct StubBotPersistence;
 #[async_trait]
 impl sentinel_core::ports::inbound::system::manage_bot_persistence::ManageBotPersistenceUseCase
@@ -2587,52 +2493,6 @@ impl sentinel_core::ports::inbound::system::manage_server_events::ManageServerEv
         DomainError,
     > {
         Ok(vec![])
-    }
-}
-
-pub struct StubRbac;
-#[async_trait]
-impl sentinel_core::ports::inbound::system::manage_rbac::ManageRbacUseCase for StubRbac {
-    async fn grant_role(
-        &self,
-        _: sentinel_core::ports::inbound::system::manage_rbac::GrantRoleCommand,
-    ) -> Result<sentinel_core::domain::entities::system::rbac::UserRoleGrant, DomainError> {
-        Err(DomainError::Internal("stub".into()))
-    }
-    async fn update_role(
-        &self,
-        _: sentinel_core::ports::inbound::system::manage_rbac::UpdateRoleCommand,
-    ) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn revoke_role(
-        &self,
-        _: sentinel_core::ports::inbound::system::manage_rbac::RevokeRoleCommand,
-    ) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn list_guild_users(
-        &self,
-        _: &str,
-    ) -> Result<Vec<sentinel_core::domain::entities::system::rbac::GuildUserEntry>, DomainError>
-    {
-        Ok(vec![])
-    }
-    async fn ensure_owner_grant(&self, _: &str, _: &str) -> Result<(), DomainError> {
-        Ok(())
-    }
-    async fn is_whitelisted(&self, _: &str) -> Result<bool, DomainError> {
-        Ok(true)
-    }
-    async fn role_for_guild(
-        &self,
-        _: &str,
-        _: &str,
-    ) -> Result<Option<sentinel_core::domain::enums::system::role::Role>, DomainError> {
-        Ok(None)
-    }
-    async fn record_user_seen(&self, _: &str, _: &str) -> Result<(), DomainError> {
-        Ok(())
     }
 }
 
@@ -2855,18 +2715,14 @@ fn base_state() -> AppState {
         dataset_uc: Arc::new(StubDataset),
         ai_jobs_uc: Arc::new(StubAiJobs),
         monthly_ranking_uc: Arc::new(StubMonthlyRanking),
-        invitations_uc: Arc::new(StubInvitations),
         oauth_uc: Arc::new(StubOAuth),
         quarantine_uc: Arc::new(StubQuarantine),
         lockdown_uc: Arc::new(StubLockdown),
         slowmode_uc: Arc::new(StubSlowmode),
-        component_visibility_uc: Arc::new(StubComponentVisibility),
-        component_min_role_uc: Arc::new(StubComponentMinRole),
         alert_rules_uc: Arc::new(StubAlertRules),
         docker_host: Arc::new(StubDockerHost),
         bot_persistence_uc: Arc::new(StubBotPersistence),
         server_events_uc: Arc::new(StubServerEvents),
-        rbac_admin_uc: Arc::new(StubRbac),
         sursis_uc: Arc::new(StubSursis),
         automod_adaptive_slowmode_repo: Arc::new(StubAdaptiveSlowmodeRepo),
         broadcaster: Arc::new(EventBroadcaster::new()),
@@ -2897,8 +2753,6 @@ fn base_state() -> AppState {
         web_front_url: String::new(),
         container_monitor: None,
         rate_limiter: None,
-        rbac_global_gate: false,
-        rbac_global_gate_audit: false,
         metrics_token: String::new(),
     }
 }
@@ -3073,41 +2927,6 @@ pub fn build_test_state_discord_api(discord_api: Arc<dyn DiscordApi>) -> AppStat
     let mut state = base_state();
     state.discord_api = discord_api;
     state
-}
-
-/// Construit une requete axum avec un RoleContext pre-injecte dans les
-/// extensions. Permet de couvrir les branches `rbac.is_some()` des handlers
-/// sans passer par le middleware rbac_middleware (qui requerrait un token
-/// Discord valide + Redis + api_users seede).
-///
-/// axum preserve les extensions du Request a travers les middlewares, donc
-/// un Extension<RoleContext> pose ici sera vu par les handlers via
-/// `Option<Extension<RoleContext>>`.
-#[allow(dead_code)]
-pub fn request_with_rbac(
-    method: &str,
-    uri: &str,
-    user_id: &str,
-    role: Option<sentinel_core::domain::enums::system::role::Role>,
-    guild_id: Option<String>,
-    body: Option<serde_json::Value>,
-) -> axum::http::Request<axum::body::Body> {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::RoleContext;
-    let mut builder = axum::http::Request::builder().method(method).uri(uri);
-    if body.is_some() {
-        builder = builder.header("content-type", "application/json");
-    }
-    let body = match body {
-        Some(v) => axum::body::Body::from(serde_json::to_string(&v).unwrap()),
-        None => axum::body::Body::empty(),
-    };
-    let mut req = builder.body(body).unwrap();
-    req.extensions_mut().insert(RoleContext {
-        discord_user_id: user_id.to_string(),
-        role,
-        guild_id,
-    });
-    req
 }
 
 // ══════════════════════════════════════════════════════════

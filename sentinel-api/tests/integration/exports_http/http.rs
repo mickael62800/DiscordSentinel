@@ -104,23 +104,6 @@ async fn create_export_without_rbac_passes_through() {
     assert_eq!(json["status"], "pending");
     assert!(Uuid::parse_str(json["job_id"].as_str().unwrap()).is_ok());
 }
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn create_export_viewer_forbidden() {
-    use sentinel_core::domain::enums::system::role::Role;
-    let app = router::build_for_test(state());
-    let req = test_helpers::request_with_rbac(
-        "POST",
-        "/api/exports/jobs",
-        "333333333333333333",
-        Some(Role::Viewer),
-        Some("111111111111111111".into()),
-        Some(body("infractions", "csv")),
-    );
-    let resp = app.oneshot(req).await.unwrap();
-    assert_eq!(resp.status(), StatusCode::FORBIDDEN);
-}
-
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_export_invalid_uuid_422() {
     let app = router::build_for_test(state());
