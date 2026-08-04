@@ -8,7 +8,6 @@
 //! pass-through via `check_role_for_guild`).
 
 use axum::extract::State;
-use axum::Extension;
 use axum::Json;
 
 use crate::adapters::inbound::http::dto::moderation::target_risk::{
@@ -16,27 +15,15 @@ use crate::adapters::inbound::http::dto::moderation::target_risk::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::ports::inbound::moderation::assess_target_risk::AssessTargetRiskCommand;
 
 /// POST /api/moderation/{guild_id}/assess-target-risk
 pub async fn assess_target_risk(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<AssessTargetRiskRequestDto>,
 ) -> Result<Json<TargetRiskDecisionDto>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour l'evaluation de risque de cible",
-    )
-    .await?;
 
     let decision = state
         .assess_target_risk_uc

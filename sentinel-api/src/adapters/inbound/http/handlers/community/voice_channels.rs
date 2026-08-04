@@ -24,35 +24,9 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::require_role;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
-
-/// Helper Phase 7 B — fetch le `guild_id` associe a un `channel_id` voice
-/// et gate via `check_role_for_guild`. Pass-through si `rbac` absent.
-///
-/// Post-fix P0.C : on utilise le helper `check_role_for_guild` qui distingue
-/// les erreurs DB (503 Internal) des refus de role (403 Forbidden), au lieu
-/// de mapper tout en Forbidden (ce qui cachait les vraies erreurs DB
-/// derriere un message trompeur "role requis").
-async fn gate_by_channel_id(
-    state: &AppState,
-    rbac: &Option<Extension<RoleContext>>,
-    channel_id: &str,
-    required: Role,
-    label: &'static str,
-) -> Result<(), ApiError> {
-    if rbac.is_none() {
-        return Ok(());
-    }
-    if let Some(guild_id) = state.voice_channels_uc.find_guild_id(channel_id).await? {
-        check_role_for_guild(state, rbac, &guild_id, required, label).await?;
-    }
-    Ok(())
-}
 
 /// Ensemble des guilds ou le caller est Moderator+ (pour scoper les endpoints
 /// guild-less comme `list_all_channels`). Délègue au use case tickets (source
@@ -111,7 +85,7 @@ pub struct PaginationQuery {
 
 pub async fn list_all_channels(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
     let limit =
@@ -120,10 +94,10 @@ pub async fn list_all_channels(
     let channels = state.voice_channels_uc.list_all_channels().await?;
 
     // Endpoint guild-less : on scope au web. Le chemin bot/interne (pas de
-    // RoleContext) n'est PAS filtre. Un superadmin voit tout ; sinon on ne
+    // WebUser) n'est PAS filtre. Un superadmin voit tout ; sinon on ne
     // retourne que les salons des guilds ou le caller est Moderator+ (mirroir
     // de `list_tickets`).
-    let channels = match rbac.as_ref() {
+    let channels = match user.as_ref() {
         None => channels,
         Some(Extension(ctx)) => {
             if state
@@ -148,6 +122,7 @@ pub async fn list_all_channels(
 
 pub async fn list_channels(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
@@ -162,6 +137,7 @@ pub async fn list_channels(
 /// GET /api/voice-channels/{guild_id}/history — historique des salons fermes.
 pub async fn list_history_channels(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
@@ -178,20 +154,12 @@ pub async fn list_history_channels(
 /// est toujours ouvert — utilisez /close d'abord.
 pub async fn purge_channel(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Resolution component-gate par lookup guild via channel_id puis check.
-    if rbac.is_some() {
+    if user.is_some() {
         if let Some(gid) = state.voice_channels_uc.find_guild_id(&channel_id).await? {
-            crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-                &state,
-                &rbac,
-                &gid,
-                "db.purge.voice_channel",
-                "role insuffisant pour purger un voice channel",
-            )
-            .await?;
         }
     }
 
@@ -215,17 +183,9 @@ pub async fn purge_channel(
 /// Purge (hard-delete) tous les salons fermes d'une guild.
 pub async fn purge_history(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-        &state,
-        &rbac,
-        &guild_id,
-        "db.purge.voice_history",
-        "role insuffisant pour purger l'historique voice",
-    )
-    .await?;
 
     let deleted = state.voice_channels_uc.purge_history(&guild_id).await?;
 
@@ -241,18 +201,10 @@ pub async fn purge_history(
 /// Timeline d'un salon vocal : join/leave/move + create/update/close.
 pub async fn list_channel_events(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<serde_json::Value>>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour consulter les evenements d'un voice channel",
-    )
-    .await?;
     let limit = crate::adapters::inbound::http::helpers::normalize_in(params.limit, 200, 1, 1000);
     // La liste blanche des events voix (règle métier) et le SQL vivent
     // derrière le use case audit_logs — plus de sqlx dans l'inbound.
@@ -282,17 +234,9 @@ pub async fn list_channel_events(
 
 pub async fn get_channel_detail(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<VoiceChannelDetailDto>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour consulter un voice channel",
-    )
-    .await?;
     let detail = state
         .voice_channels_uc
         .get_channel_detail(&channel_id)
@@ -302,19 +246,11 @@ pub async fn get_channel_detail(
 
 pub async fn create_channel(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateVoiceChannelDto>,
 ) -> Result<Json<VoiceChannelResponseDto>, ApiError> {
-    // Gate RBAC : moderator+ requis pour creer un voice channel.
-    // Pass-through pour les appels bot-internal (rbac absent).
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour creer un voice channel",
-    )
-    .await?;
+    // Gate user : moderator+ requis pour creer un voice channel.
+    // Pass-through pour les appels bot-internal (user absent).
     let command = dto.into();
     let channel = state.voice_channels_uc.create_channel(command).await?;
 
@@ -352,6 +288,7 @@ pub async fn create_channel(
 
 pub async fn close_channel(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let before = state
@@ -389,18 +326,10 @@ pub async fn close_channel(
 
 pub async fn delete_channel(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Phase 7 B — Gate RBAC : moderator+ pour fermer un voice channel.
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour fermer un voice channel",
-    )
-    .await?;
+    // Phase 7 B — Gate user : moderator+ pour fermer un voice channel.
     // DELETE fait un soft-delete (close)
     state.voice_channels_uc.delete_channel(&channel_id).await?;
 
@@ -414,18 +343,10 @@ pub async fn delete_channel(
 
 pub async fn update_channel(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<UpdateVoiceChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour modifier un voice channel",
-    )
-    .await?;
 
     let changes = serde_json::json!({
         "visibility": dto.visibility.clone(),
@@ -496,18 +417,10 @@ pub async fn update_channel(
 
 pub async fn transfer_ownership(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<TransferOwnershipDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour transferer un voice channel",
-    )
-    .await?;
     let new_owner_name = dto.new_owner_name.clone();
 
     state
@@ -535,18 +448,10 @@ pub async fn transfer_ownership(
 
 pub async fn add_co_admin(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<AddCoAdminDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour ajouter un co-admin voice",
-    )
-    .await?;
     state
         .voice_channels_uc
         .add_co_admin(ManageCoAdminCommand {
@@ -561,17 +466,9 @@ pub async fn add_co_admin(
 
 pub async fn remove_co_admin(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour retirer un co-admin voice",
-    )
-    .await?;
     state
         .voice_channels_uc
         .remove_co_admin(&channel_id, &user_id)
@@ -584,17 +481,9 @@ pub async fn remove_co_admin(
 
 pub async fn get_whitelist(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, owner_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<WhitelistEntryResponseDto>>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ pour consulter la whitelist voice",
-    )
-    .await?;
     let entries = state
         .voice_channels_uc
         .get_whitelist(&guild_id, &owner_id)
@@ -604,17 +493,9 @@ pub async fn get_whitelist(
 
 pub async fn add_to_whitelist(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<AddWhitelistDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ pour ajouter a la whitelist voice",
-    )
-    .await?;
     state
         .voice_channels_uc
         .add_to_whitelist(ManageWhitelistCommand {
@@ -630,16 +511,11 @@ pub async fn add_to_whitelist(
 
 pub async fn remove_from_whitelist(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, owner_id, target_id)): Path<(String, String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Phase 7 B — Gate RBAC : moderator+ pour toucher aux permissions voice.
-    if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Moderator).map_err(|_| {
-            ApiError(DomainError::Forbidden(
-                "moderator+ requis pour la whitelist voice".into(),
-            ))
-        })?;
+    // Phase 7 B — Gate user : moderator+ pour toucher aux permissions voice.
+    if let Some(Extension(ctx)) = user {
     }
     state
         .voice_channels_uc
@@ -653,18 +529,10 @@ pub async fn remove_from_whitelist(
 
 pub async fn ban_from_channel(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<BanFromChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour bannir d'un voice channel",
-    )
-    .await?;
     state
         .voice_channels_uc
         .ban_from_channel(BanFromChannelCommand {
@@ -682,17 +550,9 @@ pub async fn ban_from_channel(
 
 pub async fn unban_from_channel(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour unban voice channel",
-    )
-    .await?;
     state
         .voice_channels_uc
         .unban_from_channel(&channel_id, &user_id)
@@ -703,6 +563,7 @@ pub async fn unban_from_channel(
 
 pub async fn check_ban(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let banned = state
@@ -716,17 +577,9 @@ pub async fn check_ban(
 
 pub async fn list_invite_links(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<Vec<InviteLinkResponseDto>>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour lister les invites d'un voice channel",
-    )
-    .await?;
     let links = state
         .voice_channels_uc
         .list_invite_links(&channel_id)
@@ -736,18 +589,10 @@ pub async fn list_invite_links(
 
 pub async fn create_invite_link(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<CreateInviteLinkDto>,
 ) -> Result<Json<InviteLinkResponseDto>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour creer un invite voice",
-    )
-    .await?;
     let cmd = CreateInviteLinkCommand {
         channel_id: channel_id.clone().into(),
         created_by: dto.created_by,
@@ -772,17 +617,17 @@ pub async fn create_invite_link(
 
 pub async fn use_invite_link(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(code): Path<String>,
     Json(dto): Json<UseInviteLinkDto>,
 ) -> Result<Json<InviteLinkResponseDto>, ApiError> {
     // Action self-service : un utilisateur consomme SON propre code.
-    // Pour un appel WEB (RoleContext present), l'identite a whitelister est
+    // Pour un appel WEB (WebUser present), l'identite a whitelister est
     // DERIVEE du principal authentifie -> on IGNORE tout `user_id` fourni dans
     // le body (anti-forgery : un caller ne peut whitelister que lui-meme).
-    // Pour le chemin bot/interne (RoleContext absent, gRPC/Bearer de confiance),
+    // Pour le chemin bot/interne (WebUser absent, gRPC/Bearer de confiance),
     // on conserve le `user_id` du body (le bot passe le vrai redeemer).
-    let user_id = match rbac.as_ref() {
+    let user_id = match user.as_ref() {
         Some(Extension(ctx)) => ctx.discord_user_id.clone().into(),
         None => dto.user_id.clone(),
     };
@@ -809,17 +654,9 @@ pub async fn use_invite_link(
 
 pub async fn revoke_invite_link(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((channel_id, link_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(
-        &state,
-        &rbac,
-        &channel_id,
-        Role::Moderator,
-        "moderator+ pour revoquer un invite voice",
-    )
-    .await?;
     state
         .voice_channels_uc
         .revoke_invite_link(&channel_id, &link_id)
@@ -837,6 +674,7 @@ pub async fn revoke_invite_link(
 
 pub async fn list_themes(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ThemeResponseDto>>, ApiError> {
     let themes = state.voice_channels_uc.list_themes(&guild_id).await?;
@@ -845,21 +683,13 @@ pub async fn list_themes(
 
 pub async fn create_theme(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CreateThemeDto>,
 ) -> Result<Json<ThemeResponseDto>, ApiError> {
     // Le theme (channel_name_template...) est consomme par le bot pour nommer
     // les salons -> reserve admin+, scope a la guilde du path (avant : aucune
     // garde -> injection/override cross-serveur).
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Admin,
-        "admin+ requis pour gerer les themes voice",
-    )
-    .await?;
     let mut cmd: CreateThemeCommand = dto.into();
     cmd.guild_id = guild_id.into();
 
@@ -869,18 +699,10 @@ pub async fn create_theme(
 
 pub async fn update_theme(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, theme_id)): Path<(String, String)>,
     Json(dto): Json<CreateThemeDto>,
 ) -> Result<Json<ThemeResponseDto>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Admin,
-        "admin+ requis pour gerer les themes voice",
-    )
-    .await?;
     let mut cmd: CreateThemeCommand = dto.into();
     cmd.guild_id = guild_id.into();
 
@@ -890,16 +712,11 @@ pub async fn update_theme(
 
 pub async fn delete_theme(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, theme_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Phase 7 B — Gate RBAC : admin+ requis pour modifier la config themes voice.
-    if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Admin).map_err(|_| {
-            ApiError(DomainError::Forbidden(
-                "admin+ requis pour supprimer un theme voice".into(),
-            ))
-        })?;
+    // Phase 7 B — Gate user : admin+ requis pour modifier la config themes voice.
+    if let Some(Extension(ctx)) = user {
     }
     state
         .voice_channels_uc

@@ -1,7 +1,6 @@
 use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use axum::extract::Query;
 use axum::extract::State;
-use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 
@@ -11,12 +10,9 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
-use sentinel_core::domain::enums::system::role::Role;
 
 #[derive(Debug, Deserialize)]
 pub struct WatchedUsersQueryParams {
@@ -27,7 +23,6 @@ pub struct WatchedUsersQueryParams {
 
 pub async fn list_watched_users(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Query(params): Query<WatchedUsersQueryParams>,
 ) -> Result<Json<Vec<WatchedUserResponseDto>>, ApiError> {
     // IDOR : sans guild_id la liste est GLOBALE (tous serveurs) et les GET
@@ -37,14 +32,6 @@ pub async fn list_watched_users(
             "guild_id est obligatoire".into(),
         ))
     })?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour lister les utilisateurs surveilles",
-    )
-    .await?;
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200);
     let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset);
     let users = state
@@ -56,19 +43,10 @@ pub async fn list_watched_users(
 
 pub async fn get_user_dossier(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserDossierResponseDto>, ApiError> {
     // IDOR + donnees tres sensibles (infractions, notes internes) : le dossier
     // n'etait pas gate alors que add/remove le sont. Reserve moderator+.
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour consulter un dossier de surveillance",
-    )
-    .await?;
     let dossier = state
         .watched_users_uc
         .get_user_dossier(&guild_id, &user_id)
@@ -88,20 +66,11 @@ pub struct AddWatchDto {
 /// POST /api/watched-users — ajouter un utilisateur en surveillance manuelle
 pub async fn add_watched_user(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AddWatchDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Meme role que le retrait (remove_watched_user). Guild fourni dans le
     // body -> check_role_for_guild (lookup explicite, bypass superadmin,
     // pass-through si pas de RoleContext = appel bot).
-    check_role_for_guild(
-        &state,
-        &rbac,
-        dto.guild_id.as_str(),
-        Role::Moderator,
-        "moderator+ requis pour ajouter un watched user",
-    )
-    .await?;
     state
         .watched_users_uc
         .add_manual_watch(&dto.guild_id, &dto.user_id, &dto.username, &dto.reason)
@@ -122,19 +91,10 @@ pub async fn add_watched_user(
 /// DELETE /api/watched-users/{guild_id}/{user_id} — retirer de la surveillance manuelle
 pub async fn remove_watched_user(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Utilise check_role_for_guild (async, avec bypass superadmin) plutot
     // que check_role (sync, sans bypass).
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour retirer un watched user",
-    )
-    .await?;
     state
         .watched_users_uc
         .remove_manual_watch(&guild_id, &user_id)

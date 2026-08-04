@@ -3,14 +3,12 @@
 //! regle metier (gates, deltas, assemblage des tops, baselines) vit dans
 //! `ManageMonthlyRankingUseCase` ; le SQL dans `MonthlyRankingRepository`.
 
+use axum::Json;
 use axum::extract::State;
-use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 
 #[derive(Serialize)]
 pub struct MonthlyRankingReport {
@@ -65,17 +63,8 @@ fn map_entries(
 /// RBAC : `Admin` sur la guild (pass-through pour les appels bot/internes).
 pub async fn force_publish_monthly_ranking(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Json(req): Json<ForceRankingRequest>,
 ) -> Result<Json<ForceRankingResponse>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &req.guild_id,
-        Role::Admin,
-        "admin+ requis pour forcer la publication du classement mensuel",
-    )
-    .await?;
 
     let data = state
         .monthly_ranking_uc

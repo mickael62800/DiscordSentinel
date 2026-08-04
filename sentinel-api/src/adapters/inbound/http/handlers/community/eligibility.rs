@@ -4,15 +4,12 @@
 //! donnees Discord (roles actuels, dates de join) et applique la decision.
 
 use axum::extract::State;
-use axum::Extension;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::ports::inbound::community::check_eligibility::{
     CheckRoleEligibilityCommand, ValidateSponsorshipCommand,
 };
@@ -40,21 +37,12 @@ pub struct RoleEligibilityBody {
 /// POST /api/community/eligibility/{guild_id}/role — decide de l'eligibilite au role.
 pub async fn check_role_eligibility(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<RoleEligibilityBody>,
 ) -> Result<Json<EligibilityDto>, ApiError> {
     // Decision d'attribution de role : operation du BOT (Bearer API_KEY ->
     // Internal, bypass). Sans cette garde, un appelant web sonderait les regles
     // d'un serveur arbitraire.
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Admin,
-        "acces reserve pour verifier l'eligibilite a un role",
-    )
-    .await?;
 
     let decision = state
         .eligibility_uc
@@ -87,18 +75,9 @@ pub struct SponsorshipEligibilityBody {
 /// POST /api/community/eligibility/{guild_id}/sponsorship — valide un parrainage.
 pub async fn validate_sponsorship(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<SponsorshipEligibilityBody>,
 ) -> Result<Json<EligibilityDto>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Admin,
-        "acces reserve pour valider un parrainage",
-    )
-    .await?;
 
     let decision = state
         .eligibility_uc

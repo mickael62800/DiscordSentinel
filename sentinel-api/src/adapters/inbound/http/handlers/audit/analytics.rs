@@ -7,10 +7,8 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::dto::audit::analytics::*;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 
 /// TTL du cache analytics (5 minutes).
 const ANALYTICS_CACHE_TTL: u64 = 300;
@@ -67,37 +65,12 @@ where
     Ok(Json(value))
 }
 
-/// Garde commune aux lectures analytics : exige un guild_id + moderator+ scope
-/// guilde. Les GET echappent au gate global -> sans elle, tout appelant lisait
-/// les analytics de moderation (top infracteurs, tendances) de n'importe quel
-/// serveur, ou l'agregat GLOBAL (guild_id absent) tous serveurs confondus.
-async fn guard_analytics_read(
-    state: &AppState,
-    rbac: &Option<Extension<RoleContext>>,
-    guild_id: Option<&str>,
-) -> Result<(), ApiError> {
-    let gid = guild_id.ok_or_else(|| {
-        ApiError::from(sentinel_core::domain::errors::DomainError::ValidationError(
-            "guild_id requis".into(),
-        ))
-    })?;
-    check_role_for_guild(
-        state,
-        rbac,
-        gid,
-        Role::Moderator,
-        "moderator+ requis pour les analytics",
-    )
-    .await
-}
-
 /// GET /api/analytics — Retourne toutes les analytics en une seule requete (cache 5min).
 pub async fn get_full_analytics(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<FullAnalyticsDto>, ApiError> {
-    guard_analytics_read(&state, &rbac, params.guild_id.as_deref()).await?;
     let days = params.days();
     let limit = params.limit();
     let guild_id = params.guild_id.as_deref();
@@ -138,7 +111,7 @@ pub struct ResetAnalyticsResponse {
 
 pub async fn reset_analytics(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<ResetAnalyticsResponse>, ApiError> {
     let guild_id = params.guild_id.as_deref().ok_or_else(|| {
@@ -148,15 +121,7 @@ pub async fn reset_analytics(
     })?;
 
     // Guild fourni en query -> check_role_for_guild (lookup explicite, bypass
-    // superadmin, pass-through si pas de RoleContext = appel interne).
-    check_role_for_guild(
-        &state,
-        &rbac,
-        guild_id,
-        Role::Admin,
-        "admin+ requis pour reinitialiser les analytics",
-    )
-    .await?;
+    // superadmin, pass-through si pas de WebUser = appel interne).
 
     let deleted_rows = state.analytics_repo.reset_activity(guild_id).await?;
 

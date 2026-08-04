@@ -1,8 +1,7 @@
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
-use crate::adapters::inbound::http::middleware::rbac::check_role;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use axum::extract::Path;
 use axum::extract::State;
@@ -10,7 +9,6 @@ use axum::Extension;
 use axum::Json;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
-use sentinel_core::domain::enums::system::role::Role;
 use serde::Serialize;
 #[derive(Debug, Serialize)]
 pub struct DiscordRoleDto {
@@ -51,6 +49,7 @@ impl From<DiscordRole> for DiscordRoleDto {
 /// GET /api/discord-roles/{guild_id} — Liste les roles Discord d'un serveur
 pub async fn list_roles(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<DiscordRoleDto>>, ApiError> {
     let roles = state.discord_role_repo.find_by_guild(&guild_id).await?;
@@ -77,33 +76,13 @@ const DANGEROUS_ROLE_PERMS: u64 = (1 << 3)   // ADMINISTRATOR
     | (1 << 34)  // MANAGE_THREADS
     | (1 << 7); // VIEW_AUDIT_LOG
 
-/// Exige Owner si les permissions demandees contiennent un bit sensible.
-fn guard_role_permissions(
-    rbac: &Option<Extension<RoleContext>>,
-    permissions: Option<&str>,
-) -> Result<(), ApiError> {
-    if let Some(p) = permissions {
-        let bits: u64 = p.parse().unwrap_or(0);
-        if bits & DANGEROUS_ROLE_PERMS != 0 {
-            check_role(
-                rbac,
-                Role::Owner,
-                "owner requis pour un role portant des permissions sensibles",
-            )?;
-        }
-    }
-    Ok(())
-}
-
 /// POST /api/discord-roles/{guild_id}/create — Creer un role Discord
 pub async fn create_role(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<CreateRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role(&rbac, Role::Admin, "admin+ requis pour creer un role")?;
-    guard_role_permissions(&rbac, body.permissions.as_deref())?;
     let result = state
         .discord_api
         .create_role(
@@ -119,12 +98,10 @@ pub async fn create_role(
 /// PATCH /api/discord-roles/{guild_id}/{role_id} — Modifier un role Discord
 pub async fn edit_role(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, role_id)): Path<(String, String)>,
     Json(body): Json<EditRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role(&rbac, Role::Admin, "admin+ requis pour modifier un role")?;
-    guard_role_permissions(&rbac, body.permissions.as_deref())?;
     let result = state
         .discord_api
         .edit_role(
@@ -143,10 +120,9 @@ pub async fn edit_role(
 /// DELETE /api/discord-roles/{guild_id}/{role_id} — Supprimer un role Discord
 pub async fn delete_role(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, role_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role(&rbac, Role::Admin, "admin+ requis pour supprimer un role")?;
     state.discord_api.delete_role(&guild_id, &role_id).await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
 }

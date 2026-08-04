@@ -21,21 +21,13 @@ use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::system::docker_host::compute_overview;
 use sentinel_core::domain::errors::DomainError;
 
 fn forbid(msg: &str) -> ApiError {
     ApiError(DomainError::Forbidden(msg.into()))
-}
-
-fn gate_super(state: &AppState, rbac: &Option<Extension<RoleContext>>) -> Result<(), ApiError> {
-    let Some(Extension(ctx)) = rbac else {
-        return Err(forbid("auth requise"));
-    };
-    require_superadmin(state, ctx).map_err(|_| forbid("superadmin requis"))
 }
 
 /// Helper d'audit log pour les actions Docker destructives.
@@ -46,12 +38,12 @@ fn gate_super(state: &AppState, rbac: &Option<Extension<RoleContext>>) -> Result
 /// sur la page Securite serveur.
 fn audit_docker(
     state: &AppState,
-    rbac: &Option<Extension<RoleContext>>,
+    user: &Option<Extension<WebUser>>,
     action: &str,
     target: &str,
 ) {
-    let actor = match rbac {
-        Some(Extension(ctx)) => ctx.discord_user_id.clone(),
+    let actor = match user {
+        Some(Extension(u)) => u.discord_user_id.clone(),
         None => "anonymous".to_string(),
     };
     tracing::info!(
@@ -206,6 +198,7 @@ pub struct ListContainersQuery {
 
 pub async fn list_containers(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<ListContainersQuery>,
 ) -> Result<Json<Vec<ContainerDto>>, ApiError> {
     let list = state
@@ -239,11 +232,10 @@ pub async fn list_containers(
 
 pub async fn start_container(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_super(&state, &rbac)?;
-    audit_docker(&state, &rbac, "container.start", &id);
+    audit_docker(&state, &user, "container.start", &id);
     state.docker_host.start_container(&id).await?;
     Ok(ok_response())
 }
@@ -256,12 +248,11 @@ pub struct StopQuery {
 
 pub async fn stop_container(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<StopQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_super(&state, &rbac)?;
-    audit_docker(&state, &rbac, "container.stop", &id);
+    audit_docker(&state, &user, "container.stop", &id);
     state
         .docker_host
         .stop_container(&id, q.timeout.unwrap_or(10))
@@ -271,12 +262,11 @@ pub async fn stop_container(
 
 pub async fn restart_container(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<StopQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_super(&state, &rbac)?;
-    audit_docker(&state, &rbac, "container.restart", &id);
+    audit_docker(&state, &user, "container.restart", &id);
     state
         .docker_host
         .restart_container(&id, q.timeout.unwrap_or(10))
@@ -294,12 +284,11 @@ pub struct RemoveContainerQuery {
 
 pub async fn remove_container(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<RemoveContainerQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_super(&state, &rbac)?;
-    audit_docker(&state, &rbac, "container.remove", &id);
+    audit_docker(&state, &user, "container.remove", &id);
     state
         .docker_host
         .remove_container(&id, q.force.unwrap_or(false), q.volumes.unwrap_or(false))
@@ -322,6 +311,7 @@ pub struct LogsDto {
 
 pub async fn container_logs(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<LogsQuery>,
 ) -> Result<Json<LogsDto>, ApiError> {
@@ -368,12 +358,11 @@ pub struct RemoveImageQuery {
 
 pub async fn remove_image(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<RemoveImageQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_super(&state, &rbac)?;
-    audit_docker(&state, &rbac, "image.remove", &id);
+    audit_docker(&state, &user, "image.remove", &id);
     state
         .docker_host
         .remove_image(&id, q.force.unwrap_or(false), q.no_prune.unwrap_or(false))
@@ -402,12 +391,11 @@ pub async fn list_volumes(State(state): State<AppState>) -> Result<Json<Vec<Volu
 
 pub async fn remove_volume(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(name): Path<String>,
     Query(q): Query<RemoveImageQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_super(&state, &rbac)?;
-    audit_docker(&state, &rbac, "volume.remove", &name);
+    audit_docker(&state, &user, "volume.remove", &name);
     state
         .docker_host
         .remove_volume(&name, q.force.unwrap_or(false))
@@ -419,6 +407,7 @@ pub async fn remove_volume(
 
 pub async fn list_networks(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<Vec<NetworkDto>>, ApiError> {
     let list = state.docker_host.list_networks().await?;
     let out: Vec<NetworkDto> = list
@@ -448,10 +437,9 @@ fn prune_dto(
 
 pub async fn prune_containers(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
-    gate_super(&state, &rbac)?;
-    audit_docker(&state, &rbac, "prune.containers", "*");
+    audit_docker(&state, &user, "prune.containers", "*");
     let r = state.docker_host.prune_containers().await?;
     Ok(Json(prune_dto(r)))
 }
@@ -466,13 +454,12 @@ pub struct PruneImagesQuery {
 
 pub async fn prune_images(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<PruneImagesQuery>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
-    gate_super(&state, &rbac)?;
     audit_docker(
         &state,
-        &rbac,
+        &user,
         "prune.images",
         if q.all.unwrap_or(false) {
             "all=true"
@@ -489,20 +476,18 @@ pub async fn prune_images(
 
 pub async fn prune_volumes(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
-    gate_super(&state, &rbac)?;
-    audit_docker(&state, &rbac, "prune.volumes", "*");
+    audit_docker(&state, &user, "prune.volumes", "*");
     let r = state.docker_host.prune_volumes().await?;
     Ok(Json(prune_dto(r)))
 }
 
 pub async fn prune_networks(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
-    gate_super(&state, &rbac)?;
-    audit_docker(&state, &rbac, "prune.networks", "*");
+    audit_docker(&state, &user, "prune.networks", "*");
     let r = state.docker_host.prune_networks().await?;
     Ok(Json(prune_dto(r)))
 }
@@ -528,13 +513,12 @@ pub struct PruneSystemQuery {
 /// + volumes optionnels). Equivalent `docker system prune` cote CLI.
 pub async fn prune_system(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<PruneSystemQuery>,
 ) -> Result<Json<PruneSystemDto>, ApiError> {
-    gate_super(&state, &rbac)?;
     audit_docker(
         &state,
-        &rbac,
+        &user,
         "prune.system",
         &format!(
             "volumes={},all_images={}",
@@ -579,14 +563,13 @@ pub struct PruneBuildCacheQuery {
 /// POST /api/docker/prune/build-cache — purge le build cache Docker (buildkit).
 pub async fn prune_build_cache(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<PruneBuildCacheQuery>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
-    gate_super(&state, &rbac)?;
     let all = q.all.unwrap_or(true);
     audit_docker(
         &state,
-        &rbac,
+        &user,
         "prune.build_cache",
         if all { "all=true" } else { "all=false" },
     );

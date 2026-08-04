@@ -95,6 +95,7 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "config.server-health", path: "/server-health", label: "État serveur", icon: "server" },
   { key: "config.alert-rules", path: "/alert-rules", label: "Règles d'alerte", icon: "zap" },
   { key: "config.server-security", path: "/server-security", label: "Sécurité serveur", icon: "shield" },
+  { key: "config.server-builder", path: "/server-builder", label: "Constructeur de salons", icon: "grid" },
   { key: "config.guild-backup", path: "/guild-backup", label: "Sauvegardes serveur", icon: "save" },
   { key: "config.ai-dataset", path: "/ai-dataset", label: "Dataset IA", icon: "cpu" },
   // Module sans page dediee : la tuile ouvre directement sa config (lien

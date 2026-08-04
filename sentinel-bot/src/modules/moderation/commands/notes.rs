@@ -1,8 +1,7 @@
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
 use crate::shared::embeds::success_embed;
 
@@ -52,12 +51,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Defer immediat : la suite fait plusieurs appels HTTP (Discord + API) et
+    // depasserait la fenetre de 3s de Discord. Sans ce defer, tous les
+    // `edit_response_*` ci-dessous echouent (interaction jamais acquittee).
+    crate::shared::discord_helpers::defer_ephemeral(ctx, command).await;
+
     let options = &command.data.options;
 
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
         None => {
-            crate::shared::discord_helpers::reply_ephemeral(
+            edit_response_text(
                 ctx,
                 command,
                 "Indique un membre (`user`) ou un identifiant (`user_id`).",
@@ -123,19 +127,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .field("Categorie", category, true)
                 .field("Contenu", content, false);
 
-            if let Err(e) = command
-                .create_response(
-                    &ctx.http,
-                    CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new()
-                            .embed(embed)
-                            .ephemeral(true),
-                    ),
-                )
-                .await
-            {
-                warn!(error = %e, "Failed to send note response");
-            }
+            crate::shared::discord_helpers::edit_response_embed(ctx, command, embed).await;
         }
         Err(e) => {
             error!(error = %e, "Erreur ajout note");

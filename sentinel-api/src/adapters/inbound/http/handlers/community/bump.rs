@@ -3,16 +3,13 @@
 //! `ManageBumpUseCase` ; le SQL dans `BumpRepository`. Ici : parse + RBAC + map.
 
 use axum::extract::State;
-use axum::Extension;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::community::manage_bump::RecordBumpCommand;
-use sentinel_core::domain::enums::system::role::Role;
 
 /// Provider par defaut si un vieux client n'envoie pas le champ (retrocompat).
 fn default_provider() -> String {
@@ -46,21 +43,12 @@ pub struct BumpRewardDto {
 /// POST /api/bump/{guild_id}/{user_id} — enregistre un bump.
 pub async fn record_bump(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(body): Json<RecordBumpBody>,
 ) -> Result<Json<BumpRewardDto>, ApiError> {
     // Constater un bump et crediter est une operation du BOT (Bearer API_KEY ->
     // Internal, bypass). Sans cette garde, tout appelant web creditait n'importe
     // quel user de n'importe quel serveur (IDOR + creation de monnaie).
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Admin,
-        "acces reserve pour enregistrer un bump",
-    )
-    .await?;
 
     let reward = state
         .bump_uc

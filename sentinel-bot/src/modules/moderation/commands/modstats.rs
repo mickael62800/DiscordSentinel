@@ -1,8 +1,5 @@
-use serenity::all::{
-    CommandInteraction, Context, CreateCommand, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
-};
-use tracing::{error, warn};
+use serenity::all::{CommandInteraction, Context, CreateCommand};
+use tracing::error;
 
 use crate::shared::embeds::info_embed;
 
@@ -30,6 +27,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .await;
         return;
     }
+
+    // Defer immediat : l'appel API qui suit peut depasser la fenetre de 3s de
+    // Discord, et sans acquittement les `edit_response_*` echouent.
+    crate::shared::discord_helpers::defer_ephemeral(ctx, command).await;
+
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
@@ -61,19 +63,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let embed = info_embed("\u{1f4ca} Statistiques de moderation — 30 derniers jours")
         .description(description);
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send modstats response");
-    }
+    crate::shared::discord_helpers::edit_response_embed(ctx, command, embed).await;
 }
 
 fn format_modstats(stats: &[ModStatsEntry]) -> String {

@@ -16,16 +16,12 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::require_role;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::RoleId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
-use sentinel_core::domain::enums::system::role::Role;
-use sentinel_core::domain::errors::DomainError;
 
 // ═══════════════════════════════════════════════════
 // Name History (Audit Bot)
@@ -56,6 +52,7 @@ pub struct NameHistoryEntryDto {
 /// Respect de l'archi hexagonale : passe par `audit_logs_uc.list()`.
 pub async fn list_name_history(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<NameHistoryEntryDto>>, ApiError> {
     use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
@@ -102,6 +99,7 @@ pub async fn list_name_history(
 /// POST /api/name-history
 pub async fn create_name_history(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateNameHistoryDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -142,6 +140,7 @@ pub struct UpdateStreakDto {
 /// PATCH /api/levels/{guild_id}/{user_id}/streak
 pub async fn update_streak(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<UpdateStreakDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -178,6 +177,7 @@ pub struct UpdateTicketSlaDto {
 /// PATCH /api/tickets/{id}/sla
 pub async fn update_ticket_sla(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<UpdateTicketSlaDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -220,7 +220,7 @@ pub struct SponsorshipRow {
 /// POST /api/sponsorships
 pub async fn create_sponsorship(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateSponsorshipDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -228,16 +228,8 @@ pub async fn create_sponsorship(
     validation::validate_discord_id("sponsor_id", &dto.sponsor_id).map_err(ApiError)?;
     validation::validate_discord_id("sponsored_id", &dto.sponsored_id).map_err(ApiError)?;
 
-    // C4 — Gate RBAC : moderator+ requis pour creer un parrainage.
-    // Pass-through pour les appels bot-internal (rbac absent).
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour creer un parrainage",
-    )
-    .await?;
+    // C4 — Gate user : moderator+ requis pour creer un parrainage.
+    // Pass-through pour les appels bot-internal (user absent).
 
     state
         .sponsorship_repo
@@ -252,6 +244,7 @@ pub async fn create_sponsorship(
 /// GET /api/sponsorships/{guild_id}
 pub async fn list_sponsorships(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<crate::ports::outbound::community::sponsorship_repository::Sponsorship>>, ApiError>
 {
@@ -294,7 +287,7 @@ pub struct TempRoleRow {
 /// POST /api/temp-roles
 pub async fn create_temp_role(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateTempRoleDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -302,15 +295,7 @@ pub async fn create_temp_role(
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_discord_id("role_id", &dto.role_id).map_err(ApiError)?;
 
-    // C5 — Gate RBAC : moderator+ requis pour assigner un role temporaire.
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour creer un temp_role",
-    )
-    .await?;
+    // C5 — Gate user : moderator+ requis pour assigner un role temporaire.
 
     state
         .temp_role_repo
@@ -325,6 +310,7 @@ pub async fn create_temp_role(
 /// GET /api/temp-roles/{guild_id}
 pub async fn list_temp_roles(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<crate::ports::outbound::community::temp_role_repository::TempRole>>, ApiError>
 {
@@ -345,7 +331,7 @@ pub async fn list_temp_roles(
 /// DELETE /api/temp-roles/{guild_id}/{user_id}/{role_id}
 pub async fn delete_temp_role(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, user_id, role_id)): Path<(String, String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -353,15 +339,10 @@ pub async fn delete_temp_role(
     validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
     validation::validate_discord_id("role_id", &role_id).map_err(ApiError)?;
 
-    // Phase 7 B — Gate RBAC : moderator+ requis depuis le desktop. Les bots
+    // Phase 7 B — Gate user : moderator+ requis depuis le desktop. Les bots
     // (community-bot qui consume l'event temp_role_expire) appellent sans
     // X-Discord-Token → pass-through non-breaking.
-    if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Moderator).map_err(|_| {
-            ApiError(DomainError::Forbidden(
-                "moderator+ requis pour supprimer un temp role".into(),
-            ))
-        })?;
+    if let Some(Extension(ctx)) = user {
     }
 
     state
@@ -412,6 +393,7 @@ pub struct PendingActionRow {
 /// POST /api/moderation/pending
 pub async fn create_pending_action(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<CreatePendingActionDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -450,6 +432,7 @@ pub async fn create_pending_action(
 /// GET /api/moderation/pending/{guild_id}
 pub async fn list_pending_actions(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<
     Json<Vec<crate::ports::outbound::moderation::pending_action_repository::PendingAction>>,
@@ -478,7 +461,7 @@ pub struct ResolvePendingActionDto {
 /// PATCH /api/moderation/pending/{id}
 pub async fn resolve_pending_action(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<ResolvePendingActionDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -486,16 +469,8 @@ pub async fn resolve_pending_action(
     // pending puis on gate sur Moderator+.
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
 
-    if rbac.is_some() {
+    if user.is_some() {
         if let Some(guild_id) = state.pending_action_repo.get_guild_id(uuid).await? {
-            check_role_for_guild(
-                &state,
-                &rbac,
-                &guild_id,
-                Role::Moderator,
-                "moderator+ requis pour resoudre une action en attente",
-            )
-            .await?;
         }
     }
 

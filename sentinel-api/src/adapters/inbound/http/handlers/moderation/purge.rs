@@ -1,17 +1,12 @@
 use axum::extract::State;
-use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 use tracing::info;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]
@@ -29,7 +24,6 @@ pub struct PurgeLogsDto {
 /// pour une guild. `days = 0` signifie "tout supprimer" (pas de filtre de date).
 pub async fn purge_infractions(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<PurgeByDaysDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
@@ -37,14 +31,6 @@ pub async fn purge_infractions(
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate RBAC : owner requis pour une purge massive.
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Owner,
-        "owner requis pour purger des infractions",
-    )
-    .await?;
 
     let count = state
         .infractions_uc
@@ -70,7 +56,6 @@ pub async fn purge_infractions(
 /// DELETE /api/purge/audit-logs — purge audit logs older than X days for a guild
 pub async fn purge_audit_logs(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<PurgeByDaysDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
@@ -80,14 +65,6 @@ pub async fn purge_audit_logs(
     .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate RBAC : owner requis pour purger l'audit log.
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Owner,
-        "owner requis pour purger les audit logs",
-    )
-    .await?;
 
     let count = state
         .audit_logs_uc
@@ -117,22 +94,12 @@ pub async fn purge_audit_logs(
 /// `X-Discord-Token`) restent en pass-through.
 pub async fn purge_logs(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<PurgeLogsDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     sentinel_core::domain::entities::moderation::purge::validate_purge_days_strictly_positive(
         dto.days,
     )
     .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
-
-    // Phase 7 B — Gate superadmin pour les appels desktop.
-    if let Some(Extension(ctx)) = rbac {
-        require_superadmin(&state, &ctx).map_err(|_| {
-            ApiError(DomainError::Forbidden(
-                "superadmin requis pour purger les logs systeme".into(),
-            ))
-        })?;
-    }
 
     let count = state.log_repo.delete_older_than_days(dto.days).await?;
     info!(days = dto.days, deleted = count, "Purge logs systeme");

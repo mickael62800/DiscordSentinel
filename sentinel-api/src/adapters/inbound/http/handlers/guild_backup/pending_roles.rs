@@ -7,17 +7,15 @@
 //! au join d'un membre il POST `/consume` qui renvoie ET supprime ses roles
 //! (atomique) ; `DELETE` purge la guild (nouveau restore propre).
 
+use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::guild_backup::pending_role_grant::PendingRoleGrant;
-use sentinel_core::domain::enums::system::role::Role;
 
 const OWNER_REQUIRED: &str = "owner requis (sauvegarde/restauration de serveur)";
 
@@ -49,11 +47,9 @@ pub struct ClearedGrantsDto {
 /// Body = liste de `{user_id, role_ids}`. Owner requis (bypass interne bot).
 pub async fn save_pending_roles(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<Vec<PendingRoleGrantDto>>,
 ) -> Result<(StatusCode, Json<SavedGrantsDto>), ApiError> {
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Owner, OWNER_REQUIRED).await?;
     let grants: Vec<PendingRoleGrant> = body
         .into_iter()
         .map(|g| PendingRoleGrant {
@@ -74,10 +70,8 @@ pub async fn save_pending_roles(
 /// aucune entree.
 pub async fn consume_pending_roles(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<ConsumedGrantDto>, ApiError> {
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Owner, OWNER_REQUIRED).await?;
     let role_ids = state
         .pending_role_grants_uc
         .take_grant(&guild_id, &user_id)
@@ -89,10 +83,8 @@ pub async fn consume_pending_roles(
 /// DELETE /api/guild-backup/{guild_id}/pending-roles — purge la guild.
 pub async fn clear_pending_roles(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<ClearedGrantsDto>, ApiError> {
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Owner, OWNER_REQUIRED).await?;
     let cleared = state.pending_role_grants_uc.clear_guild(&guild_id).await?;
     Ok(Json(ClearedGrantsDto { cleared }))
 }

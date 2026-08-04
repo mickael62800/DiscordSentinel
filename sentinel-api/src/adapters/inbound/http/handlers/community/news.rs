@@ -14,10 +14,9 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::community::public_guard::{
     clamp_limit, ensure_guild_id,
 };
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::community::news::{NewsPost, UpsertNewsCommand};
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 const DEFAULT_LIMIT: i64 = 5;
@@ -97,18 +96,10 @@ fn parse_published(s: Option<&str>) -> Result<Option<chrono::DateTime<chrono::Ut
 /// GET /api/news/{guild_id}
 pub async fn list_news(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<NewsDto>>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Viewer,
-        "acces aux annonces refuse",
-    )
-    .await?;
 
     let items = state
         .news_uc
@@ -124,18 +115,10 @@ pub async fn list_news(
 /// POST /api/news/{guild_id}
 pub async fn create_news(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<UpsertNewsDto>,
 ) -> Result<Json<NewsDto>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour publier une annonce",
-    )
-    .await?;
 
     let cmd = UpsertNewsCommand {
         guild_id,
@@ -145,7 +128,7 @@ pub async fn create_news(
         is_pinned: dto.is_pinned,
         is_public: dto.is_public,
         published_at: parse_published(dto.published_at.as_deref())?,
-        created_by: rbac
+        created_by: user
             .as_ref()
             .map(|Extension(c)| c.discord_user_id.clone())
             .unwrap_or_default(),
@@ -156,19 +139,11 @@ pub async fn create_news(
 /// PUT /api/news/detail/{id}
 pub async fn update_news(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpsertNewsDto>,
 ) -> Result<Json<NewsDto>, ApiError> {
     let existing = state.news_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &existing.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour modifier une annonce",
-    )
-    .await?;
 
     let cmd = UpsertNewsCommand {
         guild_id: existing.guild_id,
@@ -187,18 +162,10 @@ pub async fn update_news(
 /// DELETE /api/news/detail/{id}
 pub async fn delete_news(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let existing = state.news_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &existing.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour supprimer une annonce",
-    )
-    .await?;
 
     state.news_uc.delete(id).await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
@@ -225,6 +192,7 @@ pub struct PublicNewsDto {
 /// GET /api/public/news/{guild_id}
 pub async fn public_news(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<PublicNewsDto>>, ApiError> {

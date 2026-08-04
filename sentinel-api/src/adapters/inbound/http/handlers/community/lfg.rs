@@ -17,10 +17,9 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::community::public_guard::{
     clamp_limit, ensure_guild_id,
 };
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::community::lfg::{LfgPost, UpsertLfgCommand};
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 const DEFAULT_LIMIT: i64 = 20;
@@ -113,9 +112,9 @@ pub struct CreateLfgDto {
 /// Toutes les ecritures passent par la : sans identite, on ne sait ni a qui
 /// attribuer l'annonce, ni qui a le droit d'y toucher.
 fn require_ctx(
-    rbac: &Option<Extension<RoleContext>>,
-) -> Result<&RoleContext, ApiError> {
-    rbac.as_ref()
+    user: &Option<Extension<WebUser>>,
+) -> Result<&WebUser, ApiError> {
+    user.as_ref()
         .map(|Extension(c)| c)
         .ok_or_else(|| ApiError(DomainError::Forbidden("auth Discord requise".into())))
 }
@@ -123,7 +122,7 @@ fn require_ctx(
 /// Pseudo d'affichage d'un membre, resolu cote serveur.
 ///
 /// Jamais lu depuis le corps de la requete : un client pourrait alors publier
-/// une annonce sous le nom de quelqu'un d'autre. Le `RoleContext` ne porte que
+/// une annonce sous le nom de quelqu'un d'autre. Le `WebUser` ne porte que
 /// l'identifiant, on va donc chercher le pseudo dans `guild_members`.
 ///
 /// Un membre absent de la table (jamais synchronise) ne doit pas empecher de
@@ -141,18 +140,10 @@ async fn display_name(state: &AppState, guild_id: &str, user_id: &str) -> String
 /// GET /api/lfg/{guild_id}
 pub async fn list_lfg(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<LfgDto>>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Viewer,
-        "acces aux annonces refuse",
-    )
-    .await?;
 
     let posts = state
         .lfg_uc
@@ -168,11 +159,11 @@ pub async fn list_lfg(
 /// POST /api/lfg/{guild_id}
 pub async fn create_lfg(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<CreateLfgDto>,
 ) -> Result<Json<LfgDto>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
+    let ctx = require_ctx(&user)?;
 
     let expires_at = match dto.expires_at.as_deref() {
         Some(s) => Some(
@@ -203,34 +194,25 @@ pub async fn create_lfg(
     Ok(Json(state.lfg_uc.create(cmd).await?.into()))
 }
 
-/// Le demandeur est-il `Moderator+` sur cette guilde ?
+/// Le demandeur peut-il moderer une annonce qui n'est pas la sienne ?
 ///
-/// Sert a autoriser la moderation d'une annonce qui n'est pas la sienne. On
-/// interroge le role plutot que de l'exiger : un simple membre doit pouvoir
-/// continuer sur SES annonces.
-async fn is_staff(
-    state: &AppState,
-    rbac: &Option<Extension<RoleContext>>,
-    guild_id: &str,
-) -> bool {
-    check_role_for_guild(state, rbac, guild_id, Role::Moderator, "")
-        .await
-        .is_ok()
-}
+/// Depuis le passage en superadmin-only, oui dans tous les cas : un appelant
+/// web a forcement franchi le gate `SUPERADMIN_USER_IDS`, et un appelant
+/// interne (bot/worker) est de confiance. Le parametre reste passe au use case
+/// qui, lui, distingue encore proprietaire et staff.
+const CALLER_IS_STAFF: bool = true;
 
 /// POST /api/lfg/detail/{id}/close
 pub async fn close_lfg(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
-    let existing = state.lfg_uc.get(id).await?;
-    let staff = is_staff(&state, &rbac, &existing.guild_id).await;
+    let ctx = require_ctx(&user)?;
 
     state
         .lfg_uc
-        .close(id, &ctx.discord_user_id, staff)
+        .close(id, &ctx.discord_user_id, CALLER_IS_STAFF)
         .await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
@@ -238,16 +220,14 @@ pub async fn close_lfg(
 /// DELETE /api/lfg/detail/{id}
 pub async fn delete_lfg(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
-    let existing = state.lfg_uc.get(id).await?;
-    let staff = is_staff(&state, &rbac, &existing.guild_id).await;
+    let ctx = require_ctx(&user)?;
 
     state
         .lfg_uc
-        .delete(id, &ctx.discord_user_id, staff)
+        .delete(id, &ctx.discord_user_id, CALLER_IS_STAFF)
         .await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
 }
@@ -255,10 +235,10 @@ pub async fn delete_lfg(
 /// POST /api/lfg/detail/{id}/join — « je viens ».
 pub async fn join_lfg(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<LfgDto>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
+    let ctx = require_ctx(&user)?;
     let existing = state.lfg_uc.get(id).await?;
     let name = display_name(&state, &existing.guild_id, &ctx.discord_user_id).await;
 
@@ -269,10 +249,10 @@ pub async fn join_lfg(
 /// DELETE /api/lfg/detail/{id}/join — se retirer.
 pub async fn leave_lfg(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<LfgDto>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
+    let ctx = require_ctx(&user)?;
     Ok(Json(
         state.lfg_uc.leave(id, &ctx.discord_user_id).await?.into(),
     ))
@@ -304,6 +284,7 @@ pub struct PublicLfgDto {
 /// GET /api/public/lfg/{guild_id}
 pub async fn public_lfg(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<PublicLfgDto>>, ApiError> {

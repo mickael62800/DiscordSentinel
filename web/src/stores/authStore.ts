@@ -59,9 +59,8 @@ export const useAuthStore = defineStore("auth", () => {
 
     // Si on a un user en cache, valide que le token Discord est encore
     // accepte par l'API. Sur 401 (token expire) -> http.ts purge + redirige.
-    // Sur 403 (whitelist_middleware refuse : user pas/plus dans api_user_guilds)
-    // on clear localement et on redirige sur /login?error=not_invited pour
-    // proposer un code d'invitation.
+    // Sur 403 (le compte n'est plus dans SUPERADMIN_USER_IDS) on purge la
+    // session locale et on renvoie vers /login avec un message explicite.
     if (user.value) {
       try {
         const { httpGet } = await import("@/api/http");
@@ -76,7 +75,7 @@ export const useAuthStore = defineStore("auth", () => {
           } catch { /* ignore */ }
           // Redirect manuel vers login avec message explicite.
           if (window.location.pathname !== "/login") {
-            window.location.href = "/login?error=not_invited";
+            window.location.href = "/login?error=not_authorized";
           }
         }
         // 401 / network : http.ts gere ou on laisse passer.

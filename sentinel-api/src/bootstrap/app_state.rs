@@ -457,21 +457,6 @@ pub async fn build_app_state(
         ),
     );
 
-    // Invitations : repo Postgres + use case (generation code unique, octroi de
-    // role atomique au redeem). Le SQL vit dans le repo, la regle metier dans le
-    // service, le handler HTTP ne fait que parse/RBAC/map.
-    let invitation_repo = Arc::new(
-        crate::adapters::outbound::postgres::system::invitation_repository::PgInvitationRepository::new(
-            pg_pool.clone(),
-        ),
-    );
-    let invitations_uc: Arc<
-        dyn crate::ports::inbound::system::manage_invitations::ManageInvitationsUseCase,
-    > = Arc::new(
-        crate::application::system::manage_invitations_service::ManageInvitationsService::new(
-            invitation_repo,
-        ),
-    );
 
     // Sauvegarde / restauration de serveur (guild_backup) : repo + use case.
     let snapshot_repo: Arc<dyn crate::ports::outbound::guild_backup::snapshot_repository::SnapshotRepository> =
@@ -568,17 +553,6 @@ pub async fn build_app_state(
             oauth_session_repo,
         ));
 
-    // RBAC applicatif (CRUD roles owner) : repo Postgres + use case. Le SQL
-    // (api_users / api_user_guilds) vit dans l'adapter, les garde-fous metier
-    // (anti-lockout, dernier owner) dans le service ; le handler ne fait que
-    // gate/parse/map. Distinct du middleware RBAC (resolution de role).
-    let rbac_repo: Arc<dyn crate::ports::outbound::system::rbac_repository::RbacRepository> =
-        Arc::new(crate::adapters::outbound::postgres::system::rbac_repository::PgRbacRepository::new(pg_pool.clone()));
-    let rbac_admin_uc: Arc<dyn crate::ports::inbound::system::manage_rbac::ManageRbacUseCase> =
-        Arc::new(sentinel_core::application::system::manage_rbac_service::ManageRbacService::new(
-            rbac_repo,
-        ));
-
     // Quarantaine de securite : repo Postgres (SQL security_quarantine_pending) +
     // use case (calcul du delai avant kick). Le handler ne fait que parse/RBAC/map.
     let quarantine_repo: Arc<dyn crate::ports::outbound::system::quarantine_repository::QuarantineRepository> =
@@ -605,26 +579,6 @@ pub async fn build_app_state(
     let slowmode_uc: Arc<dyn crate::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCase> =
         Arc::new(sentinel_core::application::system::manage_slowmode_service::ManageSlowmodeService::new(
             slowmode_repo,
-        ));
-
-    // Visibilite des composants UI par role : repo Postgres (SQL
-    // rbac_component_visibility + transaction batch) + use case. Le handler ne
-    // fait que parse/RBAC/valider/map.
-    let component_visibility_repo: Arc<dyn crate::ports::outbound::system::component_visibility_repository::ComponentVisibilityRepository> =
-        Arc::new(crate::adapters::outbound::postgres::system::component_visibility_repository::PgComponentVisibilityRepository::new(pg_pool.clone()));
-    let component_visibility_uc: Arc<dyn crate::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase> =
-        Arc::new(sentinel_core::application::system::manage_component_visibility_service::ManageComponentVisibilityService::new(
-            component_visibility_repo,
-        ));
-
-    // Overrides RBAC de min_role par composant sensible : repo Postgres (SQL
-    // rbac_component_min_role) + use case. Le handler ne fait que RBAC/valider
-    // (registry component_gates) puis mapper ; le cache Redis reste au handler.
-    let component_min_role_repo: Arc<dyn crate::ports::outbound::system::component_min_role_repository::ComponentMinRoleRepository> =
-        Arc::new(crate::adapters::outbound::postgres::system::component_min_role_repository::PgComponentMinRoleRepository::new(pg_pool.clone()));
-    let component_min_role_uc: Arc<dyn crate::ports::inbound::system::manage_component_min_role::ManageComponentMinRoleUseCase> =
-        Arc::new(sentinel_core::application::system::manage_component_min_role_service::ManageComponentMinRoleService::new(
-            component_min_role_repo,
         ));
 
     // Règles d'alerte de supervision : repo Postgres (SQL alert_rules) + use
@@ -762,12 +716,9 @@ pub async fn build_app_state(
         rules_uc,
         infractions_uc,
         tickets_uc,
-        invitations_uc,
         quarantine_uc,
         lockdown_uc,
         slowmode_uc,
-        component_visibility_uc,
-        component_min_role_uc,
         alert_rules_uc,
         bot_persistence_uc,
         server_events_uc,
@@ -831,7 +782,6 @@ pub async fn build_app_state(
         security_logs_uc,
         security_audit_uc,
         oauth_uc,
-        rbac_admin_uc,
         tls_cert_uc,
         docker_host,
         geoip_uc,
@@ -879,7 +829,5 @@ pub async fn build_app_state(
         rate_limiter: Some(Arc::new(
             crate::adapters::outbound::system::rate_limiter::RateLimiter::from_env(),
         )),
-        rbac_global_gate: config.rbac_global_gate,
-        rbac_global_gate_audit: config.rbac_global_gate_audit,
     }
 }

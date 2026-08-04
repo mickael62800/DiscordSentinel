@@ -5,11 +5,8 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::middleware::rbac::{
-    check_role, check_role_for_guild, RoleContext,
-};
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::validation;
 use axum::extract::Query;
 use axum::extract::State;
@@ -19,7 +16,7 @@ use axum::Json;
 /// POST /api/security/events — signaler un événement de sécurité (depuis le security-bot)
 pub async fn report_event(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<ReportEventDto>,
 ) -> Result<Json<SecurityEventResponseDto>, ApiError> {
     // Validation
@@ -28,14 +25,6 @@ pub async fn report_event(
     // Reserve au security-bot (Bearer API_KEY -> Internal, bypass) et aux admins
     // du serveur concerne. Empeche un user web de forger des evenements de
     // securite (faux positifs / watched users) pour une guilde arbitraire.
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Admin,
-        "role insuffisant pour signaler un evenement de securite",
-    )
-    .await?;
 
     let (command, (event_type, severity, description, guild_id)) =
         crate::capture_and_into!(dto, event_type, severity, description, guild_id);
@@ -60,17 +49,9 @@ pub async fn report_event(
 /// crees automatiquement par ces evenements.
 pub async fn purge_events(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    crate::adapters::inbound::http::middleware::component_gates::check_component_role(
-        &state,
-        &rbac,
-        &guild_id,
-        "db.purge.security_events",
-        "role insuffisant pour purger les evenements de securite",
-    )
-    .await?;
 
     // La purge (SQL) vit dans le use case / repo (plus de SQL inline).
     let (deleted_events, deleted_watches) = state.security_uc.purge_events(&guild_id).await?;
@@ -84,21 +65,9 @@ pub async fn purge_events(
 /// GET /api/security/events — lister les événements de sécurité
 pub async fn list_events(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(params): Query<SecurityQueryParams>,
 ) -> Result<Json<Vec<SecurityEventResponseDto>>, ApiError> {
-    // Scope : un appelant web doit etre modo du serveur demande ; la liste
-    // globale (sans guild_id) est reservee aux appels internes/superadmin.
-    match params.guild_id.as_deref() {
-        Some(gid) => {
-            check_role_for_guild(&state, &rbac, gid, Role::Moderator, "role insuffisant").await?
-        }
-        None => check_role(
-            &rbac,
-            Role::Owner,
-            "guild_id requis pour lister les evenements de securite",
-        )?,
-    }
     let events = state
         .security_uc
         .list_events(params.guild_id.as_deref())

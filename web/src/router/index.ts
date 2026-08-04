@@ -132,11 +132,11 @@ export const routes: RouteRecordRaw[] = [
 
   // ── Configuration / Admin ──
   { path: "/component-config", name: "component-config", component: () => import("../components/pages/ComponentConfigPage.vue") },
-  { path: "/rbac", name: "rbac", component: () => import("../components/pages/RbacPage.vue") },
   { path: "/system/operations", name: "system-ops", component: () => import("../components/pages/SystemOpsPage.vue") },
   { path: "/server-health", name: "server-health", component: () => import("../components/pages/ServerHealthPage.vue") },
   { path: "/alert-rules", name: "alert-rules", component: () => import("../components/pages/AlertRulesPage.vue") },
   { path: "/server-security", name: "server-security", component: () => import("../components/pages/ServerSecurityPage.vue") },
   { path: "/guild-backup", name: "guild-backup", component: () => import("../components/pages/GuildBackupPage.vue") },
+  { path: "/server-builder", name: "server-builder", component: () => import("../components/pages/ServerBuilderPage.vue") },
   { path: "/ai-dataset", name: "ai-dataset", component: () => import("../components/pages/AiDatasetPage.vue") },
 ];

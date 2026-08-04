@@ -16,12 +16,11 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::community::event::{
     CommunityEvent, EventAnswer, EventStatus, UpsertEventCommand,
 };
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::outbound::community::event_repository::EventWindow;
 
@@ -145,18 +144,10 @@ fn parse_dt(s: &str, field: &str) -> Result<DateTime<Utc>, ApiError> {
 /// GET /api/events/{guild_id}?from=&to=
 pub async fn list_events(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<EventDto>>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Viewer,
-        "acces au planning refuse",
-    )
-    .await?;
 
     let events = state
         .events_uc
@@ -168,18 +159,10 @@ pub async fn list_events(
 /// GET /api/events/detail/{id}
 pub async fn get_event(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<EventDetailDto>, ApiError> {
     let detail = state.events_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &detail.event.guild_id,
-        Role::Viewer,
-        "acces au planning refuse",
-    )
-    .await?;
 
     Ok(Json(EventDetailDto {
         participants: detail
@@ -198,20 +181,12 @@ pub async fn get_event(
 /// POST /api/events/{guild_id}
 pub async fn create_event(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<UpsertEventDto>,
 ) -> Result<Json<EventDto>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour creer un evenement",
-    )
-    .await?;
 
-    let author = rbac
+    let author = user
         .as_ref()
         .map(|Extension(c)| c.discord_user_id.clone())
         .unwrap_or_default();
@@ -235,19 +210,11 @@ pub async fn create_event(
 /// PUT /api/events/detail/{id}
 pub async fn update_event(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpsertEventDto>,
 ) -> Result<Json<EventDto>, ApiError> {
     let existing = state.events_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &existing.event.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour modifier un evenement",
-    )
-    .await?;
 
     let cmd = UpsertEventCommand {
         guild_id: existing.event.guild_id.clone(),
@@ -268,18 +235,10 @@ pub async fn update_event(
 /// DELETE /api/events/detail/{id}
 pub async fn delete_event(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let existing = state.events_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &existing.event.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour supprimer un evenement",
-    )
-    .await?;
 
     state.events_uc.delete(id).await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
@@ -294,11 +253,11 @@ pub struct JoinDto {
 /// POST /api/events/detail/{id}/join — s'inscrire (ou changer d'avis).
 pub async fn join_event(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<JoinDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let Some(Extension(ctx)) = rbac else {
+    let Some(Extension(ctx)) = user else {
         return Err(ApiError(DomainError::Forbidden("auth Discord requise".into())));
     };
 
@@ -317,10 +276,10 @@ pub async fn join_event(
 /// DELETE /api/events/detail/{id}/join — se desinscrire.
 pub async fn leave_event(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let Some(Extension(ctx)) = rbac else {
+    let Some(Extension(ctx)) = user else {
         return Err(ApiError(DomainError::Forbidden("auth Discord requise".into())));
     };
     state.events_uc.leave(id, &ctx.discord_user_id).await?;
@@ -348,6 +307,7 @@ pub struct PublicEventDto {
 /// GET /api/public/events/{guild_id}?from=&to=
 pub async fn public_events(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<PublicEventDto>>, ApiError> {

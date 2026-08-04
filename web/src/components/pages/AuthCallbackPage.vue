@@ -4,7 +4,7 @@ import { onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 import { setDiscordUser, setDiscordToken, type DiscordUser } from "@/api/config";
 import { useAuthStore } from "@/stores/authStore";
-import { invitationsService } from "@/services/invitationsService";
+import { httpGet } from "@/api/http";
 import { takeEntryDestination } from "@/entrySpace";
 
 const router = useRouter();
@@ -12,8 +12,6 @@ const store = useAuthStore();
 
 const status = ref<"redeeming" | "ok" | "error">("ok");
 const message = ref("Connexion en cours…");
-
-const PENDING_INVITE_KEY = "ds.pending_invitation_code";
 
 onMounted(async () => {
   // Backend redirige ici avec les infos dans le FRAGMENT (#…) pour eviter
@@ -45,47 +43,28 @@ onMounted(async () => {
   // Nettoie l'URL (retire le fragment sensible) avant la prochaine nav.
   history.replaceState(null, "", window.location.pathname);
 
-  // Si un code d'invitation a ete saisi sur la page Login, on tente le redeem
-  // MAINTENANT (le token Discord est dispo, l'API peut nous identifier).
-  const pendingCode = sessionStorage.getItem(PENDING_INVITE_KEY);
-  if (pendingCode) {
-    sessionStorage.removeItem(PENDING_INVITE_KEY);
-    status.value = "redeeming";
-    message.value = `Application du code d'invitation ${pendingCode}…`;
-    try {
-      const r = await invitationsService.redeem(pendingCode);
-      message.value = `✅ Code accepté ! Rôle ${r.role}. Redirection…`;
-      status.value = "ok";
-    } catch (e) {
-      const msg = errMsg(e);
-      message.value = `⚠️ Code refusé : ${msg}`;
-      status.value = "error";
-      // Pause pour que l'utilisateur lise le message
-      await new Promise((r) => setTimeout(r, 2500));
-    }
-  }
-
-  // Verifie que le user est bien autorise a acceder au site.
-  // Si pas de row dans api_user_guilds + pas superadmin -> retour login
-  // avec un message explicatif pour proposer la saisie d'un code.
+  // Verifie que le compte Discord est autorise. L'acces au back-office est
+  // reserve aux identifiants listes dans SUPERADMIN_USER_IDS cote API : celle-ci
+  // repond 200 si c'est le cas, 403 sinon.
   status.value = "redeeming";
   message.value = "Vérification des accès…";
   try {
-    const access = await invitationsService.checkAccess();
-    if (!access.is_authorized) {
-      message.value = "Accès refusé. Tu n'es pas dans la liste des utilisateurs autorisés.";
+    await httpGet("/api/auth/check-access");
+  } catch (e) {
+    const msg = errMsg(e);
+    if (msg.includes("403")) {
+      message.value = "Accès refusé. Ce compte Discord n'est pas administrateur.";
       status.value = "error";
       // Cleanup le token pour ne pas laisser une session "fantome"
       setDiscordToken("");
       setDiscordUser(null);
       store.$patch({ user: null, initialized: true });
       await new Promise((r) => setTimeout(r, 2500));
-      router.replace({ name: "login", query: { error: "not_invited" } });
+      router.replace({ name: "login", query: { error: "not_authorized" } });
       return;
     }
-  } catch (e) {
-    // Si check-access echoue (rate limit Discord, etc.), on laisse passer
-    // pour ne pas bloquer un user legitime sur une erreur transitoire.
+    // Erreur transitoire (reseau, rate limit Discord) : on laisse passer
+    // plutot que de bloquer l'administrateur legitime.
     console.warn("check-access failed, proceeding anyway:", e);
   }
 

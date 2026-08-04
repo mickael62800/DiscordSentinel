@@ -1,7 +1,6 @@
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::State;
-use axum::Extension;
 use axum::Json;
 use uuid::Uuid;
 
@@ -10,11 +9,7 @@ use crate::adapters::inbound::http::dto::moderation::rules::RuleResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::middleware::rbac::check_role;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 
 pub async fn get_rules(
     State(state): State<AppState>,
@@ -26,19 +21,10 @@ pub async fn get_rules(
 
 pub async fn create_rule(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateRuleDto>,
 ) -> Result<Json<RuleResponseDto>, ApiError> {
     // Guild fourni dans le body (pas dans le path) : lookup explicite via
     // check_role_for_guild. Pass-through si pas de RoleContext (appel bot).
-    check_role_for_guild(
-        &state,
-        &rbac,
-        dto.guild_id.as_str(),
-        Role::Admin,
-        "admin+ requis pour creer/modifier une regle",
-    )
-    .await?;
     let command = dto.into();
     let rule = state.rules_uc.create_or_update_rule(command).await?;
     Ok(single_dto(rule))
@@ -46,10 +32,8 @@ pub async fn create_rule(
 
 pub async fn delete_rule(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, rule_id)): Path<(String, Uuid)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role(&rbac, Role::Admin, "admin+ requis pour supprimer une regle")?;
     state.rules_uc.delete_rule(&guild_id, rule_id).await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
 }

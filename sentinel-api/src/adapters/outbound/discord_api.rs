@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use sentinel_core::domain::errors::DomainError;
 pub use sentinel_core::ports::outbound::discord_api::{
-    DiscordApi, DiscordChannel, DiscordMember, DiscordUser, UserGuild,
+    DiscordApi, DiscordChannel, DiscordMember, DiscordRoleInfo, DiscordUser, NewChannel, UserGuild,
 };
 
 /// Service pour les appels a l'API Discord.
@@ -12,11 +12,29 @@ pub struct DiscordApiService {
     client: reqwest::Client,
 }
 
+/// Plafond de duree d'un appel Discord. Le defaut de reqwest est ILLIMITE : un
+/// incident cote Discord bloquait une requete du panel indefiniment, et avec
+/// elle un worker tokio. 30 s laisse largement passer les appels lents
+/// (listes de membres) tout en bornant le pire cas.
+const HTTP_TIMEOUT_SECS: u64 = 30;
+
+/// Nombre de re-essais apres un 429 (limite de rythme Discord).
+const RATE_LIMIT_RETRIES: u32 = 3;
+/// Attente maximale honoree entre deux essais. Au-dela, on rend la main a
+/// l'appelant plutot que de tenir la requete HTTP du panel ouverte.
+const RATE_LIMIT_MAX_WAIT_SECS: f64 = 5.0;
+
 impl DiscordApiService {
     pub fn new(token: String) -> Self {
         Self {
             token,
-            client: reqwest::Client::new(),
+            client: reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(HTTP_TIMEOUT_SECS))
+                .build()
+                // Un builder qui echoue signifierait un environnement TLS
+                // casse ; on retombe sur le client par defaut plutot que de
+                // faire paniquer le demarrage de l'API.
+                .unwrap_or_else(|_| reqwest::Client::new()),
         }
     }
 
@@ -32,6 +50,49 @@ impl DiscordApiService {
             ));
         }
         Ok(())
+    }
+}
+
+/// Delai d'attente demande par Discord apres un 429, en secondes.
+///
+/// L'en-tete `Retry-After` fait foi. Discord le renvoie parfois en
+/// fractions de seconde (« 0.75 »), d'ou le parse en flottant.
+fn retry_after_secs(resp: &reqwest::Response) -> Option<f64> {
+    resp.headers()
+        .get("retry-after")?
+        .to_str()
+        .ok()?
+        .parse::<f64>()
+        .ok()
+        .filter(|v| *v >= 0.0)
+}
+
+/// Envoie une requete en respectant la limite de rythme Discord.
+///
+/// Un 429 n'est pas une erreur de l'appelant : c'est Discord qui demande
+/// d'attendre. Sur la creation d'un plan de salons, un seul 429 non gere
+/// faisait echouer tous les salons suivants — l'attente rend l'operation
+/// simplement plus lente au lieu de la casser a moitie.
+async fn send_with_rate_limit<F>(build: F) -> Result<reqwest::Response, DomainError>
+where
+    F: Fn() -> reqwest::RequestBuilder,
+{
+    let mut attempts = 0;
+    loop {
+        let resp = build()
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord API error: {e}")))?;
+
+        if resp.status().as_u16() != 429 || attempts >= RATE_LIMIT_RETRIES {
+            return Ok(resp);
+        }
+        let wait = retry_after_secs(&resp)
+            .unwrap_or(1.0)
+            .min(RATE_LIMIT_MAX_WAIT_SECS);
+        tracing::debug!(wait, attempts, "Discord 429 : attente avant re-essai");
+        tokio::time::sleep(std::time::Duration::from_secs_f64(wait)).await;
+        attempts += 1;
     }
 }
 
@@ -125,9 +186,133 @@ impl DiscordApi for DiscordApiService {
             2 => Some("voice"),
             4 => Some("category"),
             13 => Some("stage"),
+            // Les forums sont creables depuis le constructeur de salons : les
+            // omettre ici les rendait invisibles apres creation, donc
+            // impossibles a supprimer depuis le panel et faciles a dupliquer.
+            15 => Some("forum"),
             _ => None,
         })
         .await
+    }
+
+    /// Cree un salon / une categorie. Renvoie l'ID du salon cree.
+    ///
+    /// Les overwrites arrivent deja calcules (bits allow/deny) : le choix des
+    /// permissions est une regle metier, pas un detail de transport.
+    async fn create_channel(
+        &self,
+        guild_id: &str,
+        spec: &NewChannel<'_>,
+    ) -> Result<String, DomainError> {
+        self.ensure_configured()?;
+        let url = format!("https://discord.com/api/v10/guilds/{}/channels", guild_id);
+
+        let mut body = serde_json::json!({
+            "name": spec.name,
+            "type": spec.kind,
+            "nsfw": spec.nsfw,
+        });
+        if let Some(parent) = spec.parent_id {
+            body["parent_id"] = serde_json::Value::String(parent.to_string());
+        }
+        if let Some(topic) = spec.topic.filter(|t| !t.is_empty()) {
+            body["topic"] = serde_json::Value::String(topic.to_string());
+        }
+        if spec.slowmode > 0 {
+            body["rate_limit_per_user"] = serde_json::json!(spec.slowmode);
+        }
+        if let Some(limit) = spec.user_limit {
+            body["user_limit"] = serde_json::json!(limit);
+        }
+        if !spec.overwrites.is_empty() {
+            // Les bitfields Discord se transportent en CHAINES : ils depassent
+            // la precision entiere de JSON.
+            body["permission_overwrites"] = serde_json::Value::Array(
+                spec.overwrites
+                    .iter()
+                    .map(|ow| {
+                        serde_json::json!({
+                            "id": ow.role_id,
+                            "type": 0, // 0 = role
+                            "allow": ow.allow.to_string(),
+                            "deny": ow.deny.to_string(),
+                        })
+                    })
+                    .collect(),
+            );
+        }
+
+        let resp = send_with_rate_limit(|| {
+            self.client
+                .post(&url)
+                .header("Authorization", format!("Bot {}", self.token))
+                .json(&body)
+        })
+        .await?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            // Ces messages atterrissent tels quels dans le compte rendu du
+            // panel, en face du salon concerne : ils doivent dire quoi faire,
+            // pas recracher la reponse de Discord.
+            return Err(match status.as_u16() {
+                403 => DomainError::Forbidden(
+                    "Le bot n'a pas la permission « Gerer les salons » sur ce serveur, ou ne peut \
+                     pas accorder une permission qu'il ne possede pas lui-meme."
+                        .into(),
+                ),
+                429 => DomainError::RateLimited(
+                    "Discord limite le rythme de creation. Les salons restants n'ont pas ete \
+                     crees : relancez le plan dans quelques instants."
+                        .into(),
+                ),
+                400 if body.contains("Maximum number of channels") => DomainError::ValidationError(
+                    "Le serveur a atteint la limite Discord de 500 salons.".into(),
+                ),
+                400 => DomainError::ValidationError(format!("Salon refuse par Discord : {body}")),
+                404 => DomainError::NotFound(
+                    "Serveur Discord introuvable (le bot y est-il present ?)".into(),
+                ),
+                _ => DomainError::Internal(format!("Discord create_channel ({status}): {body}")),
+            });
+        }
+
+        let created: serde_json::Value = resp
+            .json()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Parse error: {e}")))?;
+        created
+            .get("id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| {
+                DomainError::Internal("Discord create_channel: reponse sans id".into())
+            })
+    }
+
+    /// Supprime un salon / une categorie. Supprimer une categorie ne supprime
+    /// pas ses salons (Discord les remonte a la racine) : c'est le
+    /// comportement natif, on ne le contredit pas ici.
+    async fn delete_channel(&self, channel_id: &str) -> Result<(), DomainError> {
+        self.ensure_configured()?;
+        let url = format!("https://discord.com/api/v10/channels/{}", channel_id);
+
+        let resp = send_with_rate_limit(|| {
+            self.client
+                .delete(&url)
+                .header("Authorization", format!("Bot {}", self.token))
+        })
+        .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!(
+                "Discord delete_channel failed ({status}): {body}"
+            )));
+        }
+        Ok(())
     }
 
     /// Upload un emoji custom sur un serveur Discord.
@@ -384,6 +569,48 @@ impl DiscordApi for DiscordApiService {
     }
 
     // ── Gestion des roles ──
+
+    /// Liste les roles du serveur EN DIRECT (source : Discord, pas la table
+    /// `discord_roles` synchronisee). Trie du plus haut au plus bas, comme
+    /// Discord les affiche.
+    async fn list_roles(&self, guild_id: &str) -> Result<Vec<DiscordRoleInfo>, DomainError> {
+        self.ensure_configured()?;
+        let url = format!("https://discord.com/api/v10/guilds/{}/roles", guild_id);
+
+        let resp = send_with_rate_limit(|| {
+            self.client
+                .get(&url)
+                .header("Authorization", format!("Bot {}", self.token))
+        })
+        .await?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!(
+                "Discord list_roles failed ({status}): {body}"
+            )));
+        }
+
+        let raw: Vec<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord list_roles parse: {e}")))?;
+        let mut roles: Vec<DiscordRoleInfo> = raw
+            .into_iter()
+            .filter_map(|r| {
+                Some(DiscordRoleInfo {
+                    id: r.get("id")?.as_str()?.to_string(),
+                    name: r.get("name")?.as_str()?.to_string(),
+                    color: r.get("color").and_then(|v| v.as_u64()).unwrap_or(0) as u32,
+                    position: r.get("position").and_then(|v| v.as_i64()).unwrap_or(0),
+                    managed: r.get("managed").and_then(|v| v.as_bool()).unwrap_or(false),
+                })
+            })
+            .collect();
+        roles.sort_by(|a, b| b.position.cmp(&a.position));
+        Ok(roles)
+    }
 
     /// Creer un role Discord.
     async fn create_role(

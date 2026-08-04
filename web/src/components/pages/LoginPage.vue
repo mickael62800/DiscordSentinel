@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import AppButton from "../atoms/AppButton.vue";
@@ -10,11 +10,11 @@ const router = useRouter();
 const route = useRoute();
 const { loading, error, login, user } = useAuth();
 
-// Affiche un message specifique si l'auth a refuse (ex: not_invited)
+// Affiche un message specifique si l'auth a refuse (ex: not_authorized)
 const queryError = computed<string | null>(() => {
   const e = route.query.error;
-  if (e === "not_invited") {
-    return "Accès refusé : tu n'es pas dans la liste des utilisateurs autorisés. Si tu as un code d'invitation, colle-le ci-dessous et reconnecte-toi.";
+  if (e === "not_authorized") {
+    return "Accès refusé : ce compte Discord n'est pas administrateur de l'instance.";
   }
   if (e === "callback_invalide") {
     return "Erreur OAuth : le callback Discord est invalide. Réessaie.";
@@ -25,28 +25,11 @@ const queryError = computed<string | null>(() => {
   return null;
 });
 
-// Champ code d'invitation : optionnel. Si renseigne, on le stocke en
-// sessionStorage et apres OAuth callback la page /auth/callback le
-// redeem (consomme + grant role) avant de rediriger sur le dashboard.
-const invitationCode = ref("");
-const showInviteField = ref(false);
-
-const PENDING_INVITE_KEY = "ds.pending_invitation_code";
-
 // L'espace vise arrive en query (`?espace=membre`). On le memorise tout de
 // suite : le detour par Discord quitte la page et la perdrait.
 rememberEntrySpace(route.query.espace);
 
 async function handleLogin() {
-  // Si un code est saisi, on le persist en sessionStorage pour que
-  // AuthCallbackPage puisse le retrouver apres le redirect Discord.
-  const code = invitationCode.value.trim().toUpperCase();
-  if (code) {
-    sessionStorage.setItem(PENDING_INVITE_KEY, code);
-  } else {
-    sessionStorage.removeItem(PENDING_INVITE_KEY);
-  }
-
   await login();
   if (user.value) {
     router.push(takeEntryDestination());
@@ -66,31 +49,6 @@ async function handleLogin() {
       <!-- Message d'erreur si redirection avec ?error=... -->
       <div v-if="queryError" class="query-error">
         ⚠️ {{ queryError }}
-      </div>
-
-      <!-- Champ code d'invitation (optionnel, replie par defaut) -->
-      <div class="invite-toggle">
-        <button
-          type="button"
-          class="invite-toggle-btn"
-          @click="showInviteField = !showInviteField"
-        >
-          🎟️ {{ showInviteField ? "Masquer" : "J'ai un code d'invitation" }}
-        </button>
-      </div>
-      <div v-if="showInviteField" class="invite-field">
-        <input
-          v-model="invitationCode"
-          type="text"
-          placeholder="XXXX-XXXX-XXXX"
-          maxlength="14"
-          class="invite-input"
-          autocomplete="off"
-        />
-        <p class="hint">
-          Colle ici ton code d'invitation, puis clique sur "Se connecter avec Discord".
-          Le code sera consommé automatiquement après ton login.
-        </p>
       </div>
 
       <AppButton

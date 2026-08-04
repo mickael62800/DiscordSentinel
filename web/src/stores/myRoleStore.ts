@@ -1,53 +1,44 @@
 import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import type { MyRole, RbacRole } from "@/types";
-import { rbacService } from "@/services/rbacService";
 
 /**
- * Store Pinia : role RBAC de l'utilisateur courant pour la guild selectionnee.
+ * Store Pinia : identite applicative de l'utilisateur courant.
  *
- * Load idempotent : si deja charge pour cette guild, no-op. Si en cours de
- * chargement, retourne la promesse en vol (evite les fetch paralleles).
+ * Le back-office n'a plus qu'un mode d'acces — les Discord user IDs listes
+ * dans SUPERADMIN_USER_IDS cote API. Quiconque atteint le front y figure
+ * forcement : le middleware d'API refuse (403) tous les autres avant meme
+ * d'atteindre un handler. Il n'y a donc plus de role a resoudre, ni d'appel
+ * reseau a faire ici.
  *
- * Visible dans Vue DevTools sous "myRole".
+ * Le store est conserve plutot que supprime avec ses sites d'appel : les
+ * conditions d'interface qui l'interrogent restent valides, elles sont
+ * simplement toujours vraies.
  */
+const SUPERADMIN: MyRole = {
+  discord_user_id: "",
+  guild_id: "",
+  role: "owner" as RbacRole,
+  is_superadmin: true,
+};
+
 export const useMyRoleStore = defineStore("myRole", () => {
-  const myRole = ref<MyRole | null>(null);
+  const myRole = ref<MyRole | null>(SUPERADMIN);
   const loading = ref(false);
 
-  // Etats internes (pas exposes - juste pour le caching)
-  let lastLoadedGuild: string | null = null;
-  let inFlight: Promise<MyRole | null> | null = null;
-
   const role = computed<RbacRole | null>(() => myRole.value?.role ?? null);
-  const isSuper = computed(() => myRole.value?.is_superadmin === true);
+  const isSuper = computed(() => true);
 
-  async function load(guildId: string): Promise<MyRole | null> {
-    if (lastLoadedGuild === guildId && !inFlight) return myRole.value;
-    if (inFlight && lastLoadedGuild === guildId) return inFlight;
-
-    loading.value = true;
-    inFlight = (async () => {
-      try {
-        const me = await rbacService.getMyRole(guildId).catch(() => null);
-        myRole.value = me;
-        lastLoadedGuild = guildId;
-        return me;
-      } finally {
-        loading.value = false;
-        inFlight = null;
-      }
-    })();
-    return inFlight;
+  async function load(_guildId: string): Promise<MyRole | null> {
+    return myRole.value;
   }
 
   function reset(): void {
-    myRole.value = null;
-    lastLoadedGuild = null;
+    /* Rien a reinitialiser : l'identite ne depend plus de la guilde. */
   }
 
   function invalidate(): void {
-    lastLoadedGuild = null;
+    /* Rien a invalider : aucune donnee distante n'est mise en cache. */
   }
 
   return { myRole, role, isSuper, loading, load, reset, invalidate };

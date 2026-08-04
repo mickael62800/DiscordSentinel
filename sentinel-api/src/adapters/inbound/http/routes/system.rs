@@ -83,21 +83,6 @@ pub fn routes() -> Router<AppState> {
             "/api/exports/jobs/{id}",
             get(handlers::system::exports::get_export_job),
         )
-        // Phase 7 B — Endpoints RBAC CRUD (gated via require_role dans les handlers)
-        .route(
-            "/api/rbac/guilds/{guild_id}/users",
-            get(handlers::system::rbac::list_guild_users),
-        )
-        .route(
-            "/api/rbac/guilds/{guild_id}/users/{user_id}",
-            post(handlers::system::rbac::grant_role)
-                .patch(handlers::system::rbac::update_role)
-                .delete(handlers::system::rbac::revoke_role),
-        )
-        .route(
-            "/api/rbac/me/{guild_id}",
-            get(handlers::system::rbac::get_my_role),
-        )
         // Phase 1 sync Discord <-> Web : mapping action_id <-> Discord message
         .route(
             "/api/discord-messages/register",
@@ -187,33 +172,16 @@ pub fn routes() -> Router<AppState> {
         )
         // Note : la collecte des messages (ex POST /api/ai-dataset/collect) est
         // passee en gRPC `AiDatasetService.CollectMessage` (cf. audit transport).
-        // Invitations a usage unique (owner+ pour gerer, auth pour redeem)
-        .route(
-            "/api/invitations",
-            post(handlers::system::invitations::create_invitation),
-        )
-        .route(
-            "/api/invitations/{guild_id}",
-            get(handlers::system::invitations::list_invitations),
-        )
-        .route(
-            "/api/invitations/code/{code}",
-            delete(handlers::system::invitations::revoke_invitation),
-        )
-        .route(
-            "/api/auth/redeem-invitation",
-            post(handlers::system::invitations::redeem_invitation),
-        )
+        // Sondes d'autorisation : 200 si la requete a franchi le gate
+        // superadmin, 403 sinon (le middleware repond avant le handler).
         .route(
             "/api/auth/check-access",
-            get(handlers::system::invitations::check_access),
+            get(handlers::system::nexus_access::check_access),
         )
         // Cible de `auth_request` nginx pour la passerelle /nexus-api/.
-        // Repond 200/403 selon le gate RBAC `nexus.access` (guild en en-tete
-        // X-Guild-Id). Voir handlers::system::rbac::nexus_access.
         .route(
             "/api/auth/nexus-access",
-            get(handlers::system::rbac::nexus_access),
+            get(handlers::system::nexus_access::nexus_access),
         )
         // Security monitoring (admin+) : top IPs, auth failures, audit logs, TLS
         .route(
@@ -307,22 +275,5 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/api/security/manual-bans",
             get(handlers::system::security::manual_bans),
-        )
-        // RBAC component visibility (overrides UI par role)
-        .route(
-            "/api/rbac/component-visibility/{guild_id}",
-            get(handlers::system::component_visibility::list_visibility)
-                .put(handlers::system::component_visibility::upsert_visibility),
-        )
-        // RBAC component min_role (gates API granulaires : qui a le droit
-        // de purger quoi). Source de verite securite, pas juste UI.
-        .route(
-            "/api/rbac/component-min-role/{guild_id}",
-            get(handlers::system::component_min_role::list_min_roles)
-                .put(handlers::system::component_min_role::upsert_min_role),
-        )
-        .route(
-            "/api/rbac/component-min-role/{guild_id}/{component_key}",
-            axum::routing::delete(handlers::system::component_min_role::delete_min_role),
         )
 }

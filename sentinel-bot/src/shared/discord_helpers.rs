@@ -77,6 +77,22 @@ pub async fn edit_response_text(ctx: &Context, command: &CommandInteraction, con
     }
 }
 
+/// Edit la reponse (apres un `defer_ephemeral`) avec un embed.
+/// A utiliser a la place de `create_response` quand le handler a deja defere :
+/// un second `create_response` echoue avec "Interaction has already been
+/// acknowledged" et l'utilisateur ne voit jamais le resultat.
+pub async fn edit_response_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
+    if let Err(e) = command
+        .edit_response(
+            &ctx.http,
+            serenity::builder::EditInteractionResponse::new().embed(embed),
+        )
+        .await
+    {
+        warn!(error = %e, command = %command.data.name, "Echec edit response embed");
+    }
+}
+
 /// Edit la reponse apres un defer avec un embed de feedback colore (cf.
 /// `embeds::feedback_embed`). A utiliser pour les retours d'erreur/succes apres
 /// `defer_with_confirmation`, quand on veut la coloration par severite plutot

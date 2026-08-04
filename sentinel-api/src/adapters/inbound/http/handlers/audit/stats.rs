@@ -2,12 +2,8 @@ use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildU
 use axum::extract::Query;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Extension;
 use axum::Json;
 
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
-use sentinel_core::domain::enums::system::role::Role;
 
 use crate::adapters::inbound::http::dto::audit::stats::GuildOverviewDto;
 use crate::adapters::inbound::http::dto::audit::stats::GuildVoiceStatsDto;
@@ -60,11 +56,9 @@ pub async fn record_voice(
 /// GET /api/stats/{guild_id}/user/{user_id} — stats d'un utilisateur
 pub async fn get_user_stats(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Option<UserStatsDto>>, ApiError> {
     // IDOR : les GET echappent au gate global -> exiger l'appartenance au serveur.
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Viewer, "acces reserve aux membres").await?;
     let stats = state.stats_uc.get_user_stats(&guild_id, &user_id).await?;
     Ok(Json(stats.map(UserStatsDto::from)))
 }
@@ -72,10 +66,8 @@ pub async fn get_user_stats(
 /// GET /api/stats/{guild_id}/overview — stats globales du serveur
 pub async fn get_guild_overview(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<GuildOverviewDto>, ApiError> {
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Viewer, "acces reserve aux membres").await?;
     let overview = state.stats_uc.get_guild_overview(&guild_id).await?;
     Ok(Json(GuildOverviewDto::from(overview)))
 }
@@ -83,11 +75,9 @@ pub async fn get_guild_overview(
 /// GET /api/stats/{guild_id}/leaderboard — classement
 pub async fn get_leaderboard(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LeaderboardQuery>,
 ) -> Result<Json<Vec<UserStatsDto>>, ApiError> {
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Viewer, "acces reserve aux membres").await?;
     let limit = params.limit.unwrap_or(10).min(50);
     let members = state.stats_uc.get_leaderboard(&guild_id, limit).await?;
     Ok(Json(members.into_iter().map(UserStatsDto::from).collect()))
@@ -96,11 +86,9 @@ pub async fn get_leaderboard(
 /// GET /api/stats/{guild_id}/voice-stats — stats vocales par salon
 pub async fn get_guild_voice_stats(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<VoiceStatsQuery>,
 ) -> Result<Json<GuildVoiceStatsDto>, ApiError> {
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Viewer, "acces reserve aux membres").await?;
     let days = params.days.unwrap_or(30).min(90);
     let limit = params.limit.unwrap_or(20).min(50);
     let stats = state

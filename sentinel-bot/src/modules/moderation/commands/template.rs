@@ -76,6 +76,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Defer immediat : les sous-handlers lisent/ecrivent la config via l'API et
+    // depasseraient la fenetre de 3s de Discord ; sans acquittement leurs
+    // `edit_response_*` echouent silencieusement.
+    crate::shared::discord_helpers::defer_ephemeral(ctx, command).await;
+
     let sub = command.data.options.iter().find_map(|o| match &o.value {
         CommandDataOptionValue::SubCommand(inner) => Some((o.name.as_str(), inner.as_slice())),
         _ => None,
@@ -131,19 +136,7 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction) {
     ))
     .description(description);
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send template list response");
-    }
+    crate::shared::discord_helpers::edit_response_embed(ctx, command, embed).await;
 }
 
 async fn handle_add(
@@ -237,19 +230,7 @@ async fn handle_add(
         .field("Raison", reason, false)
         .field("Total", templates.len().to_string(), true);
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send template add response");
-    }
+    crate::shared::discord_helpers::edit_response_embed(ctx, command, embed).await;
 }
 
 async fn handle_remove(
@@ -312,19 +293,7 @@ async fn handle_remove(
         .field("Supprimes", removed.to_string(), true)
         .field("Total restant", templates.len().to_string(), true);
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send template remove response");
-    }
+    crate::shared::discord_helpers::edit_response_embed(ctx, command, embed).await;
 }
 
 async fn load_templates(ctx: &Context, guild_id: &str) -> Result<Vec<ReasonTemplate>, String> {

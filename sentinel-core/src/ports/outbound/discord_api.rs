@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 use serde::Deserialize;
 
+use crate::domain::entities::system::channel_access::ChannelOverwrite;
 use crate::domain::errors::DomainError;
 
 /// Trait pour les appels a l'API Discord. Permet de mocker le service
@@ -12,6 +13,37 @@ pub trait DiscordApi: Send + Sync {
     /// chacun annote avec son `kind`. Utilise par les pickers config qui
     /// s'appliquent aux deux types (xp_channel_multipliers).
     async fn list_all_channels(&self, guild_id: &str) -> Result<Vec<DiscordChannel>, DomainError>;
+    /// Cree un salon (ou une categorie) et renvoie son ID Discord.
+    ///
+    /// Implementation par defaut en erreur : la plupart des doubles de test ne
+    /// touchent jamais a la creation de salons, et leur imposer un stub vide
+    /// n'apporterait rien. L'adaptateur reel surcharge.
+    async fn create_channel(
+        &self,
+        _guild_id: &str,
+        _spec: &NewChannel<'_>,
+    ) -> Result<String, DomainError> {
+        Err(DomainError::Internal(
+            "Creation de salon non supportee par cet adaptateur Discord".into(),
+        ))
+    }
+    /// Supprime un salon (ou une categorie). Voir la note ci-dessus pour le
+    /// defaut.
+    async fn delete_channel(&self, _channel_id: &str) -> Result<(), DomainError> {
+        Err(DomainError::Internal(
+            "Suppression de salon non supportee par cet adaptateur Discord".into(),
+        ))
+    }
+    /// Liste les roles du serveur EN DIRECT depuis Discord.
+    ///
+    /// A ne pas confondre avec le repository `discord_role` (Postgres), qui
+    /// sert un cache synchronise : pour composer des permissions on veut
+    /// l'etat reel du serveur, y compris un role cree il y a dix secondes.
+    async fn list_roles(&self, _guild_id: &str) -> Result<Vec<DiscordRoleInfo>, DomainError> {
+        Err(DomainError::Internal(
+            "Liste des roles non supportee par cet adaptateur Discord".into(),
+        ))
+    }
     async fn upload_emoji(
         &self,
         guild_id: &str,
@@ -59,6 +91,39 @@ pub trait DiscordApi: Send + Sync {
     ) -> Result<(), DomainError>;
     async fn get_user_guilds(&self, access_token: &str) -> Result<Vec<UserGuild>, DomainError>;
     async fn get_user_me(&self, access_token: &str) -> Result<DiscordUser, DomainError>;
+}
+
+/// Salon a creer, exprime dans les termes du domaine. Le `kind` est deja la
+/// valeur numerique attendue par Discord (cf.
+/// `PlannedChannelKind::discord_type`) : c'est la seule notion Discord que le
+/// port laisse passer, le reste (overwrites de permission pour `private`,
+/// forme du corps HTTP) appartient a l'adaptateur.
+#[derive(Debug, Clone)]
+pub struct NewChannel<'a> {
+    pub name: &'a str,
+    pub kind: u8,
+    /// Categorie parente (ID Discord), si le salon doit y etre range.
+    pub parent_id: Option<&'a str>,
+    pub topic: Option<&'a str>,
+    pub slowmode: u32,
+    pub user_limit: Option<u32>,
+    pub nsfw: bool,
+    /// Overwrites de permission a poser des la creation, deja calcules par le
+    /// domaine (`channel_access`) : l'adaptateur ne fait que les serialiser.
+    pub overwrites: &'a [ChannelOverwrite],
+}
+
+/// Role du serveur, lu en direct depuis Discord. Sous-ensemble utile a la
+/// composition de permissions : `managed` marque les roles pilotes par une
+/// integration (bots), qu'on n'attribue pas a la main.
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
+pub struct DiscordRoleInfo {
+    pub id: String,
+    pub name: String,
+    pub color: u32,
+    pub position: i64,
+    #[serde(default)]
+    pub managed: bool,
 }
 
 #[derive(Debug, Clone, serde::Serialize, Deserialize)]

@@ -31,7 +31,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::errors::DomainError;
 
@@ -86,8 +86,8 @@ pub struct SpinDto {
 }
 
 /// Le contexte d'authentification, ou une erreur explicite.
-fn require_ctx(rbac: &Option<Extension<RoleContext>>) -> Result<&RoleContext, ApiError> {
-    rbac.as_ref()
+fn require_ctx(user: &Option<Extension<WebUser>>) -> Result<&WebUser, ApiError> {
+    user.as_ref()
         .map(|Extension(c)| c)
         .ok_or_else(|| ApiError(DomainError::Forbidden("connexion Discord requise".into())))
 }
@@ -149,9 +149,9 @@ pub struct CoudeDto {
 /// tient a la reaction dans le salon.
 pub async fn my_coude(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<CoudeDto>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
+    let ctx = require_ctx(&user)?;
     let g = guild(&state)?;
     let c = client(&state)?;
     let uid = &ctx.discord_user_id;
@@ -178,9 +178,9 @@ pub async fn my_coude(
 /// GET /api/me/games/wallet
 pub async fn my_wallet(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<WalletDto>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
+    let ctx = require_ctx(&user)?;
     let g = guild(&state)?;
 
     let c = client(&state)?;
@@ -207,10 +207,10 @@ pub async fn my_wallet(
 /// GET /api/me/games/history
 pub async fn my_history(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<LimitQuery>,
 ) -> Result<Json<Vec<TransactionDto>>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
+    let ctx = require_ctx(&user)?;
     let g = guild(&state)?;
 
     let txs = client(&state)?
@@ -238,10 +238,10 @@ pub async fn my_history(
 /// GET /api/me/games/leaderboard
 pub async fn leaderboard(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<LimitQuery>,
 ) -> Result<Json<Vec<RankDto>>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
+    let ctx = require_ctx(&user)?;
     let g = guild(&state)?;
 
     let wallets = client(&state)?
@@ -269,9 +269,9 @@ pub async fn leaderboard(
 /// aurait diverge de celui du bot des la premiere evolution.
 pub async fn spin_wheel(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<SpinDto>, ApiError> {
-    let ctx = require_ctx(&rbac)?;
+    let ctx = require_ctx(&user)?;
     let g = guild(&state)?;
 
     let nom = display_name(&state, g, &ctx.discord_user_id).await;

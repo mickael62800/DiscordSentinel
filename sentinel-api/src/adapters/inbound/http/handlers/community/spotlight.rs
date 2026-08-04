@@ -8,12 +8,11 @@ use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::community::public_guard::ensure_guild_id;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::community::spotlight::{
     Spotlight, UpsertSpotlightCommand,
 };
-use sentinel_core::domain::enums::system::role::Role;
 
 #[derive(Debug, Deserialize)]
 pub struct PeriodQuery {
@@ -59,17 +58,9 @@ pub struct DesignateDto {
 /// GET /api/spotlight/{guild_id} — historique des designations.
 pub async fn list_spotlight(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<SpotlightDto>>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Viewer,
-        "acces au membre du mois refuse",
-    )
-    .await?;
 
     let items = state.spotlight_uc.list(&guild_id, 24).await?;
     Ok(Json(items.into_iter().map(Into::into).collect()))
@@ -78,18 +69,10 @@ pub async fn list_spotlight(
 /// POST /api/spotlight/{guild_id} — designer (ou remplacer) le membre du mois.
 pub async fn designate_spotlight(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<DesignateDto>,
 ) -> Result<Json<SpotlightDto>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour designer le membre du mois",
-    )
-    .await?;
 
     // Pseudo et avatar resolus depuis `guild_members` : le staff saisit un
     // identifiant, pas un nom d'affichage, et un nom recopie a la main
@@ -107,7 +90,7 @@ pub async fn designate_spotlight(
         avatar,
         period: dto.period,
         reason: dto.reason,
-        chosen_by: rbac
+        chosen_by: user
             .as_ref()
             .map(|Extension(c)| c.discord_user_id.clone())
             .unwrap_or_default(),
@@ -118,17 +101,9 @@ pub async fn designate_spotlight(
 /// DELETE /api/spotlight/detail/{id}
 pub async fn delete_spotlight(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, id)): Path<(String, Uuid)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour retirer une designation",
-    )
-    .await?;
 
     state.spotlight_uc.delete(id).await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
@@ -150,6 +125,7 @@ pub struct PublicSpotlightDto {
 /// GET /api/public/spotlight/{guild_id}?period=
 pub async fn public_spotlight(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<PeriodQuery>,
 ) -> Result<Json<Option<PublicSpotlightDto>>, ApiError> {

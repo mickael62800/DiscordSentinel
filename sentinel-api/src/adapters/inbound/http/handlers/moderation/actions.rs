@@ -16,27 +16,24 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::middleware::rbac::check_role;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
-use sentinel_core::domain::enums::system::role::Role;
 
 /// S1/S4 — Resout l'identite moderateur a journaliser.
 ///
-/// Web (RoleContext present, token Discord verifie) -> identite authentifiee,
+/// Web (WebUser present, token Discord verifie) -> identite authentifiee,
 /// les valeurs eventuellement fournies dans le body sont ignorees. Interne
-/// (pas de RoleContext : gRPC/Bearer/desktop) -> valeurs par defaut fournies.
+/// (pas de WebUser : gRPC/Bearer/desktop) -> valeurs par defaut fournies.
 fn resolve_web_moderator(
-    rbac: &Option<Extension<RoleContext>>,
+    user: &Option<Extension<WebUser>>,
     default_id: &str,
     default_name: &str,
 ) -> (String, String) {
-    match rbac {
+    match user {
         Some(Extension(ctx)) => (ctx.discord_user_id.clone(), ctx.discord_user_id.clone()),
         None => (default_id.to_string(), default_name.to_string()),
     }
@@ -52,16 +49,16 @@ pub struct BansQuery {
 /// POST /api/moderation/actions — enregistrer une action de modération
 pub async fn log_action(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(mut dto): Json<LogActionDto>,
 ) -> Result<Json<ModerationActionResponseDto>, ApiError> {
     // S1/S4 — Liaison de l'identite moderateur au principal authentifie.
-    // Pour un appelant WEB (RoleContext present via token Discord) on derive
+    // Pour un appelant WEB (WebUser present via token Discord) on derive
     // `moderator_id`/`moderator_name` de l'identite verifiee et on IGNORE les
     // valeurs du body (anti-usurpation). Pour le bot/interne (gRPC/Bearer, pas
-    // de RoleContext) on conserve les valeurs du body : le bot transmet le vrai
+    // de WebUser) on conserve les valeurs du body : le bot transmet le vrai
     // moderateur. NB : le bot passe par gRPC, ce handler HTTP est web-only.
-    if let Some(Extension(ctx)) = &rbac {
+    if let Some(Extension(ctx)) = &user {
         dto.moderator_id = ctx.discord_user_id.clone();
         dto.moderator_name = ctx.discord_user_id.clone();
     }
@@ -76,15 +73,7 @@ pub async fn log_action(
     )
     .map_err(ApiError)?;
 
-    // Phase 7B — Gate RBAC (pass-through pour les appels bot/internal sans token Discord).
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour enregistrer une action de moderation",
-    )
-    .await?;
+    // Phase 7B — Gate user (pass-through pour les appels bot/internal sans token Discord).
 
     let action_type = dto.action_type.clone();
     let target_name = dto.target_name.clone();
@@ -203,7 +192,7 @@ pub struct ExecuteBanDto {
 /// POST /api/moderation/execute-ban — execute un ban Discord + log l'action
 pub async fn execute_ban(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<ExecuteBanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -211,14 +200,6 @@ pub async fn execute_ban(
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_reason(&dto.reason).map_err(ApiError)?;
 
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour executer un ban",
-    )
-    .await?;
 
     state
         .discord_api
@@ -229,8 +210,8 @@ pub async fn execute_ban(
     let reason = dto.reason.clone();
 
     // S1/S4 — identite moderateur : derivee du principal authentifie pour le
-    // web (RoleContext), sinon valeurs desktop par defaut (appel interne).
-    let (moderator_id, moderator_name) = resolve_web_moderator(&rbac, "desktop", "Desktop App");
+    // web (WebUser), sinon valeurs desktop par defaut (appel interne).
+    let (moderator_id, moderator_name) = resolve_web_moderator(&user, "desktop", "Desktop App");
 
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
@@ -292,21 +273,13 @@ pub struct ExecuteMuteDto {
 /// POST /api/moderation/execute-mute — applique un timeout Discord + log l'action
 pub async fn execute_mute(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<ExecuteMuteDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_reason(&dto.reason).map_err(ApiError)?;
 
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour executer un mute",
-    )
-    .await?;
 
     let duration =
         sentinel_core::domain::entities::moderation::review::manual::resolve_mute_duration(
@@ -323,7 +296,7 @@ pub async fn execute_mute(
         .unwrap_or_else(|| dto.user_id.clone().into());
 
     // S1/S4 — identite moderateur derivee du principal authentifie (web).
-    let (moderator_id, moderator_name) = resolve_web_moderator(&rbac, "web-panel", "Web Admin");
+    let (moderator_id, moderator_name) = resolve_web_moderator(&user, "web-panel", "Web Admin");
 
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
@@ -364,20 +337,12 @@ pub struct ExecuteUnbanDto {
 /// POST /api/moderation/execute-unban — debannir un utilisateur Discord
 pub async fn execute_unban(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<ExecuteUnbanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
     validation::validate_guild_user_path(&dto.guild_id, &dto.user_id).map_err(ApiError)?;
 
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour deban un user",
-    )
-    .await?;
 
     state
         .discord_api
@@ -389,7 +354,7 @@ pub async fn execute_unban(
     let guild_id = dto.guild_id.clone();
 
     // S1/S4 — identite moderateur derivee du principal authentifie (web).
-    let (moderator_id, moderator_name) = resolve_web_moderator(&rbac, "desktop", "Desktop App");
+    let (moderator_id, moderator_name) = resolve_web_moderator(&user, "desktop", "Desktop App");
 
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id,
@@ -451,6 +416,7 @@ pub async fn execute_unban(
 /// GET /api/moderation/bans
 pub async fn list_bans(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Query(params): Query<BansQuery>,
 ) -> Result<Json<Vec<BanEntryDto>>, ApiError> {
     // Validation
@@ -469,6 +435,7 @@ pub async fn list_bans(
 /// GET /api/moderation/history/{guild_id}/{user_id}
 pub async fn get_history(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserHistoryDto>, ApiError> {
     // Validation
@@ -504,21 +471,13 @@ pub struct EvidenceEntryDto {
 
 pub async fn add_evidence(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<AddEvidenceDto>,
 ) -> Result<Json<EvidenceEntryDto>, ApiError> {
-    // Pour gater RBAC on a besoin du guild_id : on le recupere via l'action liee.
-    if rbac.is_some() {
+    // Pour gater user on a besoin du guild_id : on le recupere via l'action liee.
+    if user.is_some() {
         if let Ok(action_uuid) = uuid::Uuid::parse_str(&dto.action_id) {
             if let Some(guild_id) = state.moderation_uc.action_guild_id(action_uuid).await? {
-                check_role_for_guild(
-                    &state,
-                    &rbac,
-                    &guild_id,
-                    Role::Moderator,
-                    "moderator+ requis pour attacher une preuve",
-                )
-                .await?;
             }
         }
     }
@@ -563,6 +522,7 @@ pub async fn add_evidence(
 /// Liste les preuves attachees a une action.
 pub async fn list_evidence(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(action_id): Path<String>,
 ) -> Result<Json<Vec<EvidenceEntryDto>>, ApiError> {
     let action_uuid = validation::parse_uuid("action_id", &action_id).map_err(ApiError)?;
@@ -639,21 +599,13 @@ fn review_entry_to_dto(
 
 pub async fn add_review(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<AddReviewDto>,
 ) -> Result<Json<ReviewQueueEntryDto>, ApiError> {
     let action_uuid = validation::parse_uuid("action_id", &dto.action_id).map_err(ApiError)?;
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("added_by", &dto.added_by).map_err(ApiError)?;
 
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour ajouter une review",
-    )
-    .await?;
     let reason = dto
         .reason
         .as_deref()
@@ -679,14 +631,9 @@ pub async fn add_review(
 /// l'action de moderation liee (JOIN avec moderation_actions).
 pub async fn list_pending_reviews(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ReviewQueueEntryDto>>, ApiError> {
-    check_role(
-        &rbac,
-        Role::Moderator,
-        "moderator+ requis pour lister les reviews",
-    )?;
 
     let entries = state.review_repo.list_pending(&guild_id).await?;
     Ok(Json(entries.into_iter().map(review_entry_to_dto).collect()))
@@ -704,23 +651,15 @@ pub struct ResolveReviewDto {
 
 pub async fn resolve_review(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<ResolveReviewDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let review_uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
 
-    // RBAC via le repo.
-    if rbac.is_some() {
+    // user via le repo.
+    if user.is_some() {
         if let Some(guild_id) = state.review_repo.get_guild_id(review_uuid).await? {
-            check_role_for_guild(
-                &state,
-                &rbac,
-                &guild_id,
-                Role::Moderator,
-                "moderator+ requis pour resoudre une review",
-            )
-            .await?;
         }
     }
 
@@ -769,18 +708,13 @@ pub async fn resolve_review(
 /// Lecture deleguee au use case `modstats_uc` (read-only, aggregation simple).
 pub async fn get_modstats(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
 ) -> Result<
     Json<Vec<crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto>>,
     ApiError,
 > {
-    check_role(
-        &rbac,
-        Role::Moderator,
-        "moderator+ requis pour voir les stats de moderation",
-    )?;
     let days = (crate::adapters::inbound::http::helpers::normalize_in(params.days, 30, 1, 90)) as i32;
 
     let rows = state.modstats_uc.modstats(&guild_id, days).await?;
@@ -810,15 +744,10 @@ pub async fn get_modstats(
 /// Utilise pour la courbe "Tendance moderation" sur la page web /modstats.
 pub async fn get_modstats_trend(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
 ) -> Result<Json<Vec<ModstatsTrendDayDto>>, ApiError> {
-    check_role(
-        &rbac,
-        Role::Moderator,
-        "moderator+ requis pour voir les stats de moderation",
-    )?;
 
     let days = (crate::adapters::inbound::http::helpers::normalize_in(params.days, 30, 1, 90)) as i32;
 
@@ -861,7 +790,7 @@ pub struct ModstatsTrendDayDto {
 /// - `warn` / autre : supprime juste la ligne (pas d'effet Discord natif).
 pub async fn delete_action(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
 ) -> Result<axum::http::StatusCode, ApiError> {
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
@@ -880,15 +809,7 @@ pub async fn delete_action(
     let target_name = info.target_name;
     let action_type = info.action_type;
 
-    // Gate RBAC : moderator+ sur la guild concernee.
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour annuler une action",
-    )
-    .await?;
+    // Gate user : moderator+ sur la guild concernee.
 
     // Reversal Discord : la REGLE (quel effet inverse pour quel type) vit dans
     // le core (`reversal_effect`) ; le handler n'orchestre que les appels
@@ -974,18 +895,10 @@ pub struct ModActionCountQuery {
 /// compromis / emballement) : le bot bloque une action au-dela du quota configure.
 pub async fn mod_action_count(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, moderator_id)): Path<(String, String)>,
     Query(q): Query<ModActionCountQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis",
-    )
-    .await?;
     // Fenetre effective (defaut/bornes) : règle du core ; SQL : repository.
     let window = sentinel_core::domain::entities::moderation::action::reversal::
         mod_action_window_secs(q.window_secs);

@@ -1,6 +1,6 @@
 //! Factory reset d'un serveur (DANGER, IRREVERSIBLE).
 //!
-//! `POST /api/system/guild-reset/{guild_id}` — reserve a l'OWNER (RBAC) avec
+//! `POST /api/system/guild-reset/{guild_id}` — reserve a l'OWNER (user) avec
 //! une confirmation forte (le nom exact du serveur). Efface toutes les donnees
 //! du guild en base, puis publie un event Redis `guild_reset` pour que le bot
 //! annule l'etat Discord (deban / unmute / retrait des roles temp+quarantaine).
@@ -11,10 +11,8 @@ use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{require_role, RoleContext};
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
-use sentinel_core::domain::errors::DomainError;
 
 fn default_true() -> bool {
     true
@@ -42,21 +40,17 @@ pub struct ResetGuildResponse {
 /// POST /api/system/guild-reset/{guild_id}
 pub async fn reset_guild(
     State(state): State<AppState>,
-    ctx: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<ResetGuildBody>,
 ) -> Result<Json<ResetGuildResponse>, ApiError> {
-    // ── Garde-fou 1 : OWNER uniquement ──
-    let ctx = ctx
-        .map(|e| e.0)
-        .ok_or_else(|| ApiError::from(DomainError::Forbidden("authentification requise".into())))?;
-    require_role(&ctx, Role::Owner).map_err(|_| {
-        ApiError::from(DomainError::Forbidden(
-            "Seul le proprietaire du serveur peut le reinitialiser.".into(),
-        ))
-    })?;
+    // Acteur du reset pour la trace. `None` = appel interne (bot/worker) :
+    // l'acces est deja filtre en amont par le gate superadmin.
+    let actor = user
+        .map(|e| e.0.discord_user_id)
+        .unwrap_or_else(|| "internal".to_string());
 
-    // ── Garde-fou 2 : confirmation forte (nom du serveur), verifiee cote use case ──
+    // ── Garde-fou : confirmation forte (nom du serveur), verifiee cote use case ──
     let outcome = state
         .reset_guild_uc
         .reset(&guild_id, &body.confirmation)
@@ -64,7 +58,7 @@ pub async fn reset_guild(
 
     tracing::warn!(
         guild_id,
-        actor = %ctx.discord_user_id,
+        actor = %actor,
         total_rows = outcome.total_rows,
         tables = outcome.tables_wiped.len(),
         "FACTORY RESET execute (donnees du serveur effacees)"
@@ -90,7 +84,7 @@ pub async fn reset_guild(
             "remove_roles": body.remove_roles,
             "quarantine_role_id": outcome.discord_context.quarantine_role_id,
             "temp_role_ids": outcome.discord_context.temp_role_ids,
-            "actor": { "source": "web", "user_id": ctx.discord_user_id },
+            "actor": { "source": "web", "user_id": actor },
             "sig": sig,
         }),
     );

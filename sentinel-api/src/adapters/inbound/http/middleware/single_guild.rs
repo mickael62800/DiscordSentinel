@@ -52,7 +52,7 @@ pub async fn single_guild_middleware(
     // sur le chemin sert aux routes qui ne declarent pas `{guild_id}` mais
     // transportent quand meme un identifiant.
     let path = parts.uri.path().to_string();
-    let trouve = super::guild_auth::guild_id_from_route_param(&mut parts, &state)
+    let trouve = guild_id_from_route_param(&mut parts, &state)
         .await
         .or_else(|| guild_id_from_path(&path));
 
@@ -77,6 +77,21 @@ pub async fn single_guild_middleware(
 /// faux positif provoque un refus, donc on n'accepte qu'un snowflake
 /// plausible (17 a 20 chiffres). Un identifiant plus court est ignore plutot
 /// que de bloquer une route legitime.
+/// Valeur du parametre de route nomme exactement `guild_id`, tel que matche
+/// par le routeur axum. Source autoritaire (pas de devinette) : ne renvoie une
+/// valeur que si la route declare reellement un `{guild_id}`.
+async fn guild_id_from_route_param(
+    parts: &mut axum::http::request::Parts,
+    state: &AppState,
+) -> Option<String> {
+    use axum::extract::{FromRequestParts, RawPathParams};
+    let params = RawPathParams::from_request_parts(parts, state).await.ok()?;
+    params
+        .iter()
+        .find(|(k, _)| *k == "guild_id")
+        .map(|(_, v)| v.to_string())
+}
+
 fn guild_id_from_path(path: &str) -> Option<String> {
     path.split('/')
         .find(|seg| {

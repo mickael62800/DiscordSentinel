@@ -19,8 +19,7 @@ use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
-use crate::adapters::inbound::http::middleware::rbac::lookup_role;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
@@ -51,6 +50,7 @@ pub struct DetectionQuery {
 /// GET /api/automod/{guild_id}/detections
 pub async fn list_detections(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<DetectionQuery>,
 ) -> Result<Json<Vec<InfractionResponseDto>>, ApiError> {
@@ -80,6 +80,7 @@ pub struct ListReviewsQuery {
 /// GET /api/automod/{guild_id}/reviews
 pub async fn list_reviews(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListReviewsQuery>,
 ) -> Result<Json<Vec<AutomodReviewDto>>, ApiError> {
@@ -142,6 +143,7 @@ pub struct CreateReviewBody {
 /// reviews en attente.
 pub async fn create_review(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Json(body): Json<CreateReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     let suggested = SuggestedAction::from_str(&body.suggested_action).ok_or_else(|| {
@@ -367,8 +369,8 @@ async fn log_review_sanction(
 /// l'action Discord (warn/mute/ban/delete) en miroir.
 pub async fn resolve_review(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
     Json(body): Json<ResolveReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -390,9 +392,9 @@ pub async fn resolve_review(
     } else {
         None
     };
-    // Chemin web (RoleContext present) : on IGNORE le body et on derive les
+    // Chemin web (WebUser present) : on IGNORE le body et on derive les
     // faits du role REEL -> `can_finalize_review` exige desormais un vrai Admin.
-    let requester = effective_facts(&state, &rbac, id, body_facts).await?;
+    let requester = effective_facts(&state, &user, id, body_facts).await?;
     let review = state
         .automod_reviews_uc
         .resolve(ResolveAutomodReviewCommand {
@@ -498,10 +500,10 @@ fn facts_from_role(role: Role) -> ModeratorFacts {
 
 /// Determine les `ModeratorFacts` effectifs pour un handler de review sensible.
 ///
-/// - **Appel bot / interne** (pas de `RoleContext`, Bearer api_key de confiance) :
+/// - **Appel bot / interne** (pas de `WebUser`, Bearer api_key de confiance) :
 ///   on garde les faits fournis par le body (`body_facts`), le bot passe les
 ///   vraies permissions gateway Discord.
-/// - **Appel web** (`RoleContext` present via `X-Discord-Token`) : on IGNORE le
+/// - **Appel web** (`WebUser` present via `X-Discord-Token`) : on IGNORE le
 ///   body et on derive les faits du role REEL du principal authentifie sur la
 ///   guild de la review (trust-boundary S1). Cela fait que les regles domaine
 ///   (`can_finalize_review` exige Admin, `is_moderator` exige Moderator)
@@ -511,43 +513,27 @@ fn facts_from_role(role: Role) -> ModeratorFacts {
 /// handler/caller retry) plutot que de degrader silencieusement les privileges.
 async fn effective_facts(
     state: &AppState,
-    rbac: &Option<Extension<RoleContext>>,
+    user: &Option<Extension<WebUser>>,
     review_id: Uuid,
     body_facts: Option<ModeratorFacts>,
 ) -> Result<Option<ModeratorFacts>, ApiError> {
-    let Some(Extension(ctx)) = rbac else {
+    let Some(Extension(_)) = user else {
         // Chemin de confiance (bot/interne) : comportement inchange.
         return Ok(body_facts);
     };
 
-    // Chemin web : on a besoin de la guild de la review pour resoudre le role.
-    let review = state
-        .automod_reviews_uc
-        .get(review_id)
-        .await?
-        .ok_or_else(|| {
-            ApiError::from(DomainError::NotFound(format!(
-                "review {review_id} introuvable"
-            )))
-        })?;
-
-    let role = lookup_role(state, &ctx.discord_user_id, review.guild_id.as_str())
-        .await
-        .map_err(|e| {
-            ApiError::from(DomainError::Internal(format!(
-                "RBAC lookup role (review automod) : {e}"
-            )))
-        })?;
-
-    Ok(Some(facts_from_role(role)))
+    // Chemin web : le trust-boundary tient toujours — on ignore le body — mais
+    // il n'y a plus de role a resoudre. Un appelant web a forcement franchi le
+    // gate `SUPERADMIN_USER_IDS`, donc il a les pleins droits sur la review.
+    Ok(Some(facts_from_role(Role::Owner)))
 }
 
 /// POST /api/automod/reviews/{review_id}/ignore
 /// Clore immediatement le dossier en "ignore" (tout moderateur).
 pub async fn ignore_review(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
     Json(body): Json<CloseIgnoreBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     use crate::ports::inbound::moderation::manage_automod_reviews::CloseIgnoredCommand;
@@ -565,7 +551,7 @@ pub async fn ignore_review(
         body.has_admin_role,
     );
     // Web : faits derives du role reel ; bot : faits du body (cf. effective_facts).
-    let requester = effective_facts(&state, &rbac, id, body_facts).await?;
+    let requester = effective_facts(&state, &user, id, body_facts).await?;
     let review = state
         .automod_reviews_uc
         .close_ignored(CloseIgnoredCommand {
@@ -615,8 +601,8 @@ pub struct ReopenBody {
 /// Rouvrir un dossier resolu/ignore -> repasse en vote (tout moderateur).
 pub async fn reopen_review(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
     Json(body): Json<ReopenBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     use crate::ports::inbound::moderation::manage_automod_reviews::ReopenReviewCommand;
@@ -634,7 +620,7 @@ pub async fn reopen_review(
         body.has_admin_role,
     );
     // Web : faits derives du role reel ; bot : faits du body (cf. effective_facts).
-    let requester = effective_facts(&state, &rbac, id, body_facts).await?;
+    let requester = effective_facts(&state, &user, id, body_facts).await?;
     let review = state
         .automod_reviews_uc
         .reopen(ReopenReviewCommand {
@@ -680,8 +666,8 @@ pub struct CastVoteBody {
 /// POST /api/automod/reviews/{review_id}/vote
 pub async fn vote_review(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
     Json(body): Json<CastVoteBody>,
 ) -> Result<Json<Vec<ReviewVoteDto>>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -694,7 +680,7 @@ pub async fn vote_review(
         has_mod_role: body.has_mod_role,
         has_admin_role: false,
     };
-    let requester = effective_facts(&state, &rbac, id, Some(body_facts))
+    let requester = effective_facts(&state, &user, id, Some(body_facts))
         .await?
         .unwrap_or_default();
     let votes = state
@@ -719,6 +705,7 @@ pub async fn vote_review(
 /// GET /api/automod/reviews/{review_id}
 pub async fn get_review(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -740,6 +727,7 @@ pub async fn get_review(
 /// GET /api/automod/reviews/{review_id}/votes
 pub async fn list_review_votes(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
 ) -> Result<Json<Vec<ReviewVoteDto>>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -761,6 +749,7 @@ pub struct DecideReviewBody {
 /// edite la carte et revele le bouton admin de finalisation.
 pub async fn decide_review(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
     Json(body): Json<DecideReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
@@ -790,6 +779,7 @@ pub async fn decide_review(
 /// review_id depuis une carte 1-clic dont les boutons ne le portent pas).
 pub async fn find_review_by_message(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path((guild_id, message_id)): Path<(String, String)>,
 ) -> Result<Json<Option<AutomodReviewDto>>, ApiError> {
     let review = state

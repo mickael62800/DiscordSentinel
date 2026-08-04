@@ -446,6 +446,22 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Defer immediat, comme /mute : la suite enchaine plusieurs appels HTTP
+    // (fetch membre, timeout, log API, DM) et depasserait la fenetre de 3s.
+    // Sans ce defer les `edit_response_text` d'erreur echouaient tous.
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
+        warn!(error = %e, cmd = "unmute", "Echec defer interaction Discord");
+        return;
+    }
+
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
         None => {
@@ -540,19 +556,7 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
         .timestamp(serenity::model::Timestamp::now())
         .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(format!("✅ <@{target_id}> a ete unmute."))
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send unmute response");
-    }
+    edit_response_text(ctx, command, &format!("✅ <@{target_id}> a ete unmute.")).await;
 
     super::log_to_channel(ctx, &guild_id.to_string(), unmute_embed).await;
 }

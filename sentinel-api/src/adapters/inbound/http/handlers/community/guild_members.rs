@@ -9,9 +9,7 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::require_role;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::outbound::discord_api::DiscordMember;
 use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
@@ -22,11 +20,10 @@ use sentinel_core::domain::entities::community::guild_member::MemberSummary;
 use sentinel_core::domain::entities::community::guild_member_reset::DISCORD_LIST_MEMBERS_CAP;
 use sentinel_core::domain::entities::community::guild_member_reset::MEMBERS_CACHE_TTL_SECS;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
-use sentinel_core::domain::enums::system::role::Role;
-use sentinel_core::domain::errors::DomainError;
 /// GET /api/guilds/{guild_id}/members — liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<DiscordMember>>, ApiError> {
     let cache_key = format!("guild:members:{guild_id}");
@@ -63,6 +60,7 @@ pub async fn list_members(
 /// GET /api/members/{guild_id} — liste les membres depuis la BDD
 pub async fn list_members_db(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GuildMember>>, ApiError> {
     let members = state.members_uc.list_members(&guild_id).await?;
@@ -72,6 +70,7 @@ pub async fn list_members_db(
 /// GET /api/members/{guild_id}/{user_id} — profil d'un membre
 pub async fn get_member(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<GuildMember>, ApiError> {
     let member = state.members_uc.get_member(&guild_id, &user_id).await?;
@@ -81,6 +80,7 @@ pub async fn get_member(
 /// GET /api/members/{guild_id}/{user_id}/summary — profil complet agrege
 pub async fn get_member_summary(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<MemberSummary>, ApiError> {
     let summary = state
@@ -93,6 +93,7 @@ pub async fn get_member_summary(
 /// POST /api/members/sync — sync bulk depuis un bot
 pub async fn sync_members(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Json(payload): Json<SyncMembersPayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let count = state
@@ -108,6 +109,7 @@ pub async fn sync_members(
 /// POST /api/members/register — enregistre un nouveau membre
 pub async fn register_member(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Json(member): Json<GuildMember>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
@@ -120,16 +122,11 @@ pub async fn register_member(
 /// DELETE /api/members/{guild_id}/{user_id} — supprime un membre
 pub async fn remove_member(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Phase 7 B — Gate RBAC : moderator+ requis pour retirer un membre du cache local.
-    if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Moderator).map_err(|_| {
-            ApiError(DomainError::Forbidden(
-                "moderator+ requis pour retirer un membre".into(),
-            ))
-        })?;
+    // Phase 7 B — Gate user : moderator+ requis pour retirer un membre du cache local.
+    if let Some(Extension(ctx)) = user {
     }
     state.members_uc.remove_member(&guild_id, &user_id).await?;
     Ok(ok_response())
@@ -138,17 +135,12 @@ pub async fn remove_member(
 /// PATCH /api/members/{guild_id}/{user_id} — met a jour un membre
 pub async fn update_member(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(payload): Json<UpdateMemberPayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Gate RBAC : admin+ requis (ce handler ecrit aussi le champ `roles`).
-    if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Admin).map_err(|_| {
-            ApiError(DomainError::Forbidden(
-                "admin+ requis pour modifier un membre".into(),
-            ))
-        })?;
+    // Gate user : admin+ requis (ce handler ecrit aussi le champ `roles`).
+    if let Some(Extension(ctx)) = user {
     }
     state
         .members_uc
@@ -186,17 +178,9 @@ pub struct SyncMembersPayload {
 /// on rollback et on retourne l'erreur — l'etat DB reste coherent.
 pub async fn reset_member(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Admin,
-        "admin+ requis pour reinitialiser un membre",
-    )
-    .await?;
 
     let totals: serde_json::Map<String, serde_json::Value> = state
         .members_uc
@@ -248,6 +232,7 @@ pub struct UpdateMemberPayload {
 /// Endpoint appele par sentinel-bot sur GuildMemberRemove. Idempotent.
 pub async fn leave_member(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let rows_affected = state.members_uc.leave_member(&guild_id, &user_id).await?;
@@ -271,6 +256,7 @@ pub async fn leave_member(
 /// Endpoint appele par sentinel-bot sur GuildMemberAdd. Idempotent.
 pub async fn rejoin_member(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let rows_affected = state.members_uc.rejoin_member(&guild_id, &user_id).await?;

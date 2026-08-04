@@ -1,8 +1,7 @@
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use tracing::{error, warn};
+use tracing::error;
 
 use crate::shared::embeds::{action_emoji, info_embed};
 
@@ -39,6 +38,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .await;
         return;
     }
+
+    // Defer immediat : la suite fait plusieurs appels HTTP (Discord + API) et
+    // depasserait la fenetre de 3s de Discord. Sans ce defer, tous les
+    // `edit_response_*` ci-dessous echouent (interaction jamais acquittee).
+    crate::shared::discord_helpers::defer_ephemeral(ctx, command).await;
+
     let target_id = match super::resolve_target_user_id(command, "user") {
         Some(id) => id,
         None => {
@@ -107,19 +112,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .field("Mutes", history.total_mutes.to_string(), true)
                 .field("Bans", history.total_bans.to_string(), true);
 
-            if let Err(e) = command
-                .create_response(
-                    &ctx.http,
-                    CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new()
-                            .embed(embed)
-                            .ephemeral(true),
-                    ),
-                )
-                .await
-            {
-                warn!(error = %e, "Failed to send history response");
-            }
+            crate::shared::discord_helpers::edit_response_embed(ctx, command, embed).await;
         }
         Err(e) => {
             error!(error = %e, "Erreur recuperation historique");

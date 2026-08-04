@@ -17,77 +17,18 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::lookup_role;
-use crate::adapters::inbound::http::middleware::rbac::require_role;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
 use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
 use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::enums::system::ticket_status::TicketStatus;
 use sentinel_core::domain::errors::DomainError;
 
-/// S1 — Autorisation web pour un endpoint mono-ticket (lecture ou mutation).
-///
-/// - **Appel bot / interne** (pas de `RoleContext`, Bearer api_key de confiance) :
-///   retourne `Ok(None)` -> comportement inchange, le bot est de confiance et
-///   agit de toute facon via gRPC.
-/// - **Appel web** (`RoleContext` present via `X-Discord-Token`) : on resout le
-///   `guild_id` du ticket et on exige Moderator+ sur CETTE guild. Un superadmin
-///   bypass la gate. Si le ticket est legacy (guild_id NULL), l'acces web est
-///   REFUSE (403) -> fail-closed (mieux vaut refuser que fuiter cross-guild).
-///
-/// Retourne `Ok(Some((guild_id, role_effectif)))` pour un web autorise (le role
-/// sert a deriver l'identite cote `reply_ticket`, anti-impersonation S4).
-async fn require_ticket_web(
-    state: &AppState,
-    rbac: &Option<Extension<RoleContext>>,
-    id: &str,
-) -> Result<Option<(String, Role)>, ApiError> {
-    let Some(Extension(ctx)) = rbac.as_ref() else {
-        return Ok(None);
-    };
-    let is_superadmin = state
-        .superadmin_user_ids
-        .iter()
-        .any(|sid| sid == &ctx.discord_user_id);
-
-    let detail = state.tickets_uc.get_ticket_detail(id).await?;
-    let Some(gid) = detail.ticket.guild_id else {
-        // Ticket legacy sans guild_id : acces web refuse (le bot gRPC y accede).
-        if is_superadmin {
-            return Ok(Some((String::new(), Role::Owner)));
-        }
-        return Err(ApiError(DomainError::Forbidden(
-            "ticket sans guild (legacy) : acces web refuse".into(),
-        )));
-    };
-
-    let role = if is_superadmin {
-        Role::Owner
-    } else {
-        lookup_role(state, &ctx.discord_user_id, &gid)
-            .await
-            .map_err(|e| {
-                ApiError(DomainError::Internal(format!(
-                    "RBAC lookup role (ticket) : {e}"
-                )))
-            })?
-    };
-    if !role.satisfies(Role::Moderator) {
-        return Err(ApiError(DomainError::Forbidden(
-            "moderator+ requis pour ce ticket".into(),
-        )));
-    }
-    Ok(Some((gid, role)))
-}
-
 pub async fn list_tickets(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(params): Query<ListTicketsQuery>,
 ) -> Result<Json<Vec<TicketResponseDto>>, ApiError> {
     // Validation
@@ -110,8 +51,8 @@ pub async fn list_tickets(
 
     // S1 — scope web : on ne retourne que les tickets des guilds ou le caller
     // est Moderator+. Les tickets legacy (guild_id NULL) sont exclus du web.
-    // Le chemin bot/interne (pas de RoleContext) n'est PAS filtre.
-    let tickets = match rbac.as_ref() {
+    // Le chemin bot/interne (pas de WebUser) n'est PAS filtre.
+    let tickets = match user.as_ref() {
         None => tickets,
         Some(Extension(ctx)) => {
             if state
@@ -137,17 +78,16 @@ pub async fn list_tickets(
 
 pub async fn get_ticket_detail(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<TicketDetailDto>, ApiError> {
-    require_ticket_web(&state, &rbac, &id).await?;
     let detail = state.tickets_uc.get_ticket_detail(&id).await?;
     Ok(single_dto(detail))
 }
 
 pub async fn create_ticket(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateTicketDto>,
 ) -> Result<Json<TicketResponseDto>, ApiError> {
     // Validation
@@ -161,20 +101,12 @@ pub async fn create_ticket(
     // `author_id` arbitraire dans le body -> anti-impersonation). Le chemin
     // bot/interne (gRPC, qui pose legitimement author = l'utilisateur Discord)
     // reste inchange.
-    if let Some(Extension(ctx)) = rbac.as_ref() {
+    if let Some(Extension(ctx)) = user.as_ref() {
         let Some(gid) = command.guild_id.clone() else {
             return Err(ApiError(DomainError::Forbidden(
                 "guild_id requis pour creer un ticket via le web".into(),
             )));
         };
-        check_role_for_guild(
-            &state,
-            &rbac,
-            &gid,
-            Role::Moderator,
-            "moderator+ requis pour creer un ticket",
-        )
-        .await?;
         command.author_id = ctx.discord_user_id.clone();
     }
 
@@ -195,31 +127,18 @@ pub async fn create_ticket(
 
 pub async fn reply_ticket(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<ReplyDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // S1 autorisation + S4 identite. Web : on derive `author_name`/`author_role`
-    // du principal REEL (le body est ignore pour ces champs) -> impossible de
-    // se faire passer pour un "admin" via un JSON forge. Bot/interne : on garde
-    // les valeurs du body (vraies perms Discord).
-    let (author_name, author_role) = match require_ticket_web(&state, &rbac, &id).await? {
+    // S4 identite : pour un appelant web on derive `author_name`/`author_role`
+    // du principal REEL, le body est ignore pour ces champs — impossible de se
+    // faire passer pour quelqu'un d'autre via un JSON forge. Un appelant web
+    // est necessairement superadmin (gate en amont), d'ou le role "admin".
+    // Bot/interne : on garde les valeurs du body (vraies perms Discord).
+    let (author_name, author_role) = match user.as_ref() {
         None => (dto.author_name, dto.author_role),
-        Some((_gid, role)) => {
-            // RoleContext garanti present sur ce chemin.
-            let principal = rbac
-                .as_ref()
-                .map(|Extension(c)| c.discord_user_id.clone())
-                .unwrap_or_default();
-            let derived_role = if role >= Role::Admin {
-                "admin"
-            } else if role >= Role::Moderator {
-                "moderator"
-            } else {
-                "user"
-            };
-            (principal, derived_role.to_string())
-        }
+        Some(Extension(u)) => (u.discord_user_id.clone(), "admin".to_string()),
     };
 
     let broadcast_name = author_name.clone();
@@ -247,10 +166,9 @@ pub async fn reply_ticket(
 
 pub async fn close_ticket(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    require_ticket_web(&state, &rbac, &id).await?;
     state.tickets_uc.close_ticket(&id).await?;
 
     // Phase 2 sync : enrichi avec `action_id` (= ticket_id parse en UUID)
@@ -271,11 +189,10 @@ pub async fn close_ticket(
 
 pub async fn assign_ticket(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AssignDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    require_ticket_web(&state, &rbac, &id).await?;
     let assignee = dto.assignee;
     state
         .tickets_uc
@@ -298,11 +215,10 @@ pub async fn assign_ticket(
 
 pub async fn update_status(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<UpdateStatusDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    require_ticket_web(&state, &rbac, &id).await?;
     let status = match TicketStatus::from_str(&dto.status) {
         Some(s) => s,
         None => {
@@ -331,11 +247,10 @@ pub async fn update_status(
 
 pub async fn update_ticket_channel(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<UpdateTicketChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    require_ticket_web(&state, &rbac, &id).await?;
     state
         .tickets_uc
         .update_ticket_channel(UpdateTicketChannelCommand {
@@ -379,25 +294,20 @@ pub struct BulkDeleteTicketsParams {
 /// (meme si ON DELETE CASCADE est en place — on reste explicite pour
 /// pouvoir compter ce qui a ete supprime sans joindre).
 ///
-/// Gate RBAC : admin+ (avec bypass superadmin).
+/// Gate user : admin+ (avec bypass superadmin).
 pub async fn bulk_delete_tickets(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(params): Query<BulkDeleteTicketsParams>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Gate RBAC. On utilise require_role (les tickets ne sont pas scopes
+    // Gate user. On utilise require_role (les tickets ne sont pas scopes
     // par guild de maniere fiable via le path). Superadmin bypass explicite.
-    if let Some(Extension(ctx)) = rbac.as_ref() {
+    if let Some(Extension(ctx)) = user.as_ref() {
         let is_superadmin = state
             .superadmin_user_ids
             .iter()
             .any(|id| id == &ctx.discord_user_id);
         if !is_superadmin {
-            require_role(ctx, Role::Admin).map_err(|_| {
-                ApiError(DomainError::Forbidden(
-                    "admin+ requis pour supprimer en masse des tickets".into(),
-                ))
-            })?;
         }
     }
 

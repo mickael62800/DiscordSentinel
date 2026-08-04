@@ -83,6 +83,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Defer immediat : les sous-handlers appellent l'API et depasseraient la
+    // fenetre de 3s de Discord ; sans acquittement leurs `edit_response_*`
+    // echouent et l'utilisateur ne voit jamais de reponse.
+    crate::shared::discord_helpers::defer_ephemeral(ctx, command).await;
+
     let sub = command.data.options.iter().find_map(|o| match &o.value {
         CommandDataOptionValue::SubCommand(inner) => Some((o.name.as_str(), inner.as_slice())),
         _ => None,
@@ -163,19 +168,7 @@ async fn handle_add(
                     reason.unwrap_or("_non specifiee_").to_string(),
                     false,
                 );
-            if let Err(e) = command
-                .create_response(
-                    &ctx.http,
-                    CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new()
-                            .embed(embed)
-                            .ephemeral(true),
-                    ),
-                )
-                .await
-            {
-                warn!(error = %e, "Failed to send review add response");
-            }
+            crate::shared::discord_helpers::edit_response_embed(ctx, command, embed).await;
         }
         Err(e) => {
             error!(error = %e, "Erreur ajout review");
@@ -235,19 +228,7 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction) {
     let embed = info_embed(format!("\u{1f4cb} Reviews en attente ({})", reviews.len()))
         .description(description);
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send review list response");
-    }
+    crate::shared::discord_helpers::edit_response_embed(ctx, command, embed).await;
 }
 
 async fn handle_resolve(
@@ -314,19 +295,7 @@ async fn handle_resolve(
         _ => embed,
     };
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send review resolve response");
-    }
+    crate::shared::discord_helpers::edit_response_embed(ctx, command, embed).await;
 }
 
 fn short_id(full: &str) -> String {

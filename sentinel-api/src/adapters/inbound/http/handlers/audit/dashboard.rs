@@ -298,14 +298,6 @@ pub async fn register_guild(
     };
     state.guild_repo.upsert(&guild).await?;
 
-    // Auto-grant le proprietaire Discord comme `owner` RBAC au premier
-    // enregistrement (idempotent, ne remplace aucun role existant).
-    if let Some(owner) = owner_id {
-        if let Err(e) = state.rbac_admin_uc.ensure_owner_grant(&guild_id, &owner).await {
-            warn!(error = %e, guild_id = %guild_id, owner_id = %owner, "Echec auto-grant owner RBAC");
-        }
-    }
-
     // Seed des regles de moderation par defaut (idempotent). Couvre les
     // nouvelles guilds + le retro-seed des anciennes au prochain bot startup.
     if let Err(e) = state.rules_uc.seed_default_rules(&guild_id).await {

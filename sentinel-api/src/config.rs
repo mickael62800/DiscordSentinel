@@ -28,21 +28,11 @@ pub struct AppConfig {
     /// URL de base du front web (ou rediriger apres callback OAuth).
     /// Ex: `http://192.168.1.15:5180`.
     pub web_front_url: String,
-    /// Feature flag — active le `global_rbac_gate` (gate RBAC global
-    /// fail-closed sur les mutations web) en mode ENFORCE (refuse reellement).
-    /// Default `false` (no-op). Voir `middleware/global_rbac.rs`.
-    pub rbac_global_gate: bool,
     /// Token optionnel protégeant `/metrics`. Vide (défaut) = endpoint ouvert
     /// (comportement historique : Prometheus scrape sans auth sur le réseau
     /// interne). Si défini, `/metrics` exige `Authorization: Bearer <token>`
     /// (comparaison constant-time) et Prometheus doit être configuré avec.
     pub metrics_token: String,
-    /// Mode AUDIT du gate RBAC global : exécute toute la logique de décision et
-    /// journalise ce qui SERAIT refusé, mais laisse passer les requêtes. Permet
-    /// de valider la table de routes en prod (repérer les 403 potentiels sur des
-    /// routes légitimes non mappées) AVANT de basculer en enforce. Activé quand
-    /// `RBAC_GLOBAL_GATE=audit`. Mutuellement exclusif avec l'enforce.
-    pub rbac_global_gate_audit: bool,
     /// Serveur Discord unique servi par cette installation.
     ///
     /// L'application est mono-serveur : toute requete portant un autre
@@ -140,17 +130,6 @@ impl AppConfig {
             discord_oauth_client_secret: std::env::var("DISCORD_CLIENT_SECRET").unwrap_or_default(),
             discord_oauth_redirect_uri: std::env::var("DISCORD_REDIRECT_URI").unwrap_or_default(),
             web_front_url: std::env::var("WEB_FRONT_URL").unwrap_or_default(),
-            // Tri-etat via RBAC_GLOBAL_GATE :
-            //   - "true"/"1"     -> enforce (refuse reellement)
-            //   - "audit"/"dryrun" -> audit (log-only, laisse passer)
-            //   - autre / absent -> off (no-op total)
-            // Default OFF : zero changement de comportement tant que non configure.
-            rbac_global_gate: std::env::var("RBAC_GLOBAL_GATE")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false),
-            rbac_global_gate_audit: std::env::var("RBAC_GLOBAL_GATE")
-                .map(|v| v == "audit" || v == "dryrun")
-                .unwrap_or(false),
         }
     }
 

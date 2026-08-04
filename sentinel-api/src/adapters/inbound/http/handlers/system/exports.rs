@@ -11,19 +11,15 @@
 use axum::extract::Path;
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::outbound::system::export_job_repository::{ExportJobRecord, NewExportJob};
 
@@ -88,7 +84,6 @@ impl From<ExportJobRecord> for ExportJobStatusDto {
 /// n'est pas dans l'URL).
 pub async fn create_export_job(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateExportJobDto>,
 ) -> Result<(StatusCode, Json<ExportJobCreatedDto>), ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
@@ -111,14 +106,6 @@ pub async fn create_export_job(
     }
 
     // Phase 7 B — Gate RBAC : moderator+ pour lancer un export
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Moderator,
-        "moderator+ requis pour lancer un export",
-    )
-    .await?;
 
     let id = state
         .export_jobs_uc

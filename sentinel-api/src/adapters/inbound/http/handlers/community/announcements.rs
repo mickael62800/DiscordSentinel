@@ -14,13 +14,12 @@ use crate::adapters::inbound::http::dto::community::announcements::{
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, RoleContext};
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::community::manage_announcements::{
     CreateAnnouncementCommand, RenderedAnnouncement, UpdateAnnouncementCommand,
 };
 use axum::Extension;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 const ANNOUNCEMENTS_BOT: &str = "announcements";
@@ -100,17 +99,9 @@ async fn try_post_log_embed(
 
 pub async fn create_announcement(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateAnnouncementDto>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &dto.guild_id,
-        Role::Admin,
-        "admin+ requis pour creer une annonce",
-    )
-    .await?;
     let recurrence_type = map_validation_string(parse_recurrence(&dto.recurrence_type))?;
     let content_type = map_validation_string(parse_content_type(&dto.content_type))?;
 
@@ -139,9 +130,9 @@ pub async fn create_announcement(
             .and_then(parse_hex_color),
     };
 
-    // L'auteur enregistre est le user web authentifie (RoleContext). Appel
-    // bot/interne (sans RoleContext) : fallback "web".
-    let created_by = rbac
+    // L'auteur enregistre est le user web authentifie (WebUser). Appel
+    // bot/interne (sans WebUser) : fallback "web".
+    let created_by = user
         .as_ref()
         .map(|Extension(ctx)| ctx.discord_user_id.clone())
         .unwrap_or_else(|| "web".to_string());
@@ -192,22 +183,14 @@ pub async fn create_announcement(
 
 pub async fn update_announcement(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateAnnouncementDto>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
     // Fail-closed : charge l'annonce (erreur DB propagee au lieu d'etre avalee)
     // et gate toujours (check_role_for_guild bypasse en interne si pas de
-    // RoleContext = appel bot). Avant, `if let Ok` sautait la garde sur erreur DB.
+    // WebUser = appel bot). Avant, `if let Ok` sautait la garde sur erreur DB.
     let existing = state.announcements_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &existing.guild_id,
-        Role::Admin,
-        "admin+ requis pour modifier une annonce",
-    )
-    .await?;
     let recurrence_type = map_validation_string(parse_recurrence(&dto.recurrence_type))?;
     let content_type = map_validation_string(parse_content_type(&dto.content_type))?;
     let cmd = UpdateAnnouncementCommand {
@@ -239,44 +222,29 @@ pub async fn update_announcement(
 
 pub async fn delete_announcement(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<()>, ApiError> {
     // Fail-closed (cf. update) : erreur DB propagee, garde toujours executee.
     let existing = state.announcements_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &existing.guild_id,
-        Role::Admin,
-        "admin+ requis pour supprimer une annonce",
-    )
-    .await?;
     state.announcements_uc.delete(id).await?;
     Ok(Json(()))
 }
 
 pub async fn get_announcement(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
     let ann = state.announcements_uc.get(id).await?;
     // IDOR : sans garde, tout appelant lisait le contenu d'une annonce d'un autre
     // serveur par enumeration d'UUID.
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &ann.guild_id,
-        Role::Viewer,
-        "acces reserve aux membres du serveur",
-    )
-    .await?;
     Ok(single_dto(ann))
 }
 
 pub async fn list_announcements(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<AnnouncementDto>>, ApiError> {
     let list = state.announcements_uc.list_by_guild(&guild_id).await?;
@@ -285,57 +253,33 @@ pub async fn list_announcements(
 
 pub async fn toggle_announcement(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<ToggleAnnouncementDto>,
 ) -> Result<Json<bool>, ApiError> {
     // Fail-closed (cf. update) : erreur DB propagee, garde toujours executee.
     let existing = state.announcements_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &existing.guild_id,
-        Role::Admin,
-        "admin+ requis pour activer/desactiver une annonce",
-    )
-    .await?;
     let new_state = state.announcements_uc.toggle(id, dto.enabled).await?;
     Ok(Json(new_state))
 }
 
 pub async fn preview_announcement(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<RenderedAnnouncement>, ApiError> {
     let ann = state.announcements_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &ann.guild_id,
-        Role::Viewer,
-        "acces reserve aux membres du serveur",
-    )
-    .await?;
     let rendered = state.announcements_uc.preview(id).await?;
     Ok(Json(rendered))
 }
 
 pub async fn list_runs(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Query(params): Query<RunsLimitQuery>,
 ) -> Result<Json<Vec<AnnouncementRunDto>>, ApiError> {
     let ann = state.announcements_uc.get(id).await?;
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &ann.guild_id,
-        Role::Viewer,
-        "acces reserve aux membres du serveur",
-    )
-    .await?;
     let limit = params.limit.unwrap_or(50).min(500);
     let runs = state.announcements_uc.list_runs(id, limit).await?;
     Ok(map_to_dtos(runs))
@@ -362,6 +306,7 @@ pub struct FetchDueQuery {
 /// la couleur par defaut du guild (`default_color_hex`).
 pub async fn fetch_due(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Query(params): Query<FetchDueQuery>,
 ) -> Result<Json<Vec<RenderedAnnouncement>>, ApiError> {
     let limit = params.limit.unwrap_or(50).min(200);
@@ -403,6 +348,7 @@ pub async fn fetch_due(
 /// cle est 0, la guild est skip (illimite).
 pub async fn retention_cleanup_all(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let summary = state.announcements_uc.retention_cleanup_all().await?;
     Ok(Json(serde_json::json!({
@@ -417,6 +363,7 @@ pub async fn retention_cleanup_all(
 /// le bot apres publication des messages Discord.
 pub async fn record_run_result(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(run_id): Path<Uuid>,
     Json(dto): Json<RecordRunResultDto>,
 ) -> Result<Json<()>, ApiError> {
@@ -431,6 +378,7 @@ pub async fn record_run_result(
 /// quand un user clique sur un bouton interactif d'une annonce.
 pub async fn record_button_click(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<ButtonClickDto>,
 ) -> Result<Json<()>, ApiError> {
     state
@@ -450,6 +398,7 @@ pub async fn record_button_click(
 /// GET /api/announcements/{id}/interactions — liste des clics sur les boutons.
 pub async fn list_button_interactions(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Query(params): Query<RunsLimitQuery>,
 ) -> Result<Json<Vec<ButtonInteractionDto>>, ApiError> {

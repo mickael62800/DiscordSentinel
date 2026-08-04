@@ -1,7 +1,7 @@
 //! Audit serveur : actions admin sur l'infra (vs audit_logs = events Discord).
 //!
 //! Adaptateur ENTRANT mince : le SQL vit dans `ServerEventRepository`, le bornage
-//! des filtres dans `ManageServerEventsUseCase`. Ici : parse -> RBAC -> use case.
+//! des filtres dans `ManageServerEventsUseCase`. Ici : parse -> user -> use case.
 //! Helper `record_server_event` : ecriture best-effort (log l'erreur sans bloquer
 //! l'action principale de l'appelant).
 
@@ -16,12 +16,9 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::require_role;
-use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::system::manage_server_events::ManageServerEventsUseCase;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 fn forbid(s: StatusCode, msg: &str) -> ApiError {
@@ -30,16 +27,6 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
     } else {
         DomainError::Internal(msg.into())
     })
-}
-
-fn gate_admin(state: &AppState, rbac: &Option<Extension<RoleContext>>) -> Result<(), ApiError> {
-    let Some(Extension(ctx)) = rbac else {
-        return Err(forbid(StatusCode::FORBIDDEN, "auth requise"));
-    };
-    if require_superadmin(state, ctx).is_ok() {
-        return Ok(());
-    }
-    require_role(ctx, Role::Admin).map_err(|s| forbid(s, "admin+ requis"))
 }
 
 /// Insere un event serveur via le use case. Best-effort : si echec, on log
@@ -89,10 +76,9 @@ pub struct ServerEventDto {
 
 pub async fn list_server_events(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<ServerEventsQuery>,
 ) -> Result<Json<Vec<ServerEventDto>>, ApiError> {
-    gate_admin(&state, &rbac)?;
 
     let events = state
         .server_events_uc

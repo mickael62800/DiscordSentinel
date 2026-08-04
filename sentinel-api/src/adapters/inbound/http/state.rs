@@ -39,7 +39,6 @@ pub struct AppState {
     pub rules_uc: Arc<dyn ManageRulesUseCase>,
     pub infractions_uc: Arc<dyn ManageInfractionsUseCase>,
     pub tickets_uc: Arc<dyn ManageTicketsUseCase>,
-    pub invitations_uc: Arc<dyn crate::ports::inbound::system::manage_invitations::ManageInvitationsUseCase>,
     pub security_uc: Arc<dyn ManageSecurityUseCase>,
     pub moderation_uc: Arc<dyn ManageModerationUseCase>,
     pub modstats_uc: Arc<dyn crate::ports::inbound::moderation::read_modstats::ReadModstatsUseCase>,
@@ -140,22 +139,12 @@ pub struct AppState {
         Arc<dyn crate::ports::inbound::system::manage_lockdown::ManageLockdownUseCase>,
     pub slowmode_uc:
         Arc<dyn crate::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCase>,
-    pub component_visibility_uc: Arc<
-        dyn crate::ports::inbound::system::manage_component_visibility::ManageComponentVisibilityUseCase,
-    >,
-    pub component_min_role_uc: Arc<
-        dyn crate::ports::inbound::system::manage_component_min_role::ManageComponentMinRoleUseCase,
-    >,
     pub alert_rules_uc:
         Arc<dyn crate::ports::inbound::system::manage_alert_rules::ManageAlertRulesUseCase>,
     pub bot_persistence_uc:
         Arc<dyn crate::ports::inbound::system::manage_bot_persistence::ManageBotPersistenceUseCase>,
     pub server_events_uc:
         Arc<dyn crate::ports::inbound::system::manage_server_events::ManageServerEventsUseCase>,
-    /// CRUD RBAC applicatif (endpoints owner). Nomme `rbac_admin_uc` pour ne pas
-    /// confondre avec le middleware RBAC (`middleware/rbac.rs`), qui a sa propre
-    /// logique de resolution de role.
-    pub rbac_admin_uc: Arc<dyn crate::ports::inbound::system::manage_rbac::ManageRbacUseCase>,
     pub tls_cert_uc: Arc<dyn crate::ports::inbound::system::read_tls_cert::ReadTlsCertUseCase>,
     /// Acces au daemon Docker de l'hote (listing, actions, prune, df).
     pub docker_host: Arc<dyn crate::ports::outbound::system::docker_host::DockerHost>,
@@ -190,13 +179,6 @@ pub struct AppState {
     pub container_monitor: Option<std::sync::Arc<tokio::sync::RwLock<crate::bootstrap::container_monitor::ContainerMonitorState>>>,
     /// Rate limiter dynamique : tracking req/IP en memoire pour ban auto.
     pub rate_limiter: Option<std::sync::Arc<crate::adapters::outbound::system::rate_limiter::RateLimiter>>,
-    /// Feature flag — active le `global_rbac_gate` (gate RBAC global
-    /// fail-closed sur les mutations web) en ENFORCE. Default `false` = no-op.
-    /// Voir `middleware/global_rbac.rs`.
-    pub rbac_global_gate: bool,
-    /// Mode AUDIT du gate RBAC global : log-only, laisse passer. Sert à valider
-    /// la table de routes avant de basculer en enforce.
-    pub rbac_global_gate_audit: bool,
 
     // ─────────────────────────────────────────────────────────────────────
     // NE PAS utiliser depuis les handlers — passer par un repository

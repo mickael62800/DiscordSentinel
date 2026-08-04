@@ -6,16 +6,12 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
-use axum::Extension;
 use axum::Json;
-use sentinel_core::domain::enums::system::role::Role;
 
 pub async fn list_infractions(
     State(state): State<AppState>,
@@ -40,7 +36,6 @@ pub async fn list_infractions(
 
 pub async fn delete_infraction(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Recuperer l'infraction avant suppression pour le DM ET pour le gate RBAC
@@ -50,14 +45,6 @@ pub async fn delete_infraction(
     // propre guild_id, donc on fetch d'abord puis on verifie le role
     // via check_role_for_guild (pattern "ressource-id-based").
     if let Some(ref inf) = infraction {
-        check_role_for_guild(
-            &state,
-            &rbac,
-            &inf.guild_id,
-            Role::Moderator,
-            "moderator+ requis pour supprimer une infraction",
-        )
-        .await?;
     }
 
     let deleted = state.infractions_uc.delete_infraction(&id).await?;

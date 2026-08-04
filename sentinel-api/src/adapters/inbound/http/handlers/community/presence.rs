@@ -28,8 +28,8 @@ use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::community::public_guard::ensure_guild_id;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use sentinel_core::domain::errors::DomainError;
 
 /// Salons ecrits remontes. Au-dela, la liste cesse d'informer.
@@ -71,6 +71,7 @@ pub struct PresenceDto {
 /// GET /api/public/presence/{guild_id} — visiteurs anonymes.
 pub async fn public_presence(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<PresenceDto>, ApiError> {
     presence_dto(state, guild_id, false).await
@@ -83,12 +84,12 @@ pub async fn public_presence(
 /// fausse de qui est connecte.
 pub async fn member_presence(
     State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
-    rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<PresenceDto>, ApiError> {
-    // Le contexte RBAC est exige : sans lui, cette route serait la route
+    // Le contexte user est exige : sans lui, cette route serait la route
     // publique avec les salons prives en plus.
-    if rbac.is_none() {
+    if user.is_none() {
         return Err(ApiError(DomainError::Forbidden(
             "connexion Discord requise".into(),
         )));

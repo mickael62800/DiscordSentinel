@@ -16,14 +16,11 @@ use serde::Deserialize;
 use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::require_role;
-use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::system::host_probe::HostProbe;
 use sentinel_core::domain::entities::system::security_audit::{AuditLogFilter, CleanupOptions};
 use sentinel_core::domain::entities::system::security_log::LogWindow;
-use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
 
 fn forbid(s: StatusCode, msg: &str) -> ApiError {
@@ -32,25 +29,6 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
     } else {
         DomainError::Internal(msg.into())
     })
-}
-
-/// Gate admin+ pour les endpoints globaux (non scopes par guild).
-/// Comme le middleware RBAC ne peut pas resoudre le role sans guild_id
-/// dans l'URL, on bypass pour les superadmins (env SUPERADMIN_USER_IDS).
-/// Pour les non-superadmins, il faudrait soit ajouter un guild_id dans
-/// l'URL, soit passer par un endpoint scope par guild.
-fn gate_admin(state: &AppState, rbac: &Option<Extension<RoleContext>>) -> Result<(), ApiError> {
-    let Some(Extension(ctx)) = rbac else {
-        return Err(forbid(StatusCode::FORBIDDEN, "auth requise"));
-    };
-    // Superadmin bypass : pour les endpoints globaux comme /api/security/*,
-    // c'est le seul check possible sans contexte de guild.
-    if require_superadmin(state, ctx).is_ok() {
-        return Ok(());
-    }
-    // Sinon : require admin role explicit (necessite que le middleware ait
-    // resolu ctx.role, ce qui demande un guild_id quelque part).
-    require_role(ctx, Role::Admin).map_err(|s| forbid(s, "superadmin requis"))
 }
 
 // ── 1. Top IPs par requetes ─────────────────────────────────────────────
@@ -72,10 +50,9 @@ pub struct TopIpEntry {
 
 pub async fn top_ips(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<TopIpEntry>>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("1h"));
     let limit = crate::adapters::inbound::http::helpers::normalize_in(q.limit, 20, 1, 100);
 
@@ -110,10 +87,9 @@ pub struct AuthFailureEntry {
 
 pub async fn auth_failures(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<AuthFailureEntry>>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
     let limit = crate::adapters::inbound::http::helpers::normalize_in(q.limit, 100, 1, 500);
 
@@ -155,9 +131,8 @@ pub struct BannedIpsResponse {
 
 pub async fn banned_ips(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<BannedIpsResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
 
     let Some(status) = state.ip_bans_uc.fail2ban_status().await.map_err(ApiError)? else {
         return Ok(Json(BannedIpsResponse {
@@ -195,7 +170,7 @@ pub async fn banned_ips(
 #[derive(Debug, Deserialize)]
 pub struct AuditQuery {
     pub guild_id: Option<String>,
-    pub event_type_prefix: Option<String>, // ex: "docker." ou "rbac."
+    pub event_type_prefix: Option<String>, // ex: "docker." ou "user."
     pub limit: Option<i64>,
 }
 
@@ -214,10 +189,9 @@ pub struct AuditEntry {
 
 pub async fn audit_logs(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<AuditQuery>,
 ) -> Result<Json<Vec<AuditEntry>>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let filter = AuditLogFilter {
         guild_id: q.guild_id,
         event_type_prefix: q.event_type_prefix,
@@ -267,12 +241,11 @@ pub struct BanIpResponse {
 /// mapping de la reponse.
 pub async fn ban_ip(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<BanIpDto>,
 ) -> Result<Json<BanIpResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
 
-    let actor = rbac
+    let actor = user
         .as_ref()
         .map(|r| r.0.discord_user_id.clone())
         .unwrap_or_else(|| "unknown".to_string());
@@ -308,12 +281,11 @@ pub async fn ban_ip(
 
 pub async fn unban_ip(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Json(dto): Json<BanIpDto>,
 ) -> Result<Json<BanIpResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
 
-    let actor = rbac
+    let actor = user
         .as_ref()
         .map(|r| r.0.discord_user_id.clone())
         .unwrap_or_else(|| "unknown".to_string());
@@ -379,9 +351,8 @@ pub struct SshFailuresResponse {
 
 pub async fn ssh_failures(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<SshFailuresResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     Ok(Json(read_probe(&state, HostProbe::SshFailures).await?))
 }
 
@@ -402,9 +373,8 @@ pub struct DiskTrendResponse {
 
 pub async fn disk_trend(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<DiskTrendResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     Ok(Json(read_probe(&state, HostProbe::DiskTrend).await?))
 }
 
@@ -425,9 +395,8 @@ pub struct ConnectionsResponse {
 
 pub async fn active_connections(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<ConnectionsResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     Ok(Json(read_probe(&state, HostProbe::Connections).await?))
 }
 
@@ -448,9 +417,8 @@ pub struct OpenPortsResponse {
 
 pub async fn open_ports(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<OpenPortsResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     Ok(Json(read_probe(&state, HostProbe::OpenPorts).await?))
 }
 
@@ -475,9 +443,8 @@ pub struct TrivyResponse {
 
 pub async fn trivy_vulns(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<TrivyResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     Ok(Json(read_probe(&state, HostProbe::Trivy).await?))
 }
 
@@ -507,10 +474,9 @@ pub struct GeoIpEntry {
 
 pub async fn geoip_lookup(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<GeoIpQuery>,
 ) -> Result<Json<Vec<GeoIpEntry>>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let ips: Vec<String> = q
         .ips
         .split(',')
@@ -562,9 +528,8 @@ pub struct ContainerChangesResponse {
 
 pub async fn container_changes(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<ContainerChangesResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let monitor = state
         .container_monitor
         .clone()
@@ -598,9 +563,8 @@ pub struct SuspiciousResponse {
 
 pub async fn nginx_suspicious(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<SuspiciousResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let mut data: SuspiciousResponse = read_probe(&state, HostProbe::NginxSuspicious).await?;
 
     // Filtre les entries dont l'IP est actuellement bannie manuellement.
@@ -641,9 +605,8 @@ pub struct ManualBanEntry {
 
 pub async fn manual_bans(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<Vec<ManualBanEntry>>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let bans = state
         .ip_bans_uc
         .list_manual_bans()
@@ -677,9 +640,8 @@ pub struct TlsErrorsResponse {
 
 pub async fn tls_errors(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<TlsErrorsResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     Ok(Json(read_probe(&state, HostProbe::TlsErrors).await?))
 }
 
@@ -701,9 +663,8 @@ pub struct FileIntegrityResponse {
 
 pub async fn file_integrity(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<FileIntegrityResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     Ok(Json(read_probe(&state, HostProbe::FileIntegrity).await?))
 }
 
@@ -724,9 +685,8 @@ pub struct OutboundResponse {
 
 pub async fn outbound_connections(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<OutboundResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     Ok(Json(read_probe(&state, HostProbe::Outbound).await?))
 }
 
@@ -748,10 +708,9 @@ pub struct LimitQuery {
 
 pub async fn last_successful_logins(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<LimitQuery>,
 ) -> Result<Json<Vec<SuccessfulLoginEntry>>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let limit = crate::adapters::inbound::http::helpers::normalize_in(q.limit, 20, 1, 200);
     let rows = state
         .security_audit_uc
@@ -800,10 +759,9 @@ pub struct TrafficTrendResponse {
 
 pub async fn traffic_trend(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<TrafficTrendQuery>,
 ) -> Result<Json<TrafficTrendResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
     let bucket_min = (crate::adapters::inbound::http::helpers::normalize_in(q.bucket_minutes, 5, 1, 60)) as i64;
 
@@ -846,7 +804,7 @@ pub struct CleanupQuery {
     /// True = purger aussi audit_logs (events Discord). Defaut false.
     #[serde(default)]
     pub include_audit_logs: Option<bool>,
-    /// Purge `server_events` (audit infra : ban-ip, docker, rbac).
+    /// Purge `server_events` (audit infra : ban-ip, docker, user).
     #[serde(default)]
     pub include_server_events: Option<bool>,
     /// Purge `successful_logins` (derniers logins OAuth Discord).
@@ -872,16 +830,14 @@ pub struct CleanupResponse {
 /// `audit_logs`. Gate superadmin uniquement (operation destructive).
 pub async fn cleanup_security_logs(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
     Query(q): Query<CleanupQuery>,
 ) -> Result<Json<CleanupResponse>, ApiError> {
     // Endpoint cross-guild ultra-destructif (peut DELETE FROM audit_logs
     // global). Reserve aux superadmins uniquement, pas aux admins de guild.
-    let Some(Extension(ctx)) = &rbac else {
+    let Some(Extension(ctx)) = &user else {
         return Err(forbid(StatusCode::FORBIDDEN, "auth requise"));
     };
-    require_superadmin(&state, ctx)
-        .map_err(|s| forbid(s, "superadmin requis pour cleanup_security_logs"))?;
 
     let options = CleanupOptions {
         older_than_days: q.older_than_days.unwrap_or(0).max(0),
@@ -898,7 +854,7 @@ pub async fn cleanup_security_logs(
         .await
         .map_err(ApiError)?;
 
-    let actor = rbac
+    let actor = user
         .as_ref()
         .map(|r| r.0.discord_user_id.as_str())
         .unwrap_or("unknown");
@@ -968,9 +924,8 @@ pub struct TlsCertInfo {
 
 pub async fn tls_cert(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
+    user: Option<Extension<WebUser>>,
 ) -> Result<Json<TlsCertInfo>, ApiError> {
-    gate_admin(&state, &rbac)?;
     let info = state.tls_cert_uc.read().await.map_err(ApiError)?;
     Ok(Json(TlsCertInfo {
         domain: info.domain,

@@ -8,17 +8,13 @@
 
 use axum::extract::Query;
 use axum::extract::State;
-use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 
 use crate::adapters::inbound::http::dto::moderation::copilot::MemberModerationContextDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use sentinel_core::domain::enums::system::role::Role;
 
 #[derive(Debug, Deserialize)]
 pub struct CopilotQuery {
@@ -33,18 +29,9 @@ pub struct CopilotQuery {
 /// GET /api/moderation/{guild_id}/copilot/{user_id}
 pub async fn get_member_context(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Query(params): Query<CopilotQuery>,
 ) -> Result<Json<MemberModerationContextDto>, ApiError> {
-    check_role_for_guild(
-        &state,
-        &rbac,
-        &guild_id,
-        Role::Moderator,
-        "moderator+ requis pour consulter le copilote de moderation",
-    )
-    .await?;
 
     let lookback_days = params.lookback_days.unwrap_or(90);
     let min_precedents = params.min_precedents.unwrap_or(3);
