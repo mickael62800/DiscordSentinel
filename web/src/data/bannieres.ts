@@ -25,6 +25,7 @@ export const BANNIERES: Banniere[] = [
 
   // ── Communauté ──
   { fichier: "anniv_serveur_banner.jpg", libelle: "Anniversaire du serveur", categorie: "Communauté" },
+  { fichier: "anniv_membre_banner.jpg", libelle: "Anniversaire d'arrivée (année de plus)", categorie: "Communauté" },
   { fichier: "member_mois_banner.jpg", libelle: "Membre du mois", categorie: "Communauté" },
   { fichier: "member_annee_banner.jpg", libelle: "Membre de l'année", categorie: "Communauté" },
   { fichier: "nouveau_role_banner.jpg", libelle: "Nouveau rôle", categorie: "Communauté" },
