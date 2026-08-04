@@ -130,20 +130,23 @@ mais le handler l'ignore : aucun changement fonctionnel requis cote nginx. Les
 commentaires de `web/nginx.conf` (bloc `/_nexus_auth`) ont ete corriges pour
 decrire le modele superadmin-only au lieu du RBAC `nexus.access` par guild.
 
-## 7. Dette annexe reperee, non traitee
+## 7. Dette annexe reperee
 
-Deux points releves pendant l'audit des bots, laisses en l'etat car ils
-relevent d'une decision produit :
-
-- `sentinel-bot/src/modules/moderation/commands/mute.rs` — une duree absente est
-  etiquetee « permanent » et journalisee `mute_permanent`, mais le timeout
-  Discord applique vaut `default_mute_duration_secs` (1 h par defaut). Discord
-  ne sait pas faire de timeout permanent : le libelle ment a l'utilisateur. A
-  trancher entre renommer le libelle ou basculer sur un role muet.
-- `sentinel-api/.../handlers/moderation/commands/expirations.rs` — seul handler
-  de moderation sans `has_mod_permission` explicite. Couvert par
-  `default_member_permissions` cote Discord, mais depareille avec le reste du
-  module.
+- ~~`mute.rs` — duree absente etiquetee « permanent » mais timeout reel de 1 h~~
+  **FAIT** (option « max Discord »). Discord ne sachant pas faire de timeout
+  permanent (plafond 28 jours), « sans duree » applique desormais le MAXIMUM
+  autorise (`max_mute_duration_secs`, plafonne a 28 j) au lieu de l'ancien
+  defaut de 1 h. Le libelle devient « 28 jours (max Discord) » et un champ
+  « Demute automatique » affiche la date de fin (`<t:TS:R>`, rendu relatif par
+  Discord) dans le DM, l'embed de salon et la reponse au moderateur. L'action
+  reste journalisee `mute_permanent` (categorie interne conservee : enum du
+  domaine, stats SQL, variantes web). La cle `default_mute_duration_secs`,
+  desormais inutilisee partout, a ete retiree.
+- ~~`expirations.rs` — handler sans `has_mod_permission`~~ **OBSOLETE** : le
+  fichier `sentinel-api/.../handlers/moderation/commands/expirations.rs` a ete
+  supprime par le commit `f07d7406`, et le mecanisme `has_mod_permission`
+  n'existe plus cote API (le back-office superadmin-only gate tout via
+  `superadmin_middleware`). Plus rien a traiter.
 
 ## 8. Branche
 

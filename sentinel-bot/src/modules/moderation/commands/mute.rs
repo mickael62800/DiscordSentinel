@@ -18,7 +18,7 @@ use crate::shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("mute")
-        .description("Mute un utilisateur (permanent ou temporaire)")
+        .description("Mute un utilisateur (temporaire ; vide = 28 jours, maximum Discord)")
         .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::String, "reason", "Raison du mute")
@@ -38,7 +38,7 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::Integer,
                 "duration",
-                "Duree en minutes (vide = permanent, max 40320 = 28 jours)",
+                "Duree en minutes (vide = 28 jours, le maximum autorise par Discord)",
             )
             .min_int_value(1)
             .max_int_value(40320),
@@ -150,18 +150,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         crate::modules::moderation::MODULE_BOT_NAME,
     )
     .await;
-    let default_mute_duration_secs =
-        BaseApiClient::config_u64(&guild_config, "default_mute_duration_secs", 3600);
+    // Discord plafonne un timeout a 28 jours : il n'existe pas de mute
+    // reellement permanent cote API (le membre serait demute automatiquement).
+    // "Sans duree" applique donc le MAXIMUM autorise -- le plus proche de
+    // l'intention -- et on l'annonce clairement au lieu de mentir "permanent".
+    const DISCORD_MAX_SECS: u64 = 28 * 24 * 3600;
     let max_mute_duration_secs =
-        BaseApiClient::config_u64(&guild_config, "max_mute_duration_secs", 28 * 24 * 3600);
+        BaseApiClient::config_u64(&guild_config, "max_mute_duration_secs", DISCORD_MAX_SECS);
+    let max_allowed_secs = max_mute_duration_secs.min(DISCORD_MAX_SECS);
 
     let duration_secs = duration_minutes.map(|m| (m as u64) * 60);
-    let timeout_secs = duration_secs.unwrap_or(default_mute_duration_secs);
-    let timeout_secs = timeout_secs.min(max_mute_duration_secs).min(28 * 24 * 3600);
-
     let is_permanent = duration_minutes.is_none();
+    let timeout_secs = duration_secs.unwrap_or(max_allowed_secs).min(max_allowed_secs);
+
     let duration_label = if is_permanent {
-        "permanent".to_string()
+        format!("{} jours (max Discord)", max_allowed_secs / (24 * 3600))
     } else {
         format!("{}min", duration_minutes.unwrap())
     };
@@ -366,9 +369,14 @@ pub async fn execute_mute(
         .map(|g| g.name)
         .unwrap_or_else(|_| "le serveur".into());
 
+    // Discord rend `<t:TS:R>` en relatif localise ("dans 28 jours") : le membre
+    // sait exactement quand il sera demute automatiquement.
+    let unmute_at = format!("<t:{ts}:F> (<t:{ts}:R>)");
+
     if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
         let dm_embed = moderate_embed(format!("🔇 Mute ({duration_label}) sur **{guild_name}**"))
             .field("Duree", duration_label, true)
+            .field("Demute automatique", &unmute_at, true)
             .field("Raison", reason, false);
 
         let mut dm_msg = CreateMessage::new().embed(dm_embed);
@@ -391,6 +399,7 @@ pub async fn execute_mute(
         .field("Cible", format!("<@{}>", target.id), true)
         .field("Moderateur", format!("<@{}>", moderator_id), true)
         .field("Duree", duration_label.to_string(), true)
+        .field("Demute automatique", &unmute_at, true)
         .field("ID Cible", target.id.to_string(), true)
         .field("Raison", reason, false);
     if let Some(cmd) = command {
@@ -405,8 +414,8 @@ pub async fn execute_mute(
             .edit_response(
                 &ctx.http,
                 serenity::builder::EditInteractionResponse::new().content(format!(
-                    "✅ Mute applique sur <@{}> ({}).",
-                    target.id, duration_label
+                    "✅ Mute applique sur <@{}> ({}). Demute automatique {}.",
+                    target.id, duration_label, unmute_at
                 )),
             )
             .await
