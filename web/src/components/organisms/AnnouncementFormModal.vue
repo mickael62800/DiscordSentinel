@@ -20,6 +20,7 @@ import AppModal from "../atoms/AppModal.vue";
 import AppButton from "../atoms/AppButton.vue";
 import NumberInputWithUnit from "../atoms/NumberInputWithUnit.vue";
 import AppTextarea from "../atoms/AppTextarea.vue";
+import ImagePicker from "@/components/molecules/ImagePicker.vue";
 import AnnouncementButtonsEditor from "./announcement-form/AnnouncementButtonsEditor.vue";
 
 const props = defineProps<{

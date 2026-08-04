@@ -10,6 +10,7 @@ import VoiceChannelSelect from "@/components/atoms/VoiceChannelSelect.vue";
 import RoleSelect from "@/components/atoms/RoleSelect.vue";
 import IdsListPickerField from "@/components/molecules/IdsListPickerField.vue";
 import AppTextarea from "@/components/atoms/AppTextarea.vue";
+import ImagePicker from "@/components/molecules/ImagePicker.vue";
 
 const { config, saving, saveConfig, publishRules } = useWelcome();
 const { guildIdFilter } = useGuildSelector();
@@ -230,10 +231,17 @@ async function onSave() {
 
       <details v-if="draft.welcome_enabled" class="preview">
         <summary>👁️ Aperçu</summary>
-        <div class="preview-embed" :style="{ borderLeftColor: draft.welcome_embed_color }">
-          <strong v-if="draft.welcome_title">{{ draft.welcome_title }}</strong>
-          <p>{{ previewWelcomeText }}</p>
-          <small v-if="draft.welcome_footer_text">{{ draft.welcome_footer_text }}</small>
+        <div class="preview-stack">
+          <!-- L'image occupe toute la largeur, en grand. -->
+          <figure v-if="draft.welcome_image_url" class="preview-image">
+            <img :src="draft.welcome_image_url" alt="Bannière de bienvenue" loading="lazy" />
+          </figure>
+          <!-- La carte du message vient juste en dessous, plus étroite. -->
+          <div class="preview-embed" :style="{ borderLeftColor: draft.welcome_embed_color }">
+            <strong v-if="draft.welcome_title">{{ draft.welcome_title }}</strong>
+            <p>{{ previewWelcomeText }}</p>
+            <small v-if="draft.welcome_footer_text">{{ draft.welcome_footer_text }}</small>
+          </div>
         </div>
       </details>
     </fieldset>
@@ -438,7 +446,7 @@ async function onSave() {
     </fieldset>
 
     <div class="actions">
-      <AppButton variant="primary" type="submit"  :disabled="saving">
+      <AppButton variant="primary" type="submit" :disabled="saving">
         {{ saving ? "Enregistrement…" : "Enregistrer" }}
       </AppButton>
     </div>
@@ -582,8 +590,34 @@ async function onSave() {
   margin-bottom: 10px;
 }
 
-.preview-embed {
+/* Aperçu empilé : image en grand, puis la carte plus petite en dessous. */
+.preview-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
   margin-top: 8px;
+}
+
+.preview-image {
+  margin: 0;
+  width: 100%;
+  line-height: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  overflow: hidden;
+}
+.preview-image img {
+  width: 100%;
+  max-height: 360px;
+  object-fit: cover;
+  display: block;
+}
+
+.preview-embed {
+  /* La carte « rétrécit » sous l'image : largeur d'un embed Discord. */
+  width: 100%;
+  max-width: 440px;
   padding: 14px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
