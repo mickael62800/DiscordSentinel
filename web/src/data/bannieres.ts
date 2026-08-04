@@ -61,6 +61,12 @@ export const BANNIERES: Banniere[] = [
   { fichier: "starbound_game.jpg", libelle: "Starbound", categorie: "Jeux" },
   { fichier: "vrising_game.jpg", libelle: "V Rising", categorie: "Jeux" },
   { fichier: "zomboid_game.jpg", libelle: "Project Zomboid", categorie: "Jeux" },
+
+  // ── Utilitaires ──
+  // Barre transparente tres large : posee comme image d'un embed, elle force
+  // Discord a afficher la carte a sa largeur maximale (tous les embeds
+  // deviennent alors identiques en largeur). Invisible a l'affichage.
+  { fichier: "spacer_fullwidth.png", libelle: "Barre invisible (largeur fixe)", categorie: "Utilitaires" },
 ];
 
 /// Chemin servi par le site, relatif à la racine.
