@@ -317,8 +317,8 @@ async function updatePosted() {
 <style scoped>
 .eb-layout {
   display: grid;
-  /* Colonne d'apercu assez large pour un embed Discord a son maximum (~516px). */
-  grid-template-columns: 200px minmax(0, 1fr) 540px;
+  /* Colonne d'apercu dimensionnee pour l'embed a largeur fixe (440px + marge). */
+  grid-template-columns: 200px minmax(0, 1fr) 480px;
   gap: 16px;
   align-items: start;
 }
@@ -359,10 +359,10 @@ input[type="color"] { height: 38px; padding: 3px; cursor: pointer; width: 100%; 
   display: flex; gap: 12px; justify-content: space-between;
   background: #2b2d31; border-left: 4px solid var(--accent);
   border-radius: 6px; padding: 12px 14px;
-  /* Comme un vrai embed Discord : la largeur s'ADAPTE au contenu (etroit si
-     court) et grandit jusqu'a un maximum (~516px). La hauteur suit le contenu. */
-  width: fit-content;
-  max-width: min(516px, 100%);
+  /* Largeur FIXE et identique pour tous les embeds (rendu uniforme dans le
+     builder). La hauteur, elle, suit le contenu. */
+  width: 440px;
+  max-width: 100%;
 }
 .eb-embed-body { min-width: 0; flex: 1; }
 .eb-author { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 6px; }
