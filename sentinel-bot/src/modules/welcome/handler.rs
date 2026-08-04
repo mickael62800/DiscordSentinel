@@ -321,15 +321,28 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                 } else {
                     raw_footer.replace("{count}", &member_count.to_string())
                 };
-                let mut embed = CreateEmbed::new()
+                let embed = CreateEmbed::new()
                     .title(&title)
                     .description(&text)
                     .color(color)
                     .thumbnail(new_member.user.face())
                     .footer(CreateEmbedFooter::new(footer_raw));
+
+                // L'image part en PREMIER, dans son propre message (embed sans
+                // texte) : elle s'affiche en grand, separee de la carte du
+                // message qui vient juste en dessous. Les deux dans un meme
+                // embed forceraient Discord a comprimer l'image sous le texte.
                 if !raw_image.is_empty() {
-                    info!(url = %raw_image, is_rejoin, "Ajout image banniere a l embed welcome");
-                    embed = embed.image(raw_image.as_str());
+                    info!(url = %raw_image, is_rejoin, "Envoi image banniere (message separe)");
+                    if let Err(e) = channel
+                        .send_message(
+                            &ctx.http,
+                            CreateMessage::new().embed(CreateEmbed::new().image(raw_image.as_str())),
+                        )
+                        .await
+                    {
+                        warn!(error = %e, "Echec envoi image banniere bienvenue");
+                    }
                 } else {
                     info!(is_rejoin, "Pas d image banniere configuree");
                 }
@@ -494,13 +507,23 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
             "e74c3c",
         ))
     };
-    let mut embed = CreateEmbed::new()
+    let embed = CreateEmbed::new()
         .title(&leave_title)
         .description(&text)
         .color(leave_color)
         .footer(CreateEmbedFooter::new(leave_footer));
+
+    // Image d'abord (message separe, en grand), puis la carte texte dessous.
     if !config.leave_image_url.is_empty() {
-        embed = embed.image(&config.leave_image_url);
+        if let Err(e) = ch
+            .send_message(
+                &ctx.http,
+                CreateMessage::new().embed(CreateEmbed::new().image(&config.leave_image_url)),
+            )
+            .await
+        {
+            warn!(error = %e, "Echec envoi image banniere depart");
+        }
     }
 
     if let Err(e) = ch
