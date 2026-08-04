@@ -133,7 +133,7 @@ impl From<DiskInfo> for DiskDto {
 
 pub async fn get_system_info(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<SystemInfoDto>, ApiError> {
     // SECURITE : cet endpoint divulgue des infos host (CPU/RAM, points de
     // montage disques, taille BDD, liste des services). Le gate user global ne
@@ -142,8 +142,6 @@ pub async fn get_system_info(
     // superadmins, comme les endpoints d'admin host (docker).
     // Appel web -> WebUser present -> exige superadmin. Appel interne
     // (bot/worker, AuthKind::Internal, pas de WebUser) -> autorise.
-    if let Some(Extension(ctx)) = &user {
-    }
 
     // ── 1. Liste nominative + metriques Redis ──
     let (mut bots, mut workers) = (Vec::new(), Vec::new());

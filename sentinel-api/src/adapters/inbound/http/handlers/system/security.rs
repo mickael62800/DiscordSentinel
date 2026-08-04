@@ -50,7 +50,7 @@ pub struct TopIpEntry {
 
 pub async fn top_ips(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<TopIpEntry>>, ApiError> {
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("1h"));
@@ -87,7 +87,7 @@ pub struct AuthFailureEntry {
 
 pub async fn auth_failures(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<AuthFailureEntry>>, ApiError> {
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
@@ -131,7 +131,7 @@ pub struct BannedIpsResponse {
 
 pub async fn banned_ips(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<BannedIpsResponse>, ApiError> {
 
     let Some(status) = state.ip_bans_uc.fail2ban_status().await.map_err(ApiError)? else {
@@ -189,7 +189,7 @@ pub struct AuditEntry {
 
 pub async fn audit_logs(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(q): Query<AuditQuery>,
 ) -> Result<Json<Vec<AuditEntry>>, ApiError> {
     let filter = AuditLogFilter {
@@ -351,7 +351,7 @@ pub struct SshFailuresResponse {
 
 pub async fn ssh_failures(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<SshFailuresResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::SshFailures).await?))
 }
@@ -373,7 +373,7 @@ pub struct DiskTrendResponse {
 
 pub async fn disk_trend(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<DiskTrendResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::DiskTrend).await?))
 }
@@ -395,7 +395,7 @@ pub struct ConnectionsResponse {
 
 pub async fn active_connections(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<ConnectionsResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::Connections).await?))
 }
@@ -417,7 +417,7 @@ pub struct OpenPortsResponse {
 
 pub async fn open_ports(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<OpenPortsResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::OpenPorts).await?))
 }
@@ -443,7 +443,7 @@ pub struct TrivyResponse {
 
 pub async fn trivy_vulns(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<TrivyResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::Trivy).await?))
 }
@@ -474,7 +474,7 @@ pub struct GeoIpEntry {
 
 pub async fn geoip_lookup(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(q): Query<GeoIpQuery>,
 ) -> Result<Json<Vec<GeoIpEntry>>, ApiError> {
     let ips: Vec<String> = q
@@ -528,7 +528,7 @@ pub struct ContainerChangesResponse {
 
 pub async fn container_changes(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<ContainerChangesResponse>, ApiError> {
     let monitor = state
         .container_monitor
@@ -563,7 +563,7 @@ pub struct SuspiciousResponse {
 
 pub async fn nginx_suspicious(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<SuspiciousResponse>, ApiError> {
     let mut data: SuspiciousResponse = read_probe(&state, HostProbe::NginxSuspicious).await?;
 
@@ -605,7 +605,7 @@ pub struct ManualBanEntry {
 
 pub async fn manual_bans(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<Vec<ManualBanEntry>>, ApiError> {
     let bans = state
         .ip_bans_uc
@@ -640,7 +640,7 @@ pub struct TlsErrorsResponse {
 
 pub async fn tls_errors(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<TlsErrorsResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::TlsErrors).await?))
 }
@@ -663,7 +663,7 @@ pub struct FileIntegrityResponse {
 
 pub async fn file_integrity(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<FileIntegrityResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::FileIntegrity).await?))
 }
@@ -685,7 +685,7 @@ pub struct OutboundResponse {
 
 pub async fn outbound_connections(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<OutboundResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::Outbound).await?))
 }
@@ -708,7 +708,7 @@ pub struct LimitQuery {
 
 pub async fn last_successful_logins(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(q): Query<LimitQuery>,
 ) -> Result<Json<Vec<SuccessfulLoginEntry>>, ApiError> {
     let limit = crate::adapters::inbound::http::helpers::normalize_in(q.limit, 20, 1, 200);
@@ -759,7 +759,7 @@ pub struct TrafficTrendResponse {
 
 pub async fn traffic_trend(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(q): Query<TrafficTrendQuery>,
 ) -> Result<Json<TrafficTrendResponse>, ApiError> {
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
@@ -835,7 +835,7 @@ pub async fn cleanup_security_logs(
 ) -> Result<Json<CleanupResponse>, ApiError> {
     // Endpoint cross-guild ultra-destructif (peut DELETE FROM audit_logs
     // global). Reserve aux superadmins uniquement, pas aux admins de guild.
-    let Some(Extension(ctx)) = &user else {
+    let Some(Extension(_ctx)) = &user else {
         return Err(forbid(StatusCode::FORBIDDEN, "auth requise"));
     };
 
@@ -924,7 +924,7 @@ pub struct TlsCertInfo {
 
 pub async fn tls_cert(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<TlsCertInfo>, ApiError> {
     let info = state.tls_cert_uc.read().await.map_err(ApiError)?;
     Ok(Json(TlsCertInfo {

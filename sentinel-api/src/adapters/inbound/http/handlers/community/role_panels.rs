@@ -12,7 +12,7 @@ use axum::Json;
 
 pub async fn create_panel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateRolePanelDto>,
 ) -> Result<Json<RolePanelDetailDto>, ApiError> {
     let detail = state.role_panels_uc.create_panel(dto.into()).await?;
@@ -21,7 +21,7 @@ pub async fn create_panel(
 
 pub async fn get_panel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(panel_id): Path<String>,
 ) -> Result<Json<RolePanelDetailDto>, ApiError> {
     let detail = state.role_panels_uc.get_panel(&panel_id).await?;
@@ -30,7 +30,7 @@ pub async fn get_panel(
 
 pub async fn get_panel_by_message(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(message_id): Path<String>,
 ) -> Result<Json<Option<RolePanelDetailDto>>, ApiError> {
     let detail = state
@@ -42,7 +42,7 @@ pub async fn get_panel_by_message(
 
 pub async fn list_panels(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<RolePanelDto>>, ApiError> {
     let panels = state.role_panels_uc.list_panels(&guild_id).await?;
@@ -51,12 +51,12 @@ pub async fn list_panels(
 
 pub async fn set_message_id(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<SetMessageIdDto>,
 ) -> Result<Json<()>, ApiError> {
     // Charge le panneau pour scoper la garde a SA guilde (avant : aucun user ->
     // n'importe qui rebindait le message_id d'un panneau arbitraire = hijack).
-    let detail = state.role_panels_uc.get_panel(&dto.panel_id).await?;
+    state.role_panels_uc.get_panel(&dto.panel_id).await?;
     state.role_panels_uc.set_message_id(dto.into()).await?;
     Ok(Json(()))
 }
@@ -69,8 +69,6 @@ pub async fn delete_panel(
     // Gate user : admin+ pour supprimer un panel. On passe par le use case
     // pour recuperer le guild_id (plus de SQL direct dans le handler).
     if user.is_some() {
-        if let Ok(detail) = state.role_panels_uc.get_panel(&panel_id).await {
-        }
     }
     state.role_panels_uc.delete_panel(&panel_id).await?;
     Ok(Json(()))
@@ -78,7 +76,7 @@ pub async fn delete_panel(
 
 pub async fn list_auto_roles(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<AutoRoleDto>>, ApiError> {
     let roles = state.role_panels_uc.list_auto_roles(&guild_id).await?;
@@ -87,7 +85,7 @@ pub async fn list_auto_roles(
 
 pub async fn add_auto_role(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateAutoRoleDto>,
 ) -> Result<Json<AutoRoleDto>, ApiError> {
     let role = state.role_panels_uc.add_auto_role(dto.into()).await?;
@@ -96,12 +94,10 @@ pub async fn add_auto_role(
 
 pub async fn delete_auto_role(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, role_id)): Path<(String, String)>,
 ) -> Result<Json<()>, ApiError> {
     // Phase 7 B — Gate user : admin+ pour toucher aux auto-roles.
-    if let Some(Extension(ctx)) = user {
-    }
     state
         .role_panels_uc
         .delete_auto_role(&guild_id, &role_id)

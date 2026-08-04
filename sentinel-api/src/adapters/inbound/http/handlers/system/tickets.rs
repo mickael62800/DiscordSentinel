@@ -78,7 +78,7 @@ pub async fn list_tickets(
 
 pub async fn get_ticket_detail(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
 ) -> Result<Json<TicketDetailDto>, ApiError> {
     let detail = state.tickets_uc.get_ticket_detail(&id).await?;
@@ -102,7 +102,7 @@ pub async fn create_ticket(
     // bot/interne (gRPC, qui pose legitimement author = l'utilisateur Discord)
     // reste inchange.
     if let Some(Extension(ctx)) = user.as_ref() {
-        let Some(gid) = command.guild_id.clone() else {
+        let Some(_gid) = command.guild_id.clone() else {
             return Err(ApiError(DomainError::Forbidden(
                 "guild_id requis pour creer un ticket via le web".into(),
             )));
@@ -166,7 +166,7 @@ pub async fn reply_ticket(
 
 pub async fn close_ticket(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.tickets_uc.close_ticket(&id).await?;
@@ -189,7 +189,7 @@ pub async fn close_ticket(
 
 pub async fn assign_ticket(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<AssignDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -215,7 +215,7 @@ pub async fn assign_ticket(
 
 pub async fn update_status(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<UpdateStatusDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -247,7 +247,7 @@ pub async fn update_status(
 
 pub async fn update_ticket_channel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<UpdateTicketChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {

@@ -71,7 +71,7 @@ pub struct PresenceDto {
 /// GET /api/public/presence/{guild_id} — visiteurs anonymes.
 pub async fn public_presence(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<PresenceDto>, ApiError> {
     presence_dto(state, guild_id, false).await

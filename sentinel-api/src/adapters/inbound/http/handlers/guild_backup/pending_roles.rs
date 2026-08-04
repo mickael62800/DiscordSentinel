@@ -17,7 +17,6 @@ use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildU
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::guild_backup::pending_role_grant::PendingRoleGrant;
 
-const OWNER_REQUIRED: &str = "owner requis (sauvegarde/restauration de serveur)";
 
 /// Une entree de re-attribution recue au restore (body de `save`).
 #[derive(Debug, Deserialize)]

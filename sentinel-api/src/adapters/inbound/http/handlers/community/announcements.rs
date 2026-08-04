@@ -183,14 +183,14 @@ pub async fn create_announcement(
 
 pub async fn update_announcement(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateAnnouncementDto>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
     // Fail-closed : charge l'annonce (erreur DB propagee au lieu d'etre avalee)
     // et gate toujours (check_role_for_guild bypasse en interne si pas de
     // WebUser = appel bot). Avant, `if let Ok` sautait la garde sur erreur DB.
-    let existing = state.announcements_uc.get(id).await?;
+    state.announcements_uc.get(id).await?;
     let recurrence_type = map_validation_string(parse_recurrence(&dto.recurrence_type))?;
     let content_type = map_validation_string(parse_content_type(&dto.content_type))?;
     let cmd = UpdateAnnouncementCommand {
@@ -222,18 +222,18 @@ pub async fn update_announcement(
 
 pub async fn delete_announcement(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<()>, ApiError> {
     // Fail-closed (cf. update) : erreur DB propagee, garde toujours executee.
-    let existing = state.announcements_uc.get(id).await?;
+    state.announcements_uc.get(id).await?;
     state.announcements_uc.delete(id).await?;
     Ok(Json(()))
 }
 
 pub async fn get_announcement(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
     let ann = state.announcements_uc.get(id).await?;
@@ -244,7 +244,7 @@ pub async fn get_announcement(
 
 pub async fn list_announcements(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<AnnouncementDto>>, ApiError> {
     let list = state.announcements_uc.list_by_guild(&guild_id).await?;
@@ -253,33 +253,33 @@ pub async fn list_announcements(
 
 pub async fn toggle_announcement(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<ToggleAnnouncementDto>,
 ) -> Result<Json<bool>, ApiError> {
     // Fail-closed (cf. update) : erreur DB propagee, garde toujours executee.
-    let existing = state.announcements_uc.get(id).await?;
+    state.announcements_uc.get(id).await?;
     let new_state = state.announcements_uc.toggle(id, dto.enabled).await?;
     Ok(Json(new_state))
 }
 
 pub async fn preview_announcement(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<RenderedAnnouncement>, ApiError> {
-    let ann = state.announcements_uc.get(id).await?;
+    state.announcements_uc.get(id).await?;
     let rendered = state.announcements_uc.preview(id).await?;
     Ok(Json(rendered))
 }
 
 pub async fn list_runs(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Query(params): Query<RunsLimitQuery>,
 ) -> Result<Json<Vec<AnnouncementRunDto>>, ApiError> {
-    let ann = state.announcements_uc.get(id).await?;
+    state.announcements_uc.get(id).await?;
     let limit = params.limit.unwrap_or(50).min(500);
     let runs = state.announcements_uc.list_runs(id, limit).await?;
     Ok(map_to_dtos(runs))
@@ -306,7 +306,7 @@ pub struct FetchDueQuery {
 /// la couleur par defaut du guild (`default_color_hex`).
 pub async fn fetch_due(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(params): Query<FetchDueQuery>,
 ) -> Result<Json<Vec<RenderedAnnouncement>>, ApiError> {
     let limit = params.limit.unwrap_or(50).min(200);
@@ -348,7 +348,7 @@ pub async fn fetch_due(
 /// cle est 0, la guild est skip (illimite).
 pub async fn retention_cleanup_all(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let summary = state.announcements_uc.retention_cleanup_all().await?;
     Ok(Json(serde_json::json!({
@@ -363,7 +363,7 @@ pub async fn retention_cleanup_all(
 /// le bot apres publication des messages Discord.
 pub async fn record_run_result(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(run_id): Path<Uuid>,
     Json(dto): Json<RecordRunResultDto>,
 ) -> Result<Json<()>, ApiError> {
@@ -378,7 +378,7 @@ pub async fn record_run_result(
 /// quand un user clique sur un bouton interactif d'une annonce.
 pub async fn record_button_click(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<ButtonClickDto>,
 ) -> Result<Json<()>, ApiError> {
     state
@@ -398,7 +398,7 @@ pub async fn record_button_click(
 /// GET /api/announcements/{id}/interactions — liste des clics sur les boutons.
 pub async fn list_button_interactions(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Query(params): Query<RunsLimitQuery>,
 ) -> Result<Json<Vec<ButtonInteractionDto>>, ApiError> {

@@ -58,7 +58,7 @@ pub struct DesignateDto {
 /// GET /api/spotlight/{guild_id} — historique des designations.
 pub async fn list_spotlight(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<SpotlightDto>>, ApiError> {
 
@@ -101,8 +101,8 @@ pub async fn designate_spotlight(
 /// DELETE /api/spotlight/detail/{id}
 pub async fn delete_spotlight(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
-    Path((guild_id, id)): Path<(String, Uuid)>,
+    _user: Option<Extension<WebUser>>,
+    Path((_guild_id, id)): Path<(String, Uuid)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
 
     state.spotlight_uc.delete(id).await?;
@@ -125,7 +125,7 @@ pub struct PublicSpotlightDto {
 /// GET /api/public/spotlight/{guild_id}?period=
 pub async fn public_spotlight(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<PeriodQuery>,
 ) -> Result<Json<Option<PublicSpotlightDto>>, ApiError> {

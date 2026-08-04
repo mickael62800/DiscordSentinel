@@ -49,37 +49,18 @@ impl From<DiscordRole> for DiscordRoleDto {
 /// GET /api/discord-roles/{guild_id} — Liste les roles Discord d'un serveur
 pub async fn list_roles(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<DiscordRoleDto>>, ApiError> {
     let roles = state.discord_role_repo.find_by_guild(&guild_id).await?;
     Ok(map_to_dtos(roles))
 }
 
-/// Masque des bits de permission Discord SENSIBLES : creer/modifier un role qui
-/// les porte peut donner le controle du serveur -> reserve a l'Owner (un
-/// app-Admin ne doit pas pouvoir "minter" un role Administrator qu'il
-/// s'attribuerait ensuite). Valeurs = flags de permission Discord.
-const DANGEROUS_ROLE_PERMS: u64 = (1 << 3)   // ADMINISTRATOR
-    | (1 << 5)   // MANAGE_GUILD
-    | (1 << 28)  // MANAGE_ROLES
-    | (1 << 4)   // MANAGE_CHANNELS
-    | (1 << 29)  // MANAGE_WEBHOOKS
-    | (1 << 2)   // BAN_MEMBERS
-    | (1 << 1)   // KICK_MEMBERS
-    | (1 << 40)  // MODERATE_MEMBERS
-    | (1 << 13)  // MANAGE_MESSAGES
-    | (1 << 17)  // MENTION_EVERYONE
-    | (1 << 27)  // MANAGE_NICKNAMES
-    | (1 << 30)  // MANAGE_GUILD_EXPRESSIONS
-    | (1 << 33)  // MANAGE_EVENTS
-    | (1 << 34)  // MANAGE_THREADS
-    | (1 << 7); // VIEW_AUDIT_LOG
 
 /// POST /api/discord-roles/{guild_id}/create — Creer un role Discord
 pub async fn create_role(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<CreateRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -98,7 +79,7 @@ pub async fn create_role(
 /// PATCH /api/discord-roles/{guild_id}/{role_id} — Modifier un role Discord
 pub async fn edit_role(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, role_id)): Path<(String, String)>,
     Json(body): Json<EditRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -120,7 +101,7 @@ pub async fn edit_role(
 /// DELETE /api/discord-roles/{guild_id}/{role_id} — Supprimer un role Discord
 pub async fn delete_role(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, role_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.discord_api.delete_role(&guild_id, &role_id).await?;

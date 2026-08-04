@@ -17,7 +17,7 @@ use axum::Json;
 /// GET /api/strikes/config/{guild_id}
 pub async fn get_config(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<StrikeConfigDto>, ApiError> {
     let config = state.strikes_uc.get_config(&guild_id).await?;
@@ -27,13 +27,11 @@ pub async fn get_config(
 /// PUT /api/strikes/config/{guild_id}
 pub async fn save_config(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SaveStrikeConfigDto>,
 ) -> Result<Json<StrikeConfigDto>, ApiError> {
     // Config des seuils d'escalation = admin (pas moderator).
-    if let Some(Extension(ctx)) = &user {
-    }
     let command = dto.into_command(guild_id.into());
     let config = state.strikes_uc.save_config(command).await?;
     Ok(single_dto(config))
@@ -42,7 +40,7 @@ pub async fn save_config(
 /// GET /api/strikes/{guild_id}/{user_id}
 pub async fn get_active_strikes(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<UserStrikeDto>>, ApiError> {
     let strikes = state
@@ -55,7 +53,7 @@ pub async fn get_active_strikes(
 /// POST /api/strikes
 pub async fn add_strike(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<AddStrikeDto>,
 ) -> Result<Json<StrikeResultDto>, ApiError> {
 
@@ -83,12 +81,10 @@ pub async fn add_strike(
 /// DELETE /api/strikes/{guild_id}/{user_id}
 pub async fn reset_strikes(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate user : moderator+ requis pour reset les strikes d'un user.
-    if let Some(Extension(ctx)) = user {
-    }
     state.strikes_uc.reset_strikes(&guild_id, &user_id).await?;
     Ok(ok_response())
 }

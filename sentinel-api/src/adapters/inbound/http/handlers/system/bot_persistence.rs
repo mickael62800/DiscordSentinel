@@ -52,7 +52,7 @@ pub struct NameHistoryEntryDto {
 /// Respect de l'archi hexagonale : passe par `audit_logs_uc.list()`.
 pub async fn list_name_history(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<NameHistoryEntryDto>>, ApiError> {
     use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
@@ -99,7 +99,7 @@ pub async fn list_name_history(
 /// POST /api/name-history
 pub async fn create_name_history(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateNameHistoryDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -140,7 +140,7 @@ pub struct UpdateStreakDto {
 /// PATCH /api/levels/{guild_id}/{user_id}/streak
 pub async fn update_streak(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(dto): Json<UpdateStreakDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -177,7 +177,7 @@ pub struct UpdateTicketSlaDto {
 /// PATCH /api/tickets/{id}/sla
 pub async fn update_ticket_sla(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<UpdateTicketSlaDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -220,7 +220,7 @@ pub struct SponsorshipRow {
 /// POST /api/sponsorships
 pub async fn create_sponsorship(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateSponsorshipDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -244,7 +244,7 @@ pub async fn create_sponsorship(
 /// GET /api/sponsorships/{guild_id}
 pub async fn list_sponsorships(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<crate::ports::outbound::community::sponsorship_repository::Sponsorship>>, ApiError>
 {
@@ -287,7 +287,7 @@ pub struct TempRoleRow {
 /// POST /api/temp-roles
 pub async fn create_temp_role(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateTempRoleDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -310,7 +310,7 @@ pub async fn create_temp_role(
 /// GET /api/temp-roles/{guild_id}
 pub async fn list_temp_roles(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<crate::ports::outbound::community::temp_role_repository::TempRole>>, ApiError>
 {
@@ -331,7 +331,7 @@ pub async fn list_temp_roles(
 /// DELETE /api/temp-roles/{guild_id}/{user_id}/{role_id}
 pub async fn delete_temp_role(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, user_id, role_id)): Path<(String, String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -342,8 +342,6 @@ pub async fn delete_temp_role(
     // Phase 7 B — Gate user : moderator+ requis depuis le desktop. Les bots
     // (community-bot qui consume l'event temp_role_expire) appellent sans
     // X-Discord-Token → pass-through non-breaking.
-    if let Some(Extension(ctx)) = user {
-    }
 
     state
         .temp_role_repo
@@ -393,7 +391,7 @@ pub struct PendingActionRow {
 /// POST /api/moderation/pending
 pub async fn create_pending_action(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<CreatePendingActionDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
@@ -432,7 +430,7 @@ pub async fn create_pending_action(
 /// GET /api/moderation/pending/{guild_id}
 pub async fn list_pending_actions(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<
     Json<Vec<crate::ports::outbound::moderation::pending_action_repository::PendingAction>>,
@@ -470,8 +468,6 @@ pub async fn resolve_pending_action(
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
 
     if user.is_some() {
-        if let Some(guild_id) = state.pending_action_repo.get_guild_id(uuid).await? {
-        }
     }
 
     state

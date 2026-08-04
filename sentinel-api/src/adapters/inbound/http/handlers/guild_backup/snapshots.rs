@@ -20,7 +20,6 @@ use axum::http::StatusCode;
 use sentinel_core::domain::entities::guild_backup::snapshot::GuildSnapshot;
 use sentinel_core::ports::inbound::guild_backup::manage_snapshots::{SnapshotId, SnapshotSummary};
 
-const OWNER_REQUIRED: &str = "owner requis (sauvegarde/restauration de serveur)";
 
 #[derive(Debug, Serialize)]
 pub struct StoredSnapshotDto {
@@ -118,7 +117,7 @@ pub async fn delete_snapshot(
 ) -> Result<StatusCode, ApiError> {
     let id = parse_id(&snapshot_id)?;
     // On charge d'abord pour connaitre le guild_id (RBAC) et distinguer 404.
-    let snapshot = state.guild_snapshots_uc.get_snapshot(id).await?;
+    state.guild_snapshots_uc.get_snapshot(id).await?;
     state.guild_snapshots_uc.delete_snapshot(id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -137,7 +136,7 @@ pub async fn rename_snapshot(
 ) -> Result<StatusCode, ApiError> {
     let id = parse_id(&snapshot_id)?;
     // On charge d'abord pour connaitre le guild_id (RBAC) et distinguer 404.
-    let snapshot = state.guild_snapshots_uc.get_snapshot(id).await?;
+    state.guild_snapshots_uc.get_snapshot(id).await?;
     state.guild_snapshots_uc.rename_snapshot(id, &body.label).await?;
     Ok(StatusCode::NO_CONTENT)
 }

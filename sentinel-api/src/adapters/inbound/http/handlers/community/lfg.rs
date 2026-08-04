@@ -140,7 +140,7 @@ async fn display_name(state: &AppState, guild_id: &str, user_id: &str) -> String
 /// GET /api/lfg/{guild_id}
 pub async fn list_lfg(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<LfgDto>>, ApiError> {
@@ -284,7 +284,7 @@ pub struct PublicLfgDto {
 /// GET /api/public/lfg/{guild_id}
 pub async fn public_lfg(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<PublicLfgDto>>, ApiError> {

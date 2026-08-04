@@ -68,7 +68,7 @@ where
 /// GET /api/analytics — Retourne toutes les analytics en une seule requete (cache 5min).
 pub async fn get_full_analytics(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<FullAnalyticsDto>, ApiError> {
     let days = params.days();
@@ -111,7 +111,7 @@ pub struct ResetAnalyticsResponse {
 
 pub async fn reset_analytics(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<ResetAnalyticsResponse>, ApiError> {
     let guild_id = params.guild_id.as_deref().ok_or_else(|| {

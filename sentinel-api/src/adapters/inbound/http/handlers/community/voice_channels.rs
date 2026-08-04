@@ -122,7 +122,7 @@ pub async fn list_all_channels(
 
 pub async fn list_channels(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
@@ -137,7 +137,7 @@ pub async fn list_channels(
 /// GET /api/voice-channels/{guild_id}/history — historique des salons fermes.
 pub async fn list_history_channels(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
@@ -159,8 +159,6 @@ pub async fn purge_channel(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Resolution component-gate par lookup guild via channel_id puis check.
     if user.is_some() {
-        if let Some(gid) = state.voice_channels_uc.find_guild_id(&channel_id).await? {
-        }
     }
 
     let deleted = state.voice_channels_uc.purge_channel(&channel_id).await?;
@@ -183,7 +181,7 @@ pub async fn purge_channel(
 /// Purge (hard-delete) tous les salons fermes d'une guild.
 pub async fn purge_history(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
 
@@ -201,7 +199,7 @@ pub async fn purge_history(
 /// Timeline d'un salon vocal : join/leave/move + create/update/close.
 pub async fn list_channel_events(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<serde_json::Value>>, ApiError> {
@@ -234,7 +232,7 @@ pub async fn list_channel_events(
 
 pub async fn get_channel_detail(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<VoiceChannelDetailDto>, ApiError> {
     let detail = state
@@ -246,7 +244,7 @@ pub async fn get_channel_detail(
 
 pub async fn create_channel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateVoiceChannelDto>,
 ) -> Result<Json<VoiceChannelResponseDto>, ApiError> {
     // Gate user : moderator+ requis pour creer un voice channel.
@@ -288,7 +286,7 @@ pub async fn create_channel(
 
 pub async fn close_channel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let before = state
@@ -326,7 +324,7 @@ pub async fn close_channel(
 
 pub async fn delete_channel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate user : moderator+ pour fermer un voice channel.
@@ -343,7 +341,7 @@ pub async fn delete_channel(
 
 pub async fn update_channel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<UpdateVoiceChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -417,7 +415,7 @@ pub async fn update_channel(
 
 pub async fn transfer_ownership(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<TransferOwnershipDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -448,7 +446,7 @@ pub async fn transfer_ownership(
 
 pub async fn add_co_admin(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<AddCoAdminDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -466,7 +464,7 @@ pub async fn add_co_admin(
 
 pub async fn remove_co_admin(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
@@ -481,7 +479,7 @@ pub async fn remove_co_admin(
 
 pub async fn get_whitelist(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, owner_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<WhitelistEntryResponseDto>>, ApiError> {
     let entries = state
@@ -493,7 +491,7 @@ pub async fn get_whitelist(
 
 pub async fn add_to_whitelist(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<AddWhitelistDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
@@ -511,12 +509,10 @@ pub async fn add_to_whitelist(
 
 pub async fn remove_from_whitelist(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, owner_id, target_id)): Path<(String, String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate user : moderator+ pour toucher aux permissions voice.
-    if let Some(Extension(ctx)) = user {
-    }
     state
         .voice_channels_uc
         .remove_from_whitelist(&guild_id, &owner_id, &target_id)
@@ -529,7 +525,7 @@ pub async fn remove_from_whitelist(
 
 pub async fn ban_from_channel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<BanFromChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -550,7 +546,7 @@ pub async fn ban_from_channel(
 
 pub async fn unban_from_channel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
@@ -563,7 +559,7 @@ pub async fn unban_from_channel(
 
 pub async fn check_ban(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let banned = state
@@ -577,7 +573,7 @@ pub async fn check_ban(
 
 pub async fn list_invite_links(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<Vec<InviteLinkResponseDto>>, ApiError> {
     let links = state
@@ -589,7 +585,7 @@ pub async fn list_invite_links(
 
 pub async fn create_invite_link(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<CreateInviteLinkDto>,
 ) -> Result<Json<InviteLinkResponseDto>, ApiError> {
@@ -654,7 +650,7 @@ pub async fn use_invite_link(
 
 pub async fn revoke_invite_link(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((channel_id, link_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
@@ -674,7 +670,7 @@ pub async fn revoke_invite_link(
 
 pub async fn list_themes(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ThemeResponseDto>>, ApiError> {
     let themes = state.voice_channels_uc.list_themes(&guild_id).await?;
@@ -683,7 +679,7 @@ pub async fn list_themes(
 
 pub async fn create_theme(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CreateThemeDto>,
 ) -> Result<Json<ThemeResponseDto>, ApiError> {
@@ -699,7 +695,7 @@ pub async fn create_theme(
 
 pub async fn update_theme(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, theme_id)): Path<(String, String)>,
     Json(dto): Json<CreateThemeDto>,
 ) -> Result<Json<ThemeResponseDto>, ApiError> {
@@ -712,12 +708,10 @@ pub async fn update_theme(
 
 pub async fn delete_theme(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, theme_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate user : admin+ requis pour modifier la config themes voice.
-    if let Some(Extension(ctx)) = user {
-    }
     state
         .voice_channels_uc
         .delete_theme(&guild_id, &theme_id)

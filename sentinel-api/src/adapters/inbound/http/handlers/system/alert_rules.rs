@@ -13,11 +13,6 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::system::alert_rule::{AlertRule, AlertRuleUpdate};
-use sentinel_core::domain::errors::DomainError;
-
-fn forbid(msg: &str) -> ApiError {
-    ApiError(DomainError::Forbidden(msg.into()))
-}
 
 #[derive(Serialize)]
 pub struct AlertRuleDto {
@@ -49,7 +44,7 @@ impl From<AlertRule> for AlertRuleDto {
 /// GET /api/alert-rules — liste toutes les regles (actives ou non).
 pub async fn list_alert_rules(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<Vec<AlertRuleDto>>, ApiError> {
     let rules = state.alert_rules_uc.list().await?;
     Ok(Json(rules.into_iter().map(Into::into).collect()))
@@ -67,7 +62,7 @@ pub struct UpdateAlertRuleDto {
 /// `metric`/`comparator`/`label` sont fixes (ils definissent la semantique).
 pub async fn update_alert_rule(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<UpdateAlertRuleDto>,
 ) -> Result<Json<AlertRuleDto>, ApiError> {

@@ -416,7 +416,7 @@ pub async fn execute_unban(
 /// GET /api/moderation/bans
 pub async fn list_bans(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(params): Query<BansQuery>,
 ) -> Result<Json<Vec<BanEntryDto>>, ApiError> {
     // Validation
@@ -435,7 +435,7 @@ pub async fn list_bans(
 /// GET /api/moderation/history/{guild_id}/{user_id}
 pub async fn get_history(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserHistoryDto>, ApiError> {
     // Validation
@@ -476,9 +476,7 @@ pub async fn add_evidence(
 ) -> Result<Json<EvidenceEntryDto>, ApiError> {
     // Pour gater user on a besoin du guild_id : on le recupere via l'action liee.
     if user.is_some() {
-        if let Ok(action_uuid) = uuid::Uuid::parse_str(&dto.action_id) {
-            if let Some(guild_id) = state.moderation_uc.action_guild_id(action_uuid).await? {
-            }
+        if let Ok(_action_uuid) = uuid::Uuid::parse_str(&dto.action_id) {
         }
     }
     // Validation URL — regle metier dans `domain/entities/moderation_review.rs`.
@@ -522,7 +520,7 @@ pub async fn add_evidence(
 /// Liste les preuves attachees a une action.
 pub async fn list_evidence(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(action_id): Path<String>,
 ) -> Result<Json<Vec<EvidenceEntryDto>>, ApiError> {
     let action_uuid = validation::parse_uuid("action_id", &action_id).map_err(ApiError)?;
@@ -599,7 +597,7 @@ fn review_entry_to_dto(
 
 pub async fn add_review(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<AddReviewDto>,
 ) -> Result<Json<ReviewQueueEntryDto>, ApiError> {
     let action_uuid = validation::parse_uuid("action_id", &dto.action_id).map_err(ApiError)?;
@@ -631,7 +629,7 @@ pub async fn add_review(
 /// l'action de moderation liee (JOIN avec moderation_actions).
 pub async fn list_pending_reviews(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ReviewQueueEntryDto>>, ApiError> {
 
@@ -659,8 +657,6 @@ pub async fn resolve_review(
 
     // user via le repo.
     if user.is_some() {
-        if let Some(guild_id) = state.review_repo.get_guild_id(review_uuid).await? {
-        }
     }
 
     if !sentinel_core::domain::entities::moderation::review::manual::is_valid_review_status(
@@ -708,7 +704,7 @@ pub async fn resolve_review(
 /// Lecture deleguee au use case `modstats_uc` (read-only, aggregation simple).
 pub async fn get_modstats(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
 ) -> Result<
@@ -744,7 +740,7 @@ pub async fn get_modstats(
 /// Utilise pour la courbe "Tendance moderation" sur la page web /modstats.
 pub async fn get_modstats_trend(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
 ) -> Result<Json<Vec<ModstatsTrendDayDto>>, ApiError> {
@@ -790,7 +786,7 @@ pub struct ModstatsTrendDayDto {
 /// - `warn` / autre : supprime juste la ligne (pas d'effet Discord natif).
 pub async fn delete_action(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
 ) -> Result<axum::http::StatusCode, ApiError> {
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
@@ -895,7 +891,7 @@ pub struct ModActionCountQuery {
 /// compromis / emballement) : le bot bloque une action au-dela du quota configure.
 pub async fn mod_action_count(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, moderator_id)): Path<(String, String)>,
     Query(q): Query<ModActionCountQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {

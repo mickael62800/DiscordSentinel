@@ -24,11 +24,6 @@ use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::system::docker_host::compute_overview;
-use sentinel_core::domain::errors::DomainError;
-
-fn forbid(msg: &str) -> ApiError {
-    ApiError(DomainError::Forbidden(msg.into()))
-}
 
 /// Helper d'audit log pour les actions Docker destructives.
 /// Tracking via tracing::info! structure -> apparait dans les logs API
@@ -198,7 +193,7 @@ pub struct ListContainersQuery {
 
 pub async fn list_containers(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(q): Query<ListContainersQuery>,
 ) -> Result<Json<Vec<ContainerDto>>, ApiError> {
     let list = state
@@ -311,7 +306,7 @@ pub struct LogsDto {
 
 pub async fn container_logs(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<LogsQuery>,
 ) -> Result<Json<LogsDto>, ApiError> {
@@ -407,7 +402,7 @@ pub async fn remove_volume(
 
 pub async fn list_networks(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
 ) -> Result<Json<Vec<NetworkDto>>, ApiError> {
     let list = state.docker_host.list_networks().await?;
     let out: Vec<NetworkDto> = list

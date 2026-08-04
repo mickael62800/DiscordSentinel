@@ -20,8 +20,6 @@ use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 
-const ADMIN_REQUIRED: &str = "admin+ requis pour modifier les salons du serveur";
-const OWNER_REQUIRED: &str = "owner requis pour supprimer un salon";
 
 // ── Lecture de l'existant ──
 

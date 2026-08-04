@@ -131,7 +131,7 @@ pub async fn resolve_sursis(
     let status = SursisStatus::from_str_lossy(&dto.status)
         .ok_or_else(|| ApiError(DomainError::ValidationError(format!("statut invalide : {}", dto.status))))?;
     // Gate sur la guilde du sursis (derive de la ressource) avant de resoudre.
-    let s = state
+    state
         .sursis_uc
         .get(id)
         .await?

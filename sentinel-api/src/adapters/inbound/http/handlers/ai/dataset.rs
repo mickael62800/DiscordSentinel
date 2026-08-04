@@ -22,7 +22,6 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::ai::manage_dataset::{BulkDeleteCommand, ListDatasetQuery};
-use sentinel_core::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]
 pub struct ListMessagesQuery {
@@ -50,15 +49,10 @@ pub struct ListMessagesResponse {
     pub total: i64,
 }
 
-fn forbid(msg: &str) -> ApiError {
-    ApiError(DomainError::Forbidden(msg.into()))
-}
-
 /// GET /api/ai-dataset/messages/{guild_id}
 pub async fn list_messages(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
-    Extension(ctx): Extension<WebUser>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(q): Query<ListMessagesQuery>,
 ) -> Result<Json<ListMessagesResponse>, ApiError> {
@@ -114,8 +108,7 @@ pub struct BulkDeleteResponse {
 /// DELETE /api/ai-dataset/messages/{guild_id}
 pub async fn bulk_delete(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
-    Extension(ctx): Extension<WebUser>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<BulkDeleteDto>,
 ) -> Result<Json<BulkDeleteResponse>, ApiError> {

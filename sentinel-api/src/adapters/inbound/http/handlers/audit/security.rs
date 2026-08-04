@@ -16,7 +16,7 @@ use axum::Json;
 /// POST /api/security/events — signaler un événement de sécurité (depuis le security-bot)
 pub async fn report_event(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<ReportEventDto>,
 ) -> Result<Json<SecurityEventResponseDto>, ApiError> {
     // Validation
@@ -49,7 +49,7 @@ pub async fn report_event(
 /// crees automatiquement par ces evenements.
 pub async fn purge_events(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
 
@@ -65,7 +65,7 @@ pub async fn purge_events(
 /// GET /api/security/events — lister les événements de sécurité
 pub async fn list_events(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Query(params): Query<SecurityQueryParams>,
 ) -> Result<Json<Vec<SecurityEventResponseDto>>, ApiError> {
     let events = state

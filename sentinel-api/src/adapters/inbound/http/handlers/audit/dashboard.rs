@@ -286,7 +286,6 @@ pub async fn register_guild(
     Json(dto): Json<RegisterGuildDto>,
 ) -> Result<StatusCode, ApiError> {
     let guild_id = dto.guild_id.clone();
-    let owner_id = dto.owner_id.clone();
 
     let guild = sentinel_core::domain::entities::system::guild::Guild {
         guild_id: dto.guild_id,

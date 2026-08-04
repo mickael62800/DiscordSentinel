@@ -50,7 +50,7 @@ pub struct DetectionQuery {
 /// GET /api/automod/{guild_id}/detections
 pub async fn list_detections(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<DetectionQuery>,
 ) -> Result<Json<Vec<InfractionResponseDto>>, ApiError> {
@@ -80,7 +80,7 @@ pub struct ListReviewsQuery {
 /// GET /api/automod/{guild_id}/reviews
 pub async fn list_reviews(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListReviewsQuery>,
 ) -> Result<Json<Vec<AutomodReviewDto>>, ApiError> {
@@ -143,7 +143,7 @@ pub struct CreateReviewBody {
 /// reviews en attente.
 pub async fn create_review(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(body): Json<CreateReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     let suggested = SuggestedAction::from_str(&body.suggested_action).ok_or_else(|| {
@@ -512,9 +512,9 @@ fn facts_from_role(role: Role) -> ModeratorFacts {
 /// Fail-closed : une erreur DB sur le lookup de role remonte un 500 (le
 /// handler/caller retry) plutot que de degrader silencieusement les privileges.
 async fn effective_facts(
-    state: &AppState,
+    _state: &AppState,
     user: &Option<Extension<WebUser>>,
-    review_id: Uuid,
+    _review_id: Uuid,
     body_facts: Option<ModeratorFacts>,
 ) -> Result<Option<ModeratorFacts>, ApiError> {
     let Some(Extension(_)) = user else {
@@ -705,7 +705,7 @@ pub async fn vote_review(
 /// GET /api/automod/reviews/{review_id}
 pub async fn get_review(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -727,7 +727,7 @@ pub async fn get_review(
 /// GET /api/automod/reviews/{review_id}/votes
 pub async fn list_review_votes(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
 ) -> Result<Json<Vec<ReviewVoteDto>>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -749,7 +749,7 @@ pub struct DecideReviewBody {
 /// edite la carte et revele le bouton admin de finalisation.
 pub async fn decide_review(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
     Json(body): Json<DecideReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
@@ -779,7 +779,7 @@ pub async fn decide_review(
 /// review_id depuis une carte 1-clic dont les boutons ne le portent pas).
 pub async fn find_review_by_message(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path((guild_id, message_id)): Path<(String, String)>,
 ) -> Result<Json<Option<AutomodReviewDto>>, ApiError> {
     let review = state

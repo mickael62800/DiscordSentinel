@@ -44,8 +44,6 @@ pub async fn delete_infraction(
     // Phase 7 B — Gate RBAC : moderator+ requis. L'infraction porte son
     // propre guild_id, donc on fetch d'abord puis on verifie le role
     // via check_role_for_guild (pattern "ressource-id-based").
-    if let Some(ref inf) = infraction {
-    }
 
     let deleted = state.infractions_uc.delete_infraction(&id).await?;
     if !deleted {

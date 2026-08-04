@@ -96,7 +96,7 @@ fn parse_published(s: Option<&str>) -> Result<Option<chrono::DateTime<chrono::Ut
 /// GET /api/news/{guild_id}
 pub async fn list_news(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<NewsDto>>, ApiError> {
@@ -139,7 +139,7 @@ pub async fn create_news(
 /// PUT /api/news/detail/{id}
 pub async fn update_news(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpsertNewsDto>,
 ) -> Result<Json<NewsDto>, ApiError> {
@@ -162,10 +162,10 @@ pub async fn update_news(
 /// DELETE /api/news/detail/{id}
 pub async fn delete_news(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let existing = state.news_uc.get(id).await?;
+    state.news_uc.get(id).await?;
 
     state.news_uc.delete(id).await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
@@ -192,7 +192,7 @@ pub struct PublicNewsDto {
 /// GET /api/public/news/{guild_id}
 pub async fn public_news(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<PublicNewsDto>>, ApiError> {

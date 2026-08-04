@@ -120,7 +120,7 @@ pub async fn create_confession(
 
 pub async fn update_message_refs(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateMessageRefsDto>,
 ) -> Result<Json<()>, ApiError> {
@@ -190,7 +190,7 @@ pub async fn delete_confession(
 
 pub async fn get_confession(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ConfessionDto>, ApiError> {
     let c = state.confessions_uc.get(id).await?;
@@ -201,7 +201,7 @@ pub async fn get_confession(
 
 pub async fn get_by_message_id(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(message_id): Path<String>,
 ) -> Result<Json<Option<ConfessionDto>>, ApiError> {
     let Some(c) = state.confessions_uc.get_by_message_id(&message_id).await? else {
@@ -214,7 +214,7 @@ pub async fn get_by_message_id(
 
 pub async fn list_confessions(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListConfessionsQuery>,
 ) -> Result<Json<Vec<ConfessionDto>>, ApiError> {
@@ -264,7 +264,7 @@ pub async fn create_reply(
 
 pub async fn update_reply_message_id(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateReplyMessageDto>,
 ) -> Result<Json<()>, ApiError> {
@@ -298,12 +298,12 @@ pub async fn delete_reply(
 
 pub async fn list_replies(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(confession_id): Path<Uuid>,
 ) -> Result<Json<Vec<ReplyDto>>, ApiError> {
     // Route sans {guild_id} : on resout la guild via la confession parente,
     // on verifie l'appartenance, puis on redacte les auteurs sous Admin.
-    let conf = state.confessions_uc.get(confession_id).await?;
+    state.confessions_uc.get(confession_id).await?;
     let list = state.confessions_uc.list_replies(confession_id).await?;
     Ok(Json(
         list.into_iter().map(|r| reply_dto(r, false)).collect(),
@@ -339,7 +339,7 @@ pub async fn create_report(
 
 pub async fn list_reports(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListReportsQuery>,
 ) -> Result<Json<Vec<ReportDto>>, ApiError> {
@@ -376,7 +376,7 @@ pub async fn resolve_report(
 
 pub async fn get_config(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<ConfigDto>, ApiError> {
     let cfg = state.confessions_uc.get_config(&guild_id).await?;
@@ -385,7 +385,7 @@ pub async fn get_config(
 
 pub async fn save_config(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Json(dto): Json<SaveConfigDto>,
 ) -> Result<Json<ConfigDto>, ApiError> {
     let cfg = ConfessionConfig {

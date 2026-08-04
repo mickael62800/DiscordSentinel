@@ -123,7 +123,7 @@ pub struct VoteDto {
 /// GET /api/polls/{guild_id}
 pub async fn list_polls(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<PollDto>>, ApiError> {
@@ -177,10 +177,10 @@ pub async fn create_poll(
 /// POST /api/polls/detail/{id}/close
 pub async fn close_poll(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let existing = state.polls_uc.get(id, None).await?;
+    state.polls_uc.get(id, None).await?;
 
     state.polls_uc.close(id).await?;
     Ok(Json(serde_json::json!({ "ok": true })))
@@ -189,10 +189,10 @@ pub async fn close_poll(
 /// DELETE /api/polls/detail/{id}
 pub async fn delete_poll(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let existing = state.polls_uc.get(id, None).await?;
+    state.polls_uc.get(id, None).await?;
 
     state.polls_uc.delete(id).await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
@@ -271,7 +271,7 @@ pub async fn my_polls(
 /// quoi. `my_vote` reste `None`, un visiteur n'ayant pas d'identite.
 pub async fn public_polls(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<PollDto>>, ApiError> {

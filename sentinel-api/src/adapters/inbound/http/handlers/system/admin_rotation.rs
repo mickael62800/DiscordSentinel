@@ -10,10 +10,6 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use sentinel_core::domain::entities::system::admin_rotation::RotationState;
 
-/// Cle RBAC partagee avec le bouton dashboard (rotation.dashboard). Les
-/// appels internes (bot, sans X-Discord-Token) passent ; les utilisateurs
-/// web doivent avoir le role minimal configure.
-const RBAC_KEY: &str = "rotation.dashboard";
 
 fn parse_dt(s: &Option<String>) -> Option<chrono::DateTime<chrono::Utc>> {
     s.as_deref()
