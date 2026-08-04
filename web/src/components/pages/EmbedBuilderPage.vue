@@ -317,7 +317,9 @@ async function updatePosted() {
 <style scoped>
 .eb-layout {
   display: grid;
-  grid-template-columns: 200px 1fr 360px;
+  /* Apercu : partage l'espace restant avec le formulaire et grandit avec la
+     fenetre (minmax evite qu'il ecrase le formulaire sur petit ecran). */
+  grid-template-columns: 200px minmax(0, 1fr) minmax(380px, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -357,7 +359,9 @@ input[type="color"] { height: 38px; padding: 3px; cursor: pointer; width: 100%; 
 .eb-embed {
   display: flex; gap: 12px; justify-content: space-between;
   background: #2b2d31; border-left: 4px solid var(--accent);
-  border-radius: 6px; padding: 12px 14px; max-width: 440px;
+  border-radius: 6px; padding: 12px 14px;
+  /* Prend toute la largeur disponible ; la hauteur grandit avec le contenu. */
+  width: 100%;
 }
 .eb-embed-body { min-width: 0; flex: 1; }
 .eb-author { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 6px; }
