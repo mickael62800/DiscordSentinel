@@ -1,14 +1,12 @@
 import { preloadBotDefinitions } from "./useBotDefinitions";
 import { preloadBotEnabledStatus } from "./useBotEnabledStatus";
-import { preloadComponentVisibility } from "./useComponentVisibility";
-import { preloadMyRole } from "./useMyRole";
 
 /**
  * Prefetch des donnees stables apres login confirme.
  *
  * But : eviter que chaque page navigue refetch les memes donnees au mount.
  * Appele une fois apres login (ou changement de guild) -> tous les composables
- * singleton (useBotDefinitions, useBotEnabledStatus, useComponentVisibility,
+ * singleton (useBotDefinitions, useBotEnabledStatus,
  * useDiscordRoles...) ont deja leur cache rempli quand l'utilisateur arrive
  * sur le dashboard.
  *
@@ -34,8 +32,6 @@ export async function initAppData(guildId: string | null): Promise<void> {
       await Promise.allSettled([
         preloadBotDefinitions(),
         preloadBotEnabledStatus(guildId),
-        preloadMyRole(guildId),
-        preloadComponentVisibility(guildId),
       ]);
     } finally {
       inFlight = null;

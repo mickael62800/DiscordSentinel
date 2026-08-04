@@ -29,7 +29,6 @@ import {
   type BuilderTemplate,
 } from "@/composables/useServerBuilder";
 import { useGuildSelector } from "@/composables/useGuildSelector";
-import { useMyRole } from "@/composables/useMyRole";
 import { useConfirm } from "@/composables/useConfirm";
 import { useToast } from "@/composables/useToast";
 import AdminPageShell from "../layouts/AdminPageShell.vue";
@@ -39,16 +38,15 @@ import LoadingState from "../atoms/LoadingState.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 
 const { selectedGuildId } = useGuildSelector();
-const { role, isSuper } = useMyRole();
 const { confirm } = useConfirm();
 const { success, error: toastError, info } = useToast();
 
 const builder = useServerBuilder(() => selectedGuildId.value);
 
-/// Créer des salons = admin (aligné sur la gate API). Supprimer un salon
-/// existant détruit son historique de messages : owner seulement.
-const canBuild = computed(() => isSuper.value || role.value === "owner" || role.value === "admin");
-const canDelete = computed(() => isSuper.value || role.value === "owner");
+// Back-office superadmin-only : le seul utilisateur possible peut tout faire
+// (creer comme supprimer des salons).
+const canBuild = true;
+const canDelete = true;
 
 // ── Structure actuelle du serveur ──
 const existing = ref<ExistingChannel[]>([]);
@@ -121,7 +119,7 @@ const results = ref<PlanItemResult[] | null>(null);
 /// Édition du plan verrouillée : soit le rôle ne le permet pas, soit une
 /// création est en cours. Laisser modifier le plan pendant l'application ferait
 /// diverger ce qui est affiché de ce qui a réellement été envoyé.
-const locked = computed(() => !canBuild.value || applying.value);
+const locked = computed(() => !canBuild || applying.value);
 
 /// Vider le plan est irréversible et peut effacer un long travail : on
 /// confirme, comme partout ailleurs dans le panel.

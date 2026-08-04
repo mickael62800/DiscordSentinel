@@ -6,7 +6,7 @@ const K_API = "ds.api.config";
 const K_DISCORD_USER = "ds.discord.user";
 
 export interface ApiConfig { api_url: string; api_key: string }
-export interface DiscordUser { id: string; username: string; avatar?: string | null; global_name?: string | null }
+export interface DiscordUser { id: string; username: string; avatar?: string | null; global_name?: string | null; is_superadmin?: boolean }
 
 /**
  * Origines autorisées pour `api_url`. La config est en localStorage, donc

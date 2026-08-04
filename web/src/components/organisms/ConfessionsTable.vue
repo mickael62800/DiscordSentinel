@@ -1,16 +1,14 @@
 <script setup lang="ts">
 import AppButton from "../atoms/AppButton.vue";
-import { computed } from "vue";
 import { useConfessions } from "@/composables/useConfessions";
 import { useConfirm } from "@/composables/useConfirm";
-import { useMyRole } from "@/composables/useMyRole";
 import type { Confession } from "@/services/confessionsService";
 import { useFormatDate } from "@/composables/useFormatDate";
 
 const { confessions, showReplies, deleteConfession } = useConfessions();
 const { confirm } = useConfirm();
-const { isSuper, role } = useMyRole();
-const isOwner = computed(() => isSuper.value || role.value === "owner");
+// Back-office superadmin-only : le seul utilisateur possible voit tout.
+const isOwner = true;
 const { formatDateTimeShort } = useFormatDate();
 
 function fmtDate(iso: string | null): string {
@@ -62,7 +60,7 @@ async function onDelete(c: Confession) {
         </td>
         <td class="actions">
           <AppButton variant="secondary" size="xs" @click="showReplies(c)" title="Voir les replies">💬</AppButton>
-          <AppButton variant="danger" size="xs" v-if="!c.deleted_at"  @click="onDelete(c)" title="Supprimer">🗑</AppButton>
+          <AppButton variant="danger" size="xs" v-if="!c.deleted_at" @click="onDelete(c)" title="Supprimer">🗑</AppButton>
         </td>
       </tr>
     </tbody>

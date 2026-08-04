@@ -15,7 +15,6 @@ import {
 } from "@/services/serverSecurityService";
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
-import { useMyRole } from "@/composables/useMyRole";
 import { useFormatDate } from "@/composables/useFormatDate";
 import AppTabs from "@/components/molecules/AppTabs.vue";
 import AdminPageShell from "@/components/layouts/AdminPageShell.vue";
@@ -25,8 +24,8 @@ import SecurityIntegrityTab from "@/components/organisms/SecurityIntegrityTab.vu
 
 const { success, error: showError } = useToast();
 const { confirm } = useConfirm();
-const { role, isSuper } = useMyRole();
-const canManage = computed(() => isSuper.value || role.value === "owner");
+// Back-office superadmin-only : le seul utilisateur possible peut tout gerer.
+const canManage = true;
 
 type TabKey = "overview" | "attacks" | "bans" | "network" | "integrity" | "audit" | "alerts";
 

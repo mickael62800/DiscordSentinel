@@ -2,7 +2,7 @@
 import AppButton from "../atoms/AppButton.vue";
 import { errMsg } from "@/utils/errMsg";
 import AppSelect from "@/components/atoms/AppSelect.vue";
-import { computed, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import {
   serverSecurityService,
   type AuthFailureEntry,
@@ -17,13 +17,12 @@ import { useFormatDate } from "@/composables/useFormatDate";
 const { formatDateTimeShort: fmtDate } = useFormatDate();
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
-import { useMyRole } from "@/composables/useMyRole";
 import TrafficTrendChart from "./TrafficTrendChart.vue";
 
 const { success, error: showError } = useToast();
 const { confirm } = useConfirm();
-const { role, isSuper } = useMyRole();
-const canManage = computed(() => isSuper.value || role.value === "owner");
+// Back-office superadmin-only : le seul utilisateur possible peut tout gerer.
+const canManage = true;
 
 const topIps = ref<TopIpEntry[]>([]);
 const topIpsWindow = ref<SecurityWindow>("1h");
@@ -126,7 +125,7 @@ onMounted(refresh);
             <td class="num" :class="{ danger: ip.failed > 10 }">{{ ip.failed }}</td>
             <td class="muted small">{{ fmtDate(ip.last_seen) }}</td>
             <td class="actions">
-              <AppButton variant="danger" size="xs" v-if="canManage"  @click="banIp(ip.client_ip)" title="Bannir">🚫 Ban</AppButton>
+              <AppButton variant="danger" size="xs" v-if="canManage" @click="banIp(ip.client_ip)" title="Bannir">🚫 Ban</AppButton>
             </td>
           </tr>
         </tbody>
@@ -164,7 +163,7 @@ onMounted(refresh);
             <td class="small mono">{{ e.client_ip }}</td>
             <td class="small muted ua">{{ truncate(e.user_agent, 80) }}</td>
             <td class="actions">
-              <AppButton variant="danger" size="xs" v-if="canManage && e.client_ip && e.client_ip !== '-'"  @click="banIp(e.client_ip)" title="Bannir">🚫</AppButton>
+              <AppButton variant="danger" size="xs" v-if="canManage && e.client_ip && e.client_ip !== '-'" @click="banIp(e.client_ip)" title="Bannir">🚫</AppButton>
             </td>
           </tr>
         </tbody>
@@ -194,7 +193,7 @@ onMounted(refresh);
               <td class="small mono">{{ e.user }}</td>
               <td class="small mono">{{ e.ip }}</td>
               <td class="actions">
-                <AppButton variant="danger" size="xs" v-if="canManage && e.ip !== '?'"  @click="banIp(e.ip)">🚫 Ban</AppButton>
+                <AppButton variant="danger" size="xs" v-if="canManage && e.ip !== '?'" @click="banIp(e.ip)">🚫 Ban</AppButton>
               </td>
             </tr>
           </tbody>
@@ -231,7 +230,7 @@ onMounted(refresh);
               <td class="small">{{ e.status }}</td>
               <td><span class="badge" :class="e.category === 'sqli' ? 'danger' : 'warning'">{{ e.category }}</span></td>
               <td class="small">{{ truncate(e.user_agent, 30) }}</td>
-              <td><AppButton variant="danger" size="xs" v-if="canManage"  @click="banIp(e.ip)">🚫</AppButton></td>
+              <td><AppButton variant="danger" size="xs" v-if="canManage" @click="banIp(e.ip)">🚫</AppButton></td>
             </tr>
           </tbody>
         </table>

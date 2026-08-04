@@ -6,9 +6,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { dockerService, type DockerContainer, type DockerImage, type DockerNetwork, type DockerOverview, type DockerVolume } from "@/services/dockerService";
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
-import { useComponentVisibility } from "@/composables/useComponentVisibility";
 
-const { visible } = useComponentVisibility();
 
 const { success, error: showError } = useToast();
 const { confirm } = useConfirm();
@@ -348,11 +346,11 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
             <td class="ports small">{{ c.ports.join(', ') || '—' }}</td>
             <td class="small">{{ fmtBytes(c.size_rw_bytes ?? 0) }}</td>
             <td class="actions">
-              <AppButton variant="ghost" size="xs" v-if="visible('docker.action.start')"  :disabled="busy || c.state === 'running'" title="Démarrer" @click="startCt(c)">▶</AppButton>
-              <AppButton variant="ghost" size="xs" v-if="visible('docker.action.stop')"  :disabled="busy || c.state !== 'running'" title="Arrêter" @click="stopCt(c)">⏹</AppButton>
-              <AppButton variant="ghost" size="xs" v-if="visible('docker.action.restart')"  :disabled="busy" title="Redémarrer" @click="restartCt(c)">↻</AppButton>
-              <AppButton variant="ghost" size="xs" v-if="visible('docker.action.logs')"  :disabled="busy" title="Logs" @click="openLogs(c)">📋</AppButton>
-              <AppButton variant="danger" size="xs" v-if="visible('docker.action.remove_container')"  :disabled="busy" title="Supprimer" @click="removeCt(c)">🗑</AppButton>
+              <AppButton variant="ghost" size="xs" :disabled="busy || c.state === 'running'" title="Démarrer" @click="startCt(c)">▶</AppButton>
+              <AppButton variant="ghost" size="xs" :disabled="busy || c.state !== 'running'" title="Arrêter" @click="stopCt(c)">⏹</AppButton>
+              <AppButton variant="ghost" size="xs" :disabled="busy" title="Redémarrer" @click="restartCt(c)">↻</AppButton>
+              <AppButton variant="ghost" size="xs" :disabled="busy" title="Logs" @click="openLogs(c)">📋</AppButton>
+              <AppButton variant="danger" size="xs" :disabled="busy" title="Supprimer" @click="removeCt(c)">🗑</AppButton>
             </td>
           </tr>
         </tbody>
@@ -381,7 +379,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
             <td class="small">{{ fmtBytes(img.size_bytes) }}</td>
             <td class="small">{{ img.containers > 0 ? img.containers : '—' }}</td>
             <td class="actions">
-              <AppButton variant="danger" size="xs" v-if="visible('docker.action.remove_image')"  :disabled="busy" title="Supprimer" @click="removeImg(img)">🗑</AppButton>
+              <AppButton variant="danger" size="xs" :disabled="busy" title="Supprimer" @click="removeImg(img)">🗑</AppButton>
             </td>
           </tr>
         </tbody>
@@ -406,7 +404,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
             <td class="small">{{ fmtBytes(v.size_bytes) }}</td>
             <td class="small">{{ v.ref_count ?? '—' }}</td>
             <td class="actions">
-              <AppButton variant="danger" size="xs" v-if="visible('docker.action.remove_volume')"  :disabled="busy" title="Supprimer" @click="removeVol(v)">🗑</AppButton>
+              <AppButton variant="danger" size="xs" :disabled="busy" title="Supprimer" @click="removeVol(v)">🗑</AppButton>
             </td>
           </tr>
         </tbody>
@@ -433,26 +431,26 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 
     <!-- ── Prune ── -->
     <div v-else-if="tab === 'prune'" class="prune-grid">
-      <div v-if="visible('docker.prune.containers')" class="prune-card">
+      <div class="prune-card">
         <h4>📦 Conteneurs arrêtés</h4>
         <p class="muted">Supprime tous les conteneurs en état non running.</p>
         <p v-if="overview" class="reclaim">Récupérable : {{ fmtBytes(overview.reclaimable_containers_bytes) }}</p>
         <AppButton variant="ghost" :disabled="busy" @click="pruneContainers">Nettoyer</AppButton>
       </div>
-      <div v-if="visible('docker.prune.images')" class="prune-card">
+      <div class="prune-card">
         <h4>🖼 Images dangling</h4>
         <p class="muted">Images sans tag, jamais utilisées.</p>
         <p v-if="overview" class="reclaim">Récupérable : {{ fmtBytes(overview.reclaimable_images_bytes) }}</p>
         <AppButton variant="ghost" :disabled="busy" @click="pruneImages(false)">Nettoyer dangling</AppButton>
         <AppButton variant="warning" :disabled="busy" @click="pruneImages(true)">Toutes inutilisées</AppButton>
       </div>
-      <div v-if="visible('docker.prune.volumes')" class="prune-card">
+      <div class="prune-card">
         <h4>💾 Volumes orphelins</h4>
         <p class="muted">⚠️ Volumes sans conteneur lié. Risque de perte de données.</p>
         <p v-if="overview" class="reclaim">Récupérable : {{ fmtBytes(overview.reclaimable_volumes_bytes) }}</p>
         <AppButton variant="danger" :disabled="busy" @click="pruneVolumes">Nettoyer</AppButton>
       </div>
-      <div v-if="visible('docker.prune.networks')" class="prune-card">
+      <div class="prune-card">
         <h4>🌐 Réseaux inutilisés</h4>
         <p class="muted">Réseaux sans conteneur attaché.</p>
         <AppButton variant="ghost" :disabled="busy" @click="pruneNetworks">Nettoyer</AppButton>
@@ -463,7 +461,7 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
         <p v-if="overview" class="reclaim">Récupérable : {{ fmtBytes(overview.reclaimable_build_cache_bytes) }}</p>
         <AppButton variant="warning" :disabled="busy" @click="pruneBuildCache">Nettoyer le build cache ({{ fmtBytes(overview?.reclaimable_build_cache_bytes ?? 0) }})</AppButton>
       </div>
-      <div v-if="visible('docker.prune.system')" class="prune-card highlight">
+      <div class="prune-card highlight">
         <h4>🚀 Nettoyage complet</h4>
         <p class="muted">conteneurs + images dangling + réseaux.</p>
         <AppButton variant="ghost" :disabled="busy" @click="pruneSystem(false, false)">Nettoyage standard</AppButton>

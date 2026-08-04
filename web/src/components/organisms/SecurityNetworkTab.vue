@@ -18,12 +18,11 @@ import { useFormatDate } from "@/composables/useFormatDate";
 const { formatDateTimeShort: fmtDate } = useFormatDate();
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
-import { useMyRole } from "@/composables/useMyRole";
 
 const { success, error: showError } = useToast();
 const { confirm } = useConfirm();
-const { role, isSuper } = useMyRole();
-const canManage = computed(() => isSuper.value || role.value === "owner");
+// Back-office superadmin-only : le seul utilisateur possible peut tout gerer.
+const canManage = true;
 
 const topIps = ref<TopIpEntry[]>([]);
 const topIpsWindow = ref<SecurityWindow>("1h");
@@ -158,7 +157,7 @@ onMounted(refresh);
             <td class="num">{{ r.total }}</td>
             <td class="num" :class="{ danger: (r.failed ?? 0) > 10 }">{{ r.failed ?? 0 }}</td>
             <td class="actions">
-              <AppButton variant="danger" size="xs" v-if="canManage"  @click="banIp(r.ip)">🚫</AppButton>
+              <AppButton variant="danger" size="xs" v-if="canManage" @click="banIp(r.ip)">🚫</AppButton>
             </td>
           </tr>
         </tbody>
@@ -269,7 +268,7 @@ onMounted(refresh);
             <tr v-for="(e, i) in tlsErrors.entries.slice(0, 30)" :key="i">
               <td class="small mono">{{ e.client }}</td>
               <td class="small">{{ truncate(e.error, 120) }}</td>
-              <td><AppButton variant="danger" size="xs" v-if="canManage && e.client !== '?'"  @click="banIp(e.client)">🚫</AppButton></td>
+              <td><AppButton variant="danger" size="xs" v-if="canManage && e.client !== '?'" @click="banIp(e.client)">🚫</AppButton></td>
             </tr>
           </tbody>
         </table>

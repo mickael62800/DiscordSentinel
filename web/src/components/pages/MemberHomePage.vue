@@ -23,7 +23,6 @@
 
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useAuth } from "../../composables/useAuth";
-import { useComponentVisibility } from "../../composables/useComponentVisibility";
 import {
   addWeeks,
   layoutWeek,
@@ -67,10 +66,12 @@ const guildId =
   ((import.meta.env.VITE_PUBLIC_GUILD_ID as string | undefined) ?? "");
 
 const { user, avatarUrl, logout } = useAuth();
-const { visible } = useComponentVisibility();
 
-/// Le lien vers l'administration n'apparaît que pour qui y a réellement accès.
-const hasAdminAccess = computed(() => visible("general.stats"));
+// Le lien vers l'administration n'apparait que pour un superadmin (flag pose a
+// l'OAuth / au refresh, source de verite = SUPERADMIN_USER_IDS cote API). Un
+// visiteur anonyme ou un membre ordinaire ne le voit pas ; l'acces reel reste
+// de toute facon tranche cote serveur (403) sur chaque route d'admin.
+const hasAdminAccess = computed(() => user.value?.is_superadmin === true);
 
 // ── État ──
 

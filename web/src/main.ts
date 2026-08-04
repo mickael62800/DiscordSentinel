@@ -43,8 +43,8 @@ router.beforeEach(async (to, _from, next) => {
   }
 
   // Prefetch async des donnees stables apres login. Non bloquant : on next()
-  // immediatement. Les composables singleton (useBotDefinitions, useBotEnabledStatus,
-  // useComponentVisibility) auront leur cache rempli quand les pages les liront.
+  // immediatement. Les composables singleton (useBotDefinitions, useBotEnabledStatus)
+  // auront leur cache rempli quand les pages les liront.
   if (user.value) {
     const { useGuildSelector } = await import("./composables/useGuildSelector");
     const { selectedGuildId } = useGuildSelector();

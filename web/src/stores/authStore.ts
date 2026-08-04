@@ -65,6 +65,16 @@ export const useAuthStore = defineStore("auth", () => {
       try {
         const { httpGet } = await import("@/api/http");
         await httpGet("/api/auth/check-access");
+        // check-access ne repond 200 qu'aux superadmins (le middleware refuse
+        // les autres). Y arriver prouve donc le statut : on (re)pose le flag,
+        // ce qui repare une identite en cache anterieure a son introduction.
+        if (user.value && !user.value.is_superadmin) {
+          user.value = { ...user.value, is_superadmin: true };
+          try {
+            const store = await getKv();
+            await store.set(USER_KEY, user.value);
+          } catch { /* ignore */ }
+        }
       } catch (e) {
         const msg = errMsg(e);
         if (msg.includes("403")) {

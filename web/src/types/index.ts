@@ -582,37 +582,6 @@ export interface MemberSummary {
   stats: MemberStats;
 }
 
-// ═══════════════════════════════════════════════════
-// Phase 7 B — RBAC fin
-// ═══════════════════════════════════════════════════
-
-/// `member` est le role par defaut de toute personne du serveur Discord :
-/// acces a l'espace membre, aucun acces au back-office.
-export type RbacRole = "owner" | "admin" | "moderator" | "viewer" | "member";
-
-export interface GuildUserRole {
-  discord_user_id: string;
-  display_name: string;
-  avatar_url?: string;
-  role: RbacRole;
-  granted_at: string;
-  granted_by?: string;
-}
-
-export interface MyRole {
-  discord_user_id: string;
-  guild_id: string;
-  role: RbacRole;
-  is_superadmin?: boolean;
-}
-
-// Visibilite UI par role applicatif (overrides du defaut frontend)
-export interface ComponentVisibilityEntry {
-  component_key: string;
-  role: RbacRole;
-  visible: boolean;
-}
-
 // ── Guild Backup (snapshots serveur : roles + salons) ──
 
 export interface SnapshotSummary {

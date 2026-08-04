@@ -5,7 +5,6 @@ import { useBans } from "../../composables/useBans";
 import { useConfirm } from "../../composables/useConfirm";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { useFormatDate } from "../../composables/useFormatDate";
-import { useComponentVisibility } from "@/composables/useComponentVisibility";
 import type { Infraction, ConfirmedBan } from "../../types";
 import AppBadge from "../atoms/AppBadge.vue";
 import LoadingState from "../atoms/LoadingState.vue";
@@ -15,7 +14,6 @@ import BanModal from "../molecules/BanModal.vue";
 const { success, error: showError } = useToast();
 const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm } = useConfirm();
-const { visible: rbacVisible } = useComponentVisibility();
 
 const banModalRef = ref<InstanceType<typeof BanModal> | null>(null);
 const unbanError = ref<string | null>(null);
@@ -127,7 +125,6 @@ async function onUnbanAll() {
         class="search-input"
       />
       <button
-        v-if="rbacVisible('moderation.bulk_unban')"
         type="button"
         class="unban-all-btn"
         :disabled="bulkUnbanning || filteredConfirmed.length === 0"

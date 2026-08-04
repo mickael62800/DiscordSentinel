@@ -1,6 +1,5 @@
 import { computed, type Ref } from "vue";
 import { useBotEnabledStatus } from "@/composables/useBotEnabledStatus";
-import { useComponentVisibility } from "@/composables/useComponentVisibility";
 
 /// Tile affichee sur la page d accueil.
 ///
@@ -27,9 +26,8 @@ export type DashboardSection = {
 const ALL_SECTIONS: DashboardSection[] = [
   // ── Plateforme jeux Nexus ──
   // Backend distinct (nexus-api), accessible via la passerelle /nexus-api/.
-  // L'acces est garde par le gate RBAC `nexus.access` cote serveur : masquer
-  // ces entrees ne suffirait pas, nexus-api n'a aucun controle de role.
-  // ── Journaux (un par ancien salon de logs Discord) ──
+  // L'acces est garde cote serveur par la passerelle nginx (auth_request ->
+  // sentinel-api verifie l'appartenance a SUPERADMIN_USER_IDS).
   {
     key: "nexus.servers",
     path: "/nexus/servers",
@@ -90,7 +88,6 @@ const ALL_SECTIONS: DashboardSection[] = [
 
 
   { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },
-  { key: "config.rbac", path: "/rbac", label: "Accès RBAC", icon: "shield" },
   { key: "config.system-ops", path: "/system/operations", label: "Opérations système", icon: "activity" },
   { key: "config.server-health", path: "/server-health", label: "État serveur", icon: "server" },
   { key: "config.alert-rules", path: "/alert-rules", label: "Règles d'alerte", icon: "zap" },
@@ -102,27 +99,6 @@ const ALL_SECTIONS: DashboardSection[] = [
   // profond ?bot= gere par ComponentConfigPage). Masquee si le bot est off.
   { key: "config.nasa-apod", path: "/component-config?bot=nasa-apod-bot", label: "Photo de l'espace", icon: "image", requiredBot: "nasa-apod-bot" },
 ];
-
-/// Alias : sous-chemins de hubs (fusionnes) qui partagent la gouvernance RBAC
-/// de leur hub — ils n'ont pas de tuile propre mais restent atteignables par URL.
-const PATH_RBAC_ALIASES: Record<string, string> = {
-  // Sous-pages des serveurs de jeu : meme droit que la liste.
-  "/nexus/servers/nouveau": "nexus.servers",
-  "/discord-roles": "community.role-panels",
-  "/voice-themes": "community.voice-channels",
-  "/levels-config": "community.levels",
-  "/modstats": "general.stats",
-};
-
-/// Cle RBAC (composant) gouvernant l'acces a un chemin de route, ou `undefined`
-/// si le chemin n'est pas soumis a une restriction de role connue. Utilise par
-/// le guard de navigation pour bloquer l'ouverture directe d'une page par URL
-/// quand le role ne la voit pas (defense alignee sur le masquage des tuiles).
-export function rbacKeyForPath(path: string): string | undefined {
-  const direct = ALL_SECTIONS.find((s) => s.path === path);
-  if (direct) return direct.key;
-  return PATH_RBAC_ALIASES[path];
-}
 
 /// Un groupe de tuiles regroupees par domaine (prefixe de `key`).
 export type DashboardGroup = {
@@ -151,10 +127,8 @@ const GROUP_ORDER: { prefix: string; label: string }[] = [
 /// - `requiredBot` : visible seulement si le bot est actif (single dep)
 /// - `requiredAnyBot` : visible si AU MOINS UN bot de la liste est actif
 /// - aucun des deux : toujours visible (autonome)
-/// - RBAC visibility par role (overrides BDD + defauts registry).
 export function useDashboardSections(universe?: Ref<Universe>) {
   const { isBotEnabled } = useBotEnabledStatus();
-  const { visible: rbacVisible } = useComponentVisibility();
 
   const sections = computed<DashboardSection[]>(() =>
     ALL_SECTIONS.filter((s) => {
@@ -166,7 +140,6 @@ export function useDashboardSections(universe?: Ref<Universe>) {
         const anyActive = s.requiredAnyBot.some((b) => isBotEnabled(b));
         if (!anyActive) return false;
       }
-      if (!rbacVisible(s.key)) return false;
       return true;
     }),
   );

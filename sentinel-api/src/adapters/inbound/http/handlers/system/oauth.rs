@@ -390,17 +390,24 @@ pub async fn callback(
         None
     };
 
+    // Le compte est-il superadmin (present dans SUPERADMIN_USER_IDS) ? Sert au
+    // front a decider s'il propose le lien back-office. C'est un simple confort
+    // d'affichage : l'autorisation reelle reste tranchee cote serveur par
+    // `superadmin_middleware` (403) sur chaque route d'admin.
+    let is_superadmin = state.superadmin_user_ids.iter().any(|id| id == &me.id);
+
     // 4. Rediriger le navigateur vers le front avec les infos dans le FRAGMENT
     //    (apres `#`) pour eviter que le token n'apparaisse dans les logs serveur,
     //    le referer ou l'historique intermediaire. Le front lit `location.hash`
     //    puis nettoie l'URL.
     let fragment = format!(
-        "token={}&id={}&username={}&global_name={}&avatar={}",
+        "token={}&id={}&username={}&global_name={}&avatar={}&is_superadmin={}",
         percent_encode(&token.access_token),
         percent_encode(&me.id),
         percent_encode(&me.username),
         percent_encode(me.global_name.as_deref().unwrap_or("")),
         percent_encode(me.avatar.as_deref().unwrap_or("")),
+        if is_superadmin { "1" } else { "0" },
     );
     let target = format!("{}/auth/callback#{}", front.trim_end_matches('/'), fragment);
 
@@ -417,6 +424,7 @@ struct RefreshResponse {
     username: String,
     global_name: Option<String>,
     avatar: Option<String>,
+    is_superadmin: bool,
 }
 
 fn unauthorized_clear_cookie() -> Response {
@@ -449,12 +457,17 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Respo
     let now = chrono::Utc::now();
     if s.access_expires_at > now + chrono::Duration::seconds(60) {
         let _ = state.oauth_uc.touch_session(session_id).await;
+        let is_superadmin = state
+            .superadmin_user_ids
+            .iter()
+            .any(|id| id == &s.discord_user_id);
         return axum::Json(RefreshResponse {
             token: s.access_token,
             id: s.discord_user_id,
             username: s.username,
             global_name: s.global_name,
             avatar: s.avatar,
+            is_superadmin,
         })
         .into_response();
     }
@@ -507,12 +520,17 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Respo
         })
         .await;
 
+    let is_superadmin = state
+        .superadmin_user_ids
+        .iter()
+        .any(|id| id == &s.discord_user_id);
     axum::Json(RefreshResponse {
         token: token.access_token,
         id: s.discord_user_id,
         username: s.username,
         global_name: s.global_name,
         avatar: s.avatar,
+        is_superadmin,
     })
     .into_response()
 }

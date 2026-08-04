@@ -22,10 +22,30 @@ la migration supprime `api_user_guilds`, se tromper d'ordre laisse un
 back-office inaccessible **sans table ou reparer le tir a la main**. La seule
 issue serait alors la variable d'environnement + redemarrage.
 
-`.env.example` ne documente pas encore `SUPERADMIN_USER_IDS` : a ajouter, avec
-un commentaire sur le comportement fail-closed.
+~~`.env.example` ne documente pas encore `SUPERADMIN_USER_IDS`~~ **FAIT** :
+variable ajoutee dans la section « API Backend » avec un commentaire sur le
+comportement fail-closed. Reste l'action de deploiement elle-meme (renseigner la
+valeur en prod + migration), non automatisable ici.
 
-## 2. BLOQUANT CI — la suite de tests ne compile plus
+## 2. ~~BLOQUANT CI — la suite de tests ne compile plus~~ FAIT
+
+`cargo check --workspace --all-targets` : 0 erreur, 0 warning. Detail des
+corrections :
+
+- `tests/integration/rbac_http/` supprime (dossier + entree `[[test]]` du
+  `Cargo.toml`).
+- `src/tests/config.rs` et `tests/test_helpers.rs` : champs `rbac_global_gate`
+  / `rbac_global_gate_audit` retires des constructeurs `AppConfig` / `AppState`.
+- `test_helpers.rs` : stubs `StubInvitations`, `StubComponentMinRole`,
+  `StubComponentVisibility`, `StubRbac` supprimes, ainsi que leurs champs dans
+  le builder de state et le helper `request_with_rbac`.
+- Les tests `*_with_rbac_*` (assertions 403 par role + seed `api_user_guilds`)
+  ont ete supprimes : ils validaient un sous-systeme qui n'existe plus. Les
+  actions sous-jacentes restent couvertes par les tests non-rbac de chaque
+  module. Helpers devenus morts (`seed_rbac*`, `send_request`, `pool`,
+  `insert_note`, `build_state_full_mocks`, imports `Uuid`) retires au passage.
+
+<details><summary>Detail d'origine (conserve pour reference)</summary>
 
 **Elle n'a jamais ete compilee pendant le refactor** (`cargo check` a ete lance
 sans `--all-targets`, sur demande). Les references aux symboles supprimes
@@ -51,45 +71,64 @@ Marche a suivre : `cargo check --workspace --all-targets`, puis corriger le
 listing. L'essentiel est mecanique (retrait d'un argument), sauf `rbac_http` et
 les stubs de `test_helpers` qui sont a supprimer.
 
-## 3. Nettoyage cosmetique du front (sans effet fonctionnel)
+</details>
 
-`myRoleStore` et `componentVisibilityStore` ont ete vides de leur logique et de
-leurs appels reseau : `visible(...)` renvoie toujours `true`, `isSuper` toujours
-`true`, `role` toujours `owner`. Les composants qui les interrogent compilent et
-se comportent correctement, mais leurs conditions sont desormais constantes.
+## 3. ~~Nettoyage cosmetique du front~~ FAIT
 
-Environ vingt fichiers concernes, dont `DockerAdminSection.vue`,
-`ModerationBansTab.vue`, `ModerationJournalTab.vue`, `ConfessionsTable.vue`,
-`SecurityEventsList.vue`, `VoiceChannelsHistoryList.vue`, `MemberHomePage.vue`,
-`useDashboardSections.ts`, `useUniverse.ts`, `useAppInit.ts`.
+Les deux stores (`myRoleStore`, `componentVisibilityStore`) et leurs composables
+(`useMyRole`, `useComponentVisibility`) ont ete **supprimes**. `vue-tsc --noEmit`
+: 0 erreur ; `eslint` : 0 erreur (les warnings `no-multi-spaces` restants sont
+pre-existants, hors de ce chantier). Detail :
 
-`useDashboardSections.ts` expose encore `rbacKeyForPath`, qui n'a plus d'appelant
-depuis le retrait du guard de route dans `main.ts`.
+- Conditions constantes remplacees par leur valeur : `canManage` / `canBuild` /
+  `canDelete` / `isOwner` / `hasAdminAccess` = `true` dans `ConfessionsTable`,
+  `SecurityAttacksTab`, `SecurityNetworkTab`, `GuildBackupPage`,
+  `ServerBuilderPage`, `ServerSecurityPage`, `MemberHomePage`.
+- `v-if="visible('...')"` / `v-if="rbacVisible('...')"` retires des templates
+  (`DockerAdminSection`, `ModerationBansTab`, `ModerationJournalTab`,
+  `SecurityEventsList`, `VoiceChannelsHistoryList`) : les elements s'affichent
+  toujours.
+- `useDashboardSections.ts` : filtre `rbacVisible` retire, fonction morte
+  `rbacKeyForPath` + table `PATH_RBAC_ALIASES` supprimees, tuile `config.rbac`
+  (route `/rbac` inexistante) retiree.
+- `useUniverse.ts` : `canAccessNexus` vaut desormais `true` (les deux univers
+  sont toujours accessibles au superadmin).
+- `useAppInit.ts` / `main.ts` : preloads `preloadMyRole` /
+  `preloadComponentVisibility` retires.
 
-Retirer tout ca supprimerait les deux stores et leurs composables. Volontairement
-non fait dans le commit du refactor : churn important sur des fichiers d'affichage
-deja touches, pour un gain nul a l'execution.
+**Signal superadmin cote client** (traite) : l'espace membre `/membre` est
+public (visible sans connexion), donc `hasAdminAccess` toujours vrai affichait
+le lien back-office meme a un visiteur anonyme. Ajout d'un flag `is_superadmin`
+a l'identite Discord :
 
-## 4. Warnings de compilation
+- API (`handlers/system/oauth.rs`) : le flag est calcule (appartenance a
+  `SUPERADMIN_USER_IDS`) et propage dans le fragment du callback OAuth et dans
+  la reponse de `POST /auth/refresh`.
+- Web : `DiscordUser.is_superadmin` (config.ts), lu au callback
+  (`AuthCallbackPage`) et au refresh (`http.ts`). `MemberHomePage` gate
+  desormais le lien sur `user?.is_superadmin`. Filet de securite : `authStore`
+  repose le flag quand `/api/auth/check-access` repond 200 (statut prouve),
+  ce qui repare une identite en cache anterieure au flag.
 
-`cargo check -p sentinel-api` remonte ~196 warnings, essentiellement des
-parametres `user: Option<Extension<WebUser>>` reinjectes dans des handlers qui
-ne s'en servent pas. Deux options : les prefixer `_user`, ou les retirer quand
-le handler n'a pas besoin d'identite. A faire en meme temps que §2, le
-compilateur listant les deux.
+Ce n'est qu'un confort d'affichage : l'autorisation reelle reste tranchee cote
+serveur (403) par `superadmin_middleware` sur chaque route d'admin.
 
-## 5. Dependance web manquante
+## 4. ~~Warnings de compilation~~ FAIT
 
-`vue-tsc` signale `@vueuse/motion` introuvable. Il est declare dans
-`web/package.json` (`^3.0.3`) mais absent de `node_modules` : c'est un
-`npm install` qui manque, anterieur a ce refactor et sans rapport avec lui.
+Resorbes par le commit `14146a86`. `cargo check -p sentinel-api --all-targets`
+ne remonte plus de warning.
 
-## 6. Configuration nginx
+## 5. ~~Dependance web manquante~~ FAIT
 
-`/api/auth/nexus-access` ne lit plus l'en-tete `X-Guild-Id` (la decision ne
-depend plus d'une guilde). Si la directive `auth_request` de la passerelle
-`/nexus-api/` le transmet encore, c'est devenu inutile — a nettoyer au passage,
-sans urgence.
+`@vueuse/motion` est desormais present dans `node_modules` (le `npm install`
+manquant a ete fait).
+
+## 6. ~~Configuration nginx~~ FAIT (commentaires)
+
+`/api/auth/nexus-access` ne lit plus `X-Guild-Id`. Le SPA continue de l'envoyer
+mais le handler l'ignore : aucun changement fonctionnel requis cote nginx. Les
+commentaires de `web/nginx.conf` (bloc `/_nexus_auth`) ont ete corriges pour
+decrire le modele superadmin-only au lieu du RBAC `nexus.access` par guild.
 
 ## 7. Dette annexe reperee, non traitee
 

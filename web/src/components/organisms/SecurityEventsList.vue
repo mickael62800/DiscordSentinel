@@ -14,9 +14,7 @@ import ErrorState from "@/components/atoms/ErrorState.vue";
 import EmptyState from "@/components/atoms/EmptyState.vue";
 import { severityVariant } from "@/utils/variants";
 import { useFormatDate } from "@/composables/useFormatDate";
-import { useComponentVisibility } from "@/composables/useComponentVisibility";
 
-const { visible } = useComponentVisibility();
 const { formatShortDateTime: fmt } = useFormatDate();
 const { events, loading, error, fetchEvents } = useSecurity();
 const { selectedGuildId } = useGuildSelector();
@@ -79,7 +77,7 @@ function eventIcon(type: string): string {
         class="search-input"
       />
       <button
-        v-if="events.length > 0 && visible('db.purge.security_events')"
+        v-if="events.length > 0"
         class="purge-btn"
         :disabled="purging"
         title="Supprime tous les evenements de securite et les surveillances auto (owner uniquement)"

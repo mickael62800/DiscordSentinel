@@ -4,7 +4,6 @@ import { useRouter } from "vue-router";
 import { guildBackupService } from "@/services/guildBackupService";
 import type { SnapshotSummary, TableColumn } from "@/types";
 import { useGuildSelector } from "@/composables/useGuildSelector";
-import { useMyRole } from "@/composables/useMyRole";
 import { useConfirm } from "@/composables/useConfirm";
 import { useToast } from "@/composables/useToast";
 import { useFormatDate } from "@/composables/useFormatDate";
@@ -16,15 +15,13 @@ import ErrorState from "../atoms/ErrorState.vue";
 
 const router = useRouter();
 const { selectedGuildId, selectedGuild } = useGuildSelector();
-const { role, isSuper } = useMyRole();
 const { confirm } = useConfirm();
 const { success, error: toastError, info } = useToast();
 const { formatDateTime } = useFormatDate();
 
-// RBAC : seuls le superadmin et l'owner de la guild peuvent declencher des
-// actions (capture / restore / rename / delete). Les autres roles ont une
-// vue en lecture seule.
-const canManage = computed(() => isSuper.value || role.value === "owner");
+// Back-office superadmin-only : le seul utilisateur possible peut declencher
+// toutes les actions (capture / restore / rename / delete).
+const canManage = true;
 
 const snapshots = ref<SnapshotSummary[]>([]);
 const loading = ref(false);

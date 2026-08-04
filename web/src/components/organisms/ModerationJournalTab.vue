@@ -7,7 +7,6 @@ import { useFormatDate } from "../../composables/useFormatDate";
 import { useConfirm } from "../../composables/useConfirm";
 import { useModeration } from "../../composables/useModeration";
 import { useGuildSelector } from "../../composables/useGuildSelector";
-import { useComponentVisibility } from "@/composables/useComponentVisibility";
 import type { TableColumn, Infraction } from "../../types";
 import { infractionTypeVariant } from "../../utils/variants";
 
@@ -28,7 +27,6 @@ const emit = defineEmits<{
 const { success, error: showError } = useToast();
 const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm } = useConfirm();
-const { visible: rbacVisible } = useComponentVisibility();
 
 const {
   infractions,
@@ -349,7 +347,7 @@ function openActionModal() {
         >
           Reinitialiser
         </button>
-        <div v-if="rbacVisible('db.purge.audit_logs')" class="bulk-menu-wrap" @click.stop>
+        <div class="bulk-menu-wrap" @click.stop>
           <button
             class="bulk-menu-btn"
             :disabled="!selectedGuildId"

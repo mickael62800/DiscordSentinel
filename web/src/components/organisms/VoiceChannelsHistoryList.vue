@@ -5,13 +5,11 @@ import { useVoiceChannels } from "../../composables/useVoiceChannels";
 import { useFormatDate } from "../../composables/useFormatDate";
 import { useConfirm } from "../../composables/useConfirm";
 import { usePagination } from "../../composables/usePagination";
-import { useComponentVisibility } from "@/composables/useComponentVisibility";
 import AppBadge from "../atoms/AppBadge.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 
 const emit = defineEmits<{ select: [channelId: string] }>();
 
-const { visible } = useComponentVisibility();
 const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm: confirmDialog } = useConfirm();
 
@@ -98,7 +96,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
         <p class="history-subtitle">Salons vocaux fermes / archives</p>
       </div>
       <button
-        v-if="historyChannels.length > 0 && visible('db.purge.voice_history')"
+        v-if="historyChannels.length > 0"
         class="cleanup-btn"
         :disabled="purgingAll"
         title="Supprime definitivement tout l'historique en BDD (owner uniquement)"
@@ -155,7 +153,6 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
           <td>{{ fmt(ch.created_at) }}</td>
           <td @click.stop>
             <button
-              v-if="visible('db.purge.voice_channel')"
               class="close-row-btn"
               :disabled="purging === ch.channel_id"
               title="Supprimer definitivement cette ligne (owner uniquement)"

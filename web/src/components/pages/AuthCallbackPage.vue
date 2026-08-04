@@ -35,6 +35,7 @@ onMounted(async () => {
     username,
     global_name: params.get("global_name") || null,
     avatar: params.get("avatar") || null,
+    is_superadmin: params.get("is_superadmin") === "1",
   };
 
   setDiscordToken(token);

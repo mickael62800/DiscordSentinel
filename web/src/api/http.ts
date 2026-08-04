@@ -63,6 +63,7 @@ export async function tryRefreshSession(): Promise<boolean> {
         username: data.username,
         global_name: data.global_name ?? null,
         avatar: data.avatar ?? null,
+        is_superadmin: data.is_superadmin === true,
       });
       return true;
     } catch {
