@@ -67,6 +67,7 @@ const ALL_SECTIONS: DashboardSection[] = [
 
   { key: "community.welcome", path: "/welcome", label: "Bienvenue", icon: "user-plus", requiredBot: "welcome-bot" },
   { key: "community.announcements", path: "/announcements", label: "Annonces planifiées", icon: "clock" },
+  { key: "community.embeds", path: "/embeds", label: "Embed builder", icon: "edit-3" },
   // Ce qui alimente l'espace membre du site : nouvelles, sondages, membre du
   // mois, modération des annonces de recherche de joueurs.
   { key: "community.life", path: "/vie-communaute", label: "Vie de la communauté", icon: "heart" },
