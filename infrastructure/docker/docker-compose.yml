@@ -572,12 +572,19 @@ services:
           STAGING_FLAG="--staging"
           echo "[certbot] STAGING mode actif (certs non trustables, pour tests)"
         fi
-        DEPLOY_HOOK='docker kill --signal=HUP $$(docker ps -q -f label=com.docker.compose.service=web) || true'
+        # On RESTART le conteneur web (et non un simple HUP nginx) : le symlink
+        # /etc/nginx/certs -> cert actif est pose par l'entrypoint AU DEMARRAGE
+        # uniquement, et il pointe sur le self-signed tant que le conteneur n'a
+        # pas ete relance. Un reload nginx re-lit le meme symlink (toujours
+        # self-signed) : seul un restart re-execute l'entrypoint et bascule sur
+        # le cert Let's Encrypt fraichement emis. Le conteneur certbot ne monte
+        # pas /etc/nginx/certs, il ne peut donc pas re-symlinker lui-meme.
+        DEPLOY_HOOK='docker restart $$(docker ps -q -f label=com.docker.compose.service=web) || true'
         certbot certonly --webroot -w /var/www/certbot \
           --non-interactive --agree-tos --email "$$LETSENCRYPT_EMAIL" \
           $$STAGING_FLAG --keep-until-expiring \
           -d "$$WEB_DOMAIN" || echo "[certbot] premiere obtention echouee, retry au prochain cycle"
-        docker kill --signal=HUP $$(docker ps -q -f label=com.docker.compose.service=web) 2>/dev/null || true
+        docker restart $$(docker ps -q -f label=com.docker.compose.service=web) 2>/dev/null || true
         trap exit TERM
         while :; do
           certbot renew --webroot -w /var/www/certbot --quiet \
