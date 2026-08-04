@@ -126,51 +126,6 @@ h1 {
   text-align: left;
 }
 
-.invite-toggle {
-  margin-bottom: var(--space-md);
-}
-.invite-toggle-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 12px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-}
-.invite-toggle-btn:hover {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-.invite-field {
-  margin-bottom: var(--space-lg);
-}
-.invite-input {
-  width: 100%;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border);
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-  font-family: "JetBrains Mono", monospace;
-  font-size: 14px;
-  letter-spacing: 2px;
-  text-align: center;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}
-.invite-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
-}
-.hint {
-  font-size: 11px;
-  color: var(--text-secondary);
-  margin: 0;
-  line-height: 1.4;
-}
-
 .discord-btn {
   width: 100%;
   display: flex;
