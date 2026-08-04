@@ -5,6 +5,7 @@ pub mod bump;
 pub mod confession;
 pub mod daily_activity;
 pub mod eligibility;
+pub mod embed;
 pub mod guild_member;
 pub mod guild_member_reset;
 pub mod level;

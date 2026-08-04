@@ -136,6 +136,34 @@ fn announcement_inner() -> Router<AppState> {
         )
 }
 
+fn embed_inner() -> Router<AppState> {
+    Router::new()
+        .route(
+            "/{guild_id}",
+            axum::routing::get(handlers::community::embeds::list_embeds)
+                .post(handlers::community::embeds::create_embed),
+        )
+        .route(
+            "/by-id/{id}",
+            axum::routing::get(handlers::community::embeds::get_embed)
+                .put(handlers::community::embeds::update_embed)
+                .delete(handlers::community::embeds::delete_embed),
+        )
+        .route(
+            "/by-id/{id}/post",
+            post(handlers::community::embeds::post_embed),
+        )
+        .route(
+            "/by-id/{id}/edit",
+            post(handlers::community::embeds::edit_embed),
+        )
+        // Rapport interne du bot apres un post reussi.
+        .route(
+            "/by-id/{id}/posted",
+            post(handlers::community::embeds::record_embed_posted),
+        )
+}
+
 fn confession_inner() -> Router<AppState> {
     Router::new()
         .route(
@@ -319,6 +347,7 @@ pub fn routes() -> Router<AppState> {
         )
         .nest("/api/levels", level_inner())
         .nest("/api/announcements", announcement_inner())
+        .nest("/api/embeds", embed_inner())
         .nest("/api/confessions", confession_inner())
         .nest("/api/role-panels", role_panel_inner())
         .nest("/api/auto-roles", auto_role_inner())

@@ -347,6 +347,8 @@ pub async fn build_app_state(
     let levels_uc = Arc::new(ManageLevelsService::new(level_repo, bot_config_repo.clone()));
     let announcement_repo = Arc::new(crate::adapters::outbound::postgres::community::announcement_repository::PgAnnouncementRepository::new(pg_pool.clone()));
     let announcements_uc: Arc<dyn crate::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase> = Arc::new(crate::application::community::manage_announcements_service::ManageAnnouncementsService::new(announcement_repo, bot_config_repo.clone()));
+    let embed_repo = Arc::new(crate::adapters::outbound::postgres::community::embed_repository::PgEmbedRepository::new(pg_pool.clone()));
+    let embeds_uc: Arc<dyn crate::ports::inbound::community::manage_embeds::ManageEmbedsUseCase> = Arc::new(crate::application::community::manage_embeds_service::ManageEmbedsService::new(embed_repo));
     let confession_repo = Arc::new(crate::adapters::outbound::postgres::community::confession_repository::PgConfessionRepository::new(pg_pool.clone()));
     let confessions_uc: Arc<
         dyn crate::ports::inbound::community::manage_confessions::ManageConfessionsUseCase,
@@ -734,6 +736,7 @@ pub async fn build_app_state(
         snapshots_uc,
         levels_uc,
         announcements_uc,
+        embeds_uc,
         confessions_uc,
         role_panels_uc,
         notes_uc,
