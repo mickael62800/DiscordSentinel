@@ -5,6 +5,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
 import { errMsg } from "@/utils/errMsg";
+import { renderDiscordMarkdown } from "@/utils/discordMarkdown";
 import AdminPageShell from "../layouts/AdminPageShell.vue";
 import AppButton from "../atoms/AppButton.vue";
 import AppInput from "@/components/atoms/AppInput.vue";
@@ -277,7 +278,8 @@ async function updatePosted() {
       <!-- Aperçu live -->
       <section class="eb-preview">
         <h3 class="muted small">Aperçu</h3>
-        <p v-if="form.content" class="eb-content">{{ form.content }}</p>
+        <!-- eslint-disable-next-line vue/no-v-html -- contenu échappé par renderDiscordMarkdown -->
+        <p v-if="form.content" class="eb-content" v-html="renderDiscordMarkdown(form.content)"></p>
         <div class="eb-embed" :style="{ borderLeftColor: colorHex }">
           <div class="eb-embed-body">
             <div v-if="form.author_name" class="eb-author">
@@ -285,7 +287,8 @@ async function updatePosted() {
               <span>{{ form.author_name }}</span>
             </div>
             <div v-if="form.title" class="eb-title">{{ form.title }}</div>
-            <div v-if="form.description" class="eb-desc">{{ form.description }}</div>
+            <!-- eslint-disable-next-line vue/no-v-html -- contenu échappé par renderDiscordMarkdown -->
+            <div v-if="form.description" class="eb-desc" v-html="renderDiscordMarkdown(form.description)"></div>
             <div v-if="form.fields.length" class="eb-fields">
               <div
                 v-for="(f, i) in form.fields.filter((x) => x.name)"
@@ -294,7 +297,8 @@ async function updatePosted() {
                 :class="{ inline: f.inline }"
               >
                 <div class="eb-field-name">{{ f.name }}</div>
-                <div class="eb-field-value">{{ f.value }}</div>
+                <!-- eslint-disable-next-line vue/no-v-html -- contenu échappé par renderDiscordMarkdown -->
+                <div class="eb-field-value" v-html="renderDiscordMarkdown(f.value)"></div>
               </div>
             </div>
             <img v-if="form.image_url" :src="form.image_url" class="eb-image" alt="" />
@@ -359,7 +363,26 @@ input[type="color"] { height: 38px; padding: 3px; cursor: pointer; width: 100%; 
 .eb-author { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #fff; margin-bottom: 6px; }
 .eb-author-icon { width: 20px; height: 20px; border-radius: 50%; }
 .eb-title { color: #00a8fc; font-weight: 700; font-size: 15px; margin-bottom: 6px; }
-.eb-desc { color: #dbdee1; font-size: 13px; white-space: pre-wrap; line-height: 1.4; }
+.eb-desc { color: #dbdee1; font-size: 13px; line-height: 1.4; }
+
+/* Rendu markdown Discord dans l'aperçu */
+.eb-desc :deep(a), .eb-field-value :deep(a), .eb-content :deep(a) { color: #00a8fc; text-decoration: none; }
+.eb-desc :deep(a):hover, .eb-field-value :deep(a):hover { text-decoration: underline; }
+.eb-desc :deep(strong), .eb-field-value :deep(strong) { font-weight: 700; color: #fff; }
+.eb-desc :deep(.md-code), .eb-field-value :deep(.md-code), .eb-content :deep(.md-code) {
+  background: #1e1f22; border-radius: 4px; padding: 1px 4px; font-family: monospace; font-size: 12px;
+}
+.eb-desc :deep(.md-pre), .eb-field-value :deep(.md-pre) {
+  background: #1e1f22; border: 1px solid #111214; border-radius: 4px; padding: 8px;
+  font-family: monospace; font-size: 12px; white-space: pre-wrap; margin: 4px 0; overflow-x: auto;
+}
+.eb-desc :deep(.md-h1) { font-size: 18px; font-weight: 700; color: #fff; margin: 4px 0; }
+.eb-desc :deep(.md-h2) { font-size: 16px; font-weight: 700; color: #fff; margin: 4px 0; }
+.eb-desc :deep(.md-h3) { font-size: 14px; font-weight: 700; color: #fff; margin: 4px 0; }
+.eb-desc :deep(.md-quote), .eb-field-value :deep(.md-quote) {
+  border-left: 3px solid #4e5058; padding-left: 8px; margin: 2px 0; color: #b5bac1;
+}
+.eb-desc :deep(.md-li), .eb-field-value :deep(.md-li) { padding-left: 4px; }
 .eb-fields { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .eb-field-view { flex: 1 1 100%; }
 .eb-field-view.inline { flex: 1 1 30%; min-width: 120px; }
