@@ -93,6 +93,7 @@ impl From<Row> for WelcomeConfigData {
             welcome_title: "Bienvenue !".into(),
             welcome_image_url: "".into(),
             welcome_footer_text: "{count} membres".into(),
+            welcome_text_position: "below".into(),
             rejoin_title: "Bon retour !".into(),
             rejoin_image_url: "".into(),
             rejoin_footer_text: "{count} membres".into(),
@@ -150,6 +151,7 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
         welcome_title: "Bienvenue !".into(),
         welcome_image_url: "".into(),
         welcome_footer_text: "{count} membres".into(),
+        welcome_text_position: "below".into(),
         rejoin_title: "Bon retour !".into(),
         rejoin_image_url: "".into(),
         rejoin_footer_text: "{count} membres".into(),
@@ -286,6 +288,10 @@ fn overlay_with_bot_config(
                     d.welcome_title = v;
                 }
             "welcome_image_url" => d.welcome_image_url = v,
+            "welcome_text_position"
+                if !v.is_empty() => {
+                    d.welcome_text_position = v;
+                }
             "welcome_footer_text"
                 if !v.is_empty() => {
                     d.welcome_footer_text = v;
@@ -436,6 +442,7 @@ pub(super) fn build_welcome_config_kvs(d: &WelcomeConfigData) -> Vec<(&'static s
         ("rejoin_message", d.rejoin_message.clone()),
         ("welcome_title", d.welcome_title.clone()),
         ("welcome_image_url", d.welcome_image_url.clone()),
+        ("welcome_text_position", d.welcome_text_position.clone()),
         ("welcome_footer_text", d.welcome_footer_text.clone()),
         ("rejoin_title", d.rejoin_title.clone()),
         ("rejoin_image_url", d.rejoin_image_url.clone()),

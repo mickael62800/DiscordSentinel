@@ -1487,6 +1487,7 @@ impl WelcomeConfigRepository for StubWelcomeConfigRepo {
             rejoin_message: String::new(),
             welcome_title: String::new(),
             welcome_image_url: String::new(),
+            welcome_text_position: "below".into(),
             welcome_footer_text: String::new(),
             rejoin_title: String::new(),
             rejoin_image_url: String::new(),

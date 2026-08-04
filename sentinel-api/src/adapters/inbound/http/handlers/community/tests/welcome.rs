@@ -40,6 +40,7 @@ fn sample_data() -> WelcomeConfigData {
         rejoin_message: "Re-bonjour".into(),
         welcome_title: "".into(),
         welcome_image_url: "".into(),
+        welcome_text_position: "below".into(),
         welcome_footer_text: "".into(),
         rejoin_title: "".into(),
         rejoin_image_url: "".into(),

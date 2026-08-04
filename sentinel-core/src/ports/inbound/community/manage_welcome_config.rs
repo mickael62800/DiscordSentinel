@@ -23,6 +23,7 @@ pub struct WelcomeConfigPatch {
     pub welcome_title: Option<String>,
     pub welcome_image_url: Option<String>,
     pub welcome_footer_text: Option<String>,
+    pub welcome_text_position: Option<String>,
     pub leave_enabled: Option<bool>,
     pub leave_channel_id: Option<String>,
     pub leave_message: Option<String>,

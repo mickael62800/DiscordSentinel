@@ -59,6 +59,9 @@ impl ManageWelcomeConfigUseCase for ManageWelcomeConfigService {
         if let Some(v) = patch.welcome_image_url {
             current.welcome_image_url = v;
         }
+        if let Some(v) = patch.welcome_text_position {
+            current.welcome_text_position = v;
+        }
         if let Some(v) = patch.welcome_footer_text {
             current.welcome_footer_text = v;
         }

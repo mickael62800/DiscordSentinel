@@ -328,12 +328,13 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                     .thumbnail(new_member.user.face())
                     .footer(CreateEmbedFooter::new(footer_raw));
 
-                // L'image part en PREMIER, dans son propre message (embed sans
-                // texte) : elle s'affiche en grand, separee de la carte du
-                // message qui vient juste en dessous. Les deux dans un meme
-                // embed forceraient Discord a comprimer l'image sous le texte.
-                if !raw_image.is_empty() {
-                    info!(url = %raw_image, is_rejoin, "Envoi image banniere (message separe)");
+                // Image et texte partent en DEUX messages distincts (l'image
+                // s'affiche en grand, separee de la carte). `welcome_text_position`
+                // decide de l'ordre : "above" = texte d'abord puis image ;
+                // sinon (below/defaut) = image d'abord puis texte.
+                let text_above = config.welcome_text_position == "above";
+
+                if !raw_image.is_empty() && !text_above {
                     if let Err(e) = channel
                         .send_message(
                             &ctx.http,
@@ -343,8 +344,6 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                     {
                         warn!(error = %e, "Echec envoi image banniere bienvenue");
                     }
-                } else {
-                    info!(is_rejoin, "Pas d image banniere configuree");
                 }
 
                 if let Err(e) = channel
@@ -360,6 +359,18 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                         "Message de {} envoye",
                         if is_rejoin { "retour" } else { "bienvenue" }
                     );
+                }
+
+                if !raw_image.is_empty() && text_above {
+                    if let Err(e) = channel
+                        .send_message(
+                            &ctx.http,
+                            CreateMessage::new().embed(CreateEmbed::new().image(raw_image.as_str())),
+                        )
+                        .await
+                    {
+                        warn!(error = %e, "Echec envoi image banniere bienvenue");
+                    }
                 }
             }
         }

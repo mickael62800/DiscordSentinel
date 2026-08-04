@@ -23,6 +23,7 @@ const draft = reactive({
   welcome_title: "",
   welcome_embed_color: "#5865F2",
   welcome_image_url: "",
+  welcome_text_position: "below" as "above" | "below",
   welcome_footer_text: "",
   welcome_dm_enabled: false,
   welcome_dm_message: "",
@@ -82,6 +83,7 @@ watch(
     draft.welcome_title = c.welcome_title;
     draft.welcome_embed_color = c.welcome_embed_color || "#5865F2";
     draft.welcome_image_url = c.welcome_image_url;
+    draft.welcome_text_position = c.welcome_text_position === "above" ? "above" : "below";
     draft.welcome_footer_text = c.welcome_footer_text;
     draft.welcome_dm_enabled = c.welcome_dm_enabled;
     draft.welcome_dm_message = c.welcome_dm_message;
@@ -142,6 +144,7 @@ async function onSave() {
     welcome_title: draft.welcome_title,
     welcome_embed_color: draft.welcome_embed_color,
     welcome_image_url: draft.welcome_image_url,
+    welcome_text_position: draft.welcome_text_position,
     welcome_footer_text: draft.welcome_footer_text,
     welcome_dm_enabled: draft.welcome_dm_enabled,
     welcome_dm_message: draft.welcome_dm_message,
@@ -209,6 +212,12 @@ async function onSave() {
         </label>
         <label>Image
           <ImagePicker v-model="draft.welcome_image_url" />
+        </label>
+        <label v-if="draft.welcome_image_url">Position du texte / à l'image
+          <select v-model="draft.welcome_text_position">
+            <option value="below">Texte en dessous (image en haut)</option>
+            <option value="above">Texte au-dessus (image en bas)</option>
+          </select>
         </label>
         <label class="full">Message
           <AppTextarea v-model="draft.welcome_message" :rows="6" />
