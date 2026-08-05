@@ -64,5 +64,5 @@ message WelcomeConfig {
   optional string voice_counter_channel_id = 36;
   string voice_counter_format = 37;
   // Position du texte / a l'image de bienvenue ("above" | "below").
-  string welcome_text_position = 43;
+  reserved 43;
 }

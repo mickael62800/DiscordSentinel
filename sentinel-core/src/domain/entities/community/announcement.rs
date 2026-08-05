@@ -40,35 +40,6 @@ impl RecurrenceType {
     }
 }
 
-/// Position du texte par rapport a l'image quand une annonce (ou un message de
-/// bienvenue) porte une image : l'image et le texte partent en DEUX messages
-/// distincts, et ceci decide de l'ordre d'envoi.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum TextPosition {
-    /// Texte AU-DESSUS de l'image (texte envoye en premier).
-    Above,
-    /// Texte EN DESSOUS de l'image (image envoyee en premier). Defaut.
-    #[default]
-    Below,
-}
-
-impl TextPosition {
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Above => "above",
-            Self::Below => "below",
-        }
-    }
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "above" => Some(Self::Above),
-            "below" => Some(Self::Below),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ButtonStyle {
@@ -158,9 +129,9 @@ pub struct ScheduledAnnouncement {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
-    /// Ou placer le texte par rapport a l'image (image envoyee en message
-    /// separe). Defaut : texte en dessous (image d'abord).
-    pub text_position: TextPosition,
+    /// Texte de pied d'embed. Discord le rend SOUS l'image : c'est la zone
+    /// "texte du bas" (petit, gris, sans markdown, 2048 caracteres max).
+    pub embed_footer_text: Option<String>,
 
     pub mention_everyone: bool,
     pub mention_here: bool,

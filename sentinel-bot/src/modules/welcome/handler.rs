@@ -321,29 +321,17 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                 } else {
                     raw_footer.replace("{count}", &member_count.to_string())
                 };
-                let embed = CreateEmbed::new()
+                let mut embed = CreateEmbed::new()
                     .title(&title)
                     .description(&text)
                     .color(color)
                     .thumbnail(new_member.user.face())
                     .footer(CreateEmbedFooter::new(footer_raw));
 
-                // Image et texte partent en DEUX messages distincts (l'image
-                // s'affiche en grand, separee de la carte). `welcome_text_position`
-                // decide de l'ordre : "above" = texte d'abord puis image ;
-                // sinon (below/defaut) = image d'abord puis texte.
-                let text_above = config.welcome_text_position == "above";
-
-                if !raw_image.is_empty() && !text_above {
-                    if let Err(e) = channel
-                        .send_message(
-                            &ctx.http,
-                            CreateMessage::new().embed(CreateEmbed::new().image(raw_image.as_str())),
-                        )
-                        .await
-                    {
-                        warn!(error = %e, "Echec envoi image banniere bienvenue");
-                    }
+                // L'image (banniere) est integree a l'embed : un seul message
+                // est envoye. Discord l'affiche en grand sous le texte.
+                if !raw_image.is_empty() {
+                    embed = embed.image(raw_image.as_str());
                 }
 
                 if let Err(e) = channel
@@ -359,18 +347,6 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                         "Message de {} envoye",
                         if is_rejoin { "retour" } else { "bienvenue" }
                     );
-                }
-
-                if !raw_image.is_empty() && text_above {
-                    if let Err(e) = channel
-                        .send_message(
-                            &ctx.http,
-                            CreateMessage::new().embed(CreateEmbed::new().image(raw_image.as_str())),
-                        )
-                        .await
-                    {
-                        warn!(error = %e, "Echec envoi image banniere bienvenue");
-                    }
                 }
             }
         }
@@ -518,23 +494,15 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
             "e74c3c",
         ))
     };
-    let embed = CreateEmbed::new()
+    let mut embed = CreateEmbed::new()
         .title(&leave_title)
         .description(&text)
         .color(leave_color)
         .footer(CreateEmbedFooter::new(leave_footer));
 
-    // Image d'abord (message separe, en grand), puis la carte texte dessous.
+    // L'image est integree a l'embed : un seul message, image en grand sous le texte.
     if !config.leave_image_url.is_empty() {
-        if let Err(e) = ch
-            .send_message(
-                &ctx.http,
-                CreateMessage::new().embed(CreateEmbed::new().image(&config.leave_image_url)),
-            )
-            .await
-        {
-            warn!(error = %e, "Echec envoi image banniere depart");
-        }
+        embed = embed.image(&config.leave_image_url);
     }
 
     if let Err(e) = ch

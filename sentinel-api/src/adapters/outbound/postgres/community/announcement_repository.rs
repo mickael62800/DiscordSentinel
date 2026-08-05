@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::ports::outbound::community::announcement_repository::AnnouncementRepository;
 use sentinel_core::domain::entities::community::announcement::{
     AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType, RecurrenceType, RunStatus,
-    ScheduledAnnouncement, TextPosition,
+    ScheduledAnnouncement,
 };
 use sentinel_core::domain::errors::DomainError;
 
@@ -42,7 +42,7 @@ struct AnnouncementRow {
     embed_color: Option<i32>,
     embed_image_url: Option<String>,
     embed_thumbnail_url: Option<String>,
-    text_position: String,
+    embed_footer_text: Option<String>,
     mention_everyone: bool,
     mention_here: bool,
     mention_role_ids: serde_json::Value,
@@ -81,7 +81,7 @@ impl From<AnnouncementRow> for ScheduledAnnouncement {
             embed_color: r.embed_color,
             embed_image_url: r.embed_image_url,
             embed_thumbnail_url: r.embed_thumbnail_url,
-            text_position: TextPosition::from_str(&r.text_position).unwrap_or_default(),
+            embed_footer_text: r.embed_footer_text,
             mention_everyone: r.mention_everyone,
             mention_here: r.mention_here,
             mention_role_ids: role_ids,
@@ -130,7 +130,7 @@ const SELECT_ANNOUNCEMENT: &str = r#"
         recurrence_day_of_week, recurrence_day_of_month, recurrence_month, scheduled_at,
         start_date, end_date,
         content_type, content_text, embed_title, embed_color,
-        embed_image_url, embed_thumbnail_url, text_position,
+        embed_image_url, embed_thumbnail_url, embed_footer_text,
         mention_everyone, mention_here, mention_role_ids,
         channel_ids, buttons, auto_reactions,
         created_by, created_at, updated_at,
@@ -148,7 +148,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
                 recurrence_day_of_week, recurrence_day_of_month, recurrence_month, scheduled_at,
                 start_date, end_date,
                 content_type, content_text, embed_title, embed_color,
-                embed_image_url, embed_thumbnail_url, text_position,
+                embed_image_url, embed_thumbnail_url, embed_footer_text,
                 mention_everyone, mention_here, mention_role_ids,
                 channel_ids, buttons, auto_reactions,
                 created_by, created_at, updated_at,
@@ -178,7 +178,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(a.embed_color)
         .bind(&a.embed_image_url)
         .bind(&a.embed_thumbnail_url)
-        .bind(a.text_position.as_str())
+        .bind(&a.embed_footer_text)
         .bind(a.mention_everyone)
         .bind(a.mention_here)
         .bind(serde_json::to_value(&a.mention_role_ids).unwrap_or_default())
@@ -207,7 +207,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
                 embed_image_url = $16, embed_thumbnail_url = $17,
                 mention_everyone = $18, mention_here = $19, mention_role_ids = $20,
                 channel_ids = $21, buttons = $22, auto_reactions = $23,
-                recurrence_month = $25, text_position = $26,
+                recurrence_month = $25, embed_footer_text = $26,
                 updated_at = NOW(), next_run_at = $24
             WHERE id = $1"#,
         )
@@ -228,6 +228,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(a.embed_color)
         .bind(&a.embed_image_url)
         .bind(&a.embed_thumbnail_url)
+        .bind(&a.embed_footer_text)
         .bind(a.mention_everyone)
         .bind(a.mention_here)
         .bind(serde_json::to_value(&a.mention_role_ids).unwrap_or_default())
@@ -236,7 +237,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         .bind(serde_json::to_value(&a.auto_reactions).unwrap_or_default())
         .bind(a.next_run_at)
         .bind(a.recurrence_month.map(|v| v as i16))
-        .bind(a.text_position.as_str())
+        .bind(&a.embed_footer_text)
         .execute(&self.pool)
         .await
         .map_err(pg_err)?;

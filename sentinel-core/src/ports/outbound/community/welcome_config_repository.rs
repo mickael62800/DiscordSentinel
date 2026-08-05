@@ -53,7 +53,6 @@ pub struct WelcomeConfigData {
     pub welcome_footer_text: String,
     /// Position du texte / a l'image ("above" | "below", defaut "below").
     /// L'image et le texte partent en deux messages distincts.
-    pub welcome_text_position: String,
     // Embed enrichi — retour (rejoin)
     pub rejoin_title: String,
     pub rejoin_image_url: String,

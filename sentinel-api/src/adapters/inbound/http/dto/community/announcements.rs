@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use sentinel_core::domain::entities::community::announcement::{
     AnnouncementButton, AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType,
-    RecurrenceType, RunStatus, ScheduledAnnouncement, TextPosition,
+    RecurrenceType, RunStatus, ScheduledAnnouncement,
 };
 
 #[derive(Debug, Deserialize)]
@@ -28,9 +28,7 @@ pub struct CreateAnnouncementDto {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
-    /// "above" | "below" (defaut). Position du texte / a l'image.
-    #[serde(default)]
-    pub text_position: Option<String>,
+    pub embed_footer_text: Option<String>,
     #[serde(default)]
     pub mention_everyone: bool,
     #[serde(default)]
@@ -64,9 +62,7 @@ pub struct UpdateAnnouncementDto {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
-    /// "above" | "below" (defaut). Position du texte / a l'image.
-    #[serde(default)]
-    pub text_position: Option<String>,
+    pub embed_footer_text: Option<String>,
     #[serde(default)]
     pub mention_everyone: bool,
     #[serde(default)]
@@ -106,7 +102,7 @@ pub struct AnnouncementDto {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
-    pub text_position: String,
+    pub embed_footer_text: Option<String>,
     pub mention_everyone: bool,
     pub mention_here: bool,
     pub mention_role_ids: Vec<String>,
@@ -142,7 +138,7 @@ impl From<ScheduledAnnouncement> for AnnouncementDto {
             embed_color: a.embed_color,
             embed_image_url: a.embed_image_url,
             embed_thumbnail_url: a.embed_thumbnail_url,
-            text_position: a.text_position.as_str().to_string(),
+            embed_footer_text: a.embed_footer_text,
             mention_everyone: a.mention_everyone,
             mention_here: a.mention_here,
             mention_role_ids: a.mention_role_ids,
@@ -192,11 +188,6 @@ pub fn parse_recurrence(s: &str) -> Result<RecurrenceType, String> {
             s
         )
     })
-}
-
-/// Position du texte : "above"/"below". Absent ou vide => below (defaut).
-pub fn parse_text_position(s: Option<&str>) -> TextPosition {
-    s.and_then(TextPosition::from_str).unwrap_or_default()
 }
 
 pub fn parse_content_type(s: &str) -> Result<ContentType, String> {

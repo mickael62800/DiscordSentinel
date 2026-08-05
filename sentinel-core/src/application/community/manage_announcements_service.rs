@@ -63,6 +63,16 @@ impl ManageAnnouncementsService {
             .map(|c| c.config_value)
     }
 
+    /// Limite Discord du footer d'embed (miroir de la contrainte SQL).
+    fn validate_footer_text(footer: Option<&str>) -> Result<(), DomainError> {
+        if footer.is_some_and(|f| f.chars().count() > 2048) {
+            return Err(DomainError::ValidationError(
+                "embed_footer_text trop long (max 2048)".into(),
+            ));
+        }
+        Ok(())
+    }
+
     fn validate_create(&self, cmd: &CreateAnnouncementCommand) -> Result<(), DomainError> {
         crate::application::validation::validate_non_empty(&cmd.name, "name")?;
         if cmd.recurrence_hour > 23 {
@@ -88,6 +98,7 @@ impl ManageAnnouncementsService {
                 "content_text trop long (max 4000)".into(),
             ));
         }
+        Self::validate_footer_text(cmd.embed_footer_text.as_deref())?;
         match cmd.recurrence_type {
             RecurrenceType::Once => {
                 if cmd.scheduled_at.is_none() {
@@ -184,6 +195,10 @@ impl ManageAnnouncementsService {
                 color: a.embed_color,
                 image_url: a.embed_image_url.clone(),
                 thumbnail_url: a.embed_thumbnail_url.clone(),
+                footer_text: a
+                    .embed_footer_text
+                    .as_deref()
+                    .map(|s| render_template(s, &ctx)),
             })
         } else {
             None
@@ -199,7 +214,6 @@ impl ManageAnnouncementsService {
             mentions_prefix: Self::build_mentions_prefix(a),
             buttons: a.buttons.clone(),
             auto_reactions: a.auto_reactions.clone(),
-            text_position: a.text_position,
         }
     }
 }
@@ -249,7 +263,7 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
             embed_color: cmd.embed_color,
             embed_image_url: cmd.embed_image_url,
             embed_thumbnail_url: cmd.embed_thumbnail_url,
-            text_position: cmd.text_position,
+            embed_footer_text: cmd.embed_footer_text,
             mention_everyone: cmd.mention_everyone,
             mention_here: cmd.mention_here,
             mention_role_ids: cmd.mention_role_ids,
@@ -270,6 +284,8 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         &self,
         cmd: UpdateAnnouncementCommand,
     ) -> Result<ScheduledAnnouncement, DomainError> {
+        Self::validate_footer_text(cmd.embed_footer_text.as_deref())?;
+
         let mut ann = self
             .repo
             .get_by_id(cmd.id)
@@ -308,7 +324,7 @@ impl ManageAnnouncementsUseCase for ManageAnnouncementsService {
         ann.embed_color = cmd.embed_color;
         ann.embed_image_url = cmd.embed_image_url;
         ann.embed_thumbnail_url = cmd.embed_thumbnail_url;
-        ann.text_position = cmd.text_position;
+        ann.embed_footer_text = cmd.embed_footer_text;
         ann.mention_everyone = cmd.mention_everyone;
         ann.mention_here = cmd.mention_here;
         ann.mention_role_ids = cmd.mention_role_ids;

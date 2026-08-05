@@ -33,6 +33,8 @@ struct RenderedEmbed {
     color: Option<i32>,
     image_url: Option<String>,
     thumbnail_url: Option<String>,
+    #[serde(default)]
+    footer_text: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -49,8 +51,6 @@ struct RenderedAnnouncement {
     buttons: serde_json::Value,
     #[serde(default)]
     auto_reactions: serde_json::Value,
-    #[serde(default)]
-    text_position: Option<String>,
 }
 
 /// Spawn la boucle d'annonces : aligne sur HH:00:00 UTC, puis tick

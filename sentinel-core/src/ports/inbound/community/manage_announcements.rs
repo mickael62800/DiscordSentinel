@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::community::announcement::{
     AnnouncementButton, AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType,
-    RecurrenceType, ScheduledAnnouncement, TextPosition,
+    RecurrenceType, ScheduledAnnouncement,
 };
 use crate::domain::errors::DomainError;
 
@@ -25,7 +25,7 @@ pub struct CreateAnnouncementCommand {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
-    pub text_position: TextPosition,
+    pub embed_footer_text: Option<String>,
     pub mention_everyone: bool,
     pub mention_here: bool,
     pub mention_role_ids: Vec<String>,
@@ -52,7 +52,7 @@ pub struct UpdateAnnouncementCommand {
     pub embed_color: Option<i32>,
     pub embed_image_url: Option<String>,
     pub embed_thumbnail_url: Option<String>,
-    pub text_position: TextPosition,
+    pub embed_footer_text: Option<String>,
     pub mention_everyone: bool,
     pub mention_here: bool,
     pub mention_role_ids: Vec<String>,
@@ -75,9 +75,6 @@ pub struct RenderedAnnouncement {
     pub mentions_prefix: String,
     pub buttons: Vec<AnnouncementButton>,
     pub auto_reactions: Vec<String>,
-    /// Ou placer le texte par rapport a l'image (envoi en 2 messages).
-    #[serde(default)]
-    pub text_position: TextPosition,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -87,6 +84,9 @@ pub struct RenderedEmbed {
     pub color: Option<i32>,
     pub image_url: Option<String>,
     pub thumbnail_url: Option<String>,
+    /// Rendu sous l'image par Discord.
+    #[serde(default)]
+    pub footer_text: Option<String>,
 }
 
 /// Resultat d'une passe de purge de l'historique (`announcement_runs`)

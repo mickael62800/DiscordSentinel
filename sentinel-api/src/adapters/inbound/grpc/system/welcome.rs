@@ -62,7 +62,6 @@ impl WelcomeService for WelcomeGrpc {
             rejoin_message: cfg.rejoin_message,
             welcome_title: cfg.welcome_title,
             welcome_image_url: cfg.welcome_image_url,
-            welcome_text_position: cfg.welcome_text_position,
             welcome_footer_text: cfg.welcome_footer_text,
             rejoin_title: cfg.rejoin_title,
             rejoin_image_url: cfg.rejoin_image_url,

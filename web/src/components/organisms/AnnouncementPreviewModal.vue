@@ -28,6 +28,7 @@ const emit = defineEmits<{ close: [] }>();
         <p class="prev-desc">{{ preview.embed.description }}</p>
         <img v-if="safeHttpsImageUrl(preview.embed.thumbnail_url)" :src="safeHttpsImageUrl(preview.embed.thumbnail_url)!" class="prev-thumb" />
         <img v-if="safeHttpsImageUrl(preview.embed.image_url)" :src="safeHttpsImageUrl(preview.embed.image_url)!" class="prev-img" />
+        <p v-if="preview.embed.footer_text" class="prev-footer">{{ preview.embed.footer_text }}</p>
       </div>
       <p v-else class="prev-text">{{ preview.content_text }}</p>
       <p class="muted small">
@@ -55,6 +56,14 @@ const emit = defineEmits<{ close: [] }>();
   border-radius: var(--radius-sm);
   float: right;
   margin-left: 10px;
+}
+/* Comme sur Discord : sous l'image, petit et gris. */
+.prev-footer {
+  white-space: pre-wrap;
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  clear: both;
 }
 .muted { color: var(--text-secondary); }
 .small { font-size: 12px; }

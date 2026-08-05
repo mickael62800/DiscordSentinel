@@ -20,7 +20,6 @@ export interface WelcomeConfig {
   welcome_dm_message: string;
   welcome_title: string;
   welcome_image_url: string;
-  welcome_text_position: "above" | "below";
   welcome_footer_text: string;
 
   leave_enabled: boolean;

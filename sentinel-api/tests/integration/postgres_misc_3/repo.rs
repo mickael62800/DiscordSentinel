@@ -210,7 +210,6 @@ fn sample_welcome(guild: &str) -> WelcomeConfigData {
         rejoin_message: "".into(),
         welcome_title: "".into(),
         welcome_image_url: "".into(),
-        welcome_text_position: "below".into(),
         welcome_footer_text: "".into(),
         rejoin_title: "".into(),
         rejoin_image_url: "".into(),

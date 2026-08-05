@@ -23,7 +23,6 @@ const draft = reactive({
   welcome_title: "",
   welcome_embed_color: "#5865F2",
   welcome_image_url: "",
-  welcome_text_position: "below" as "above" | "below",
   welcome_footer_text: "",
   welcome_dm_enabled: false,
   welcome_dm_message: "",
@@ -83,7 +82,6 @@ watch(
     draft.welcome_title = c.welcome_title;
     draft.welcome_embed_color = c.welcome_embed_color || "#5865F2";
     draft.welcome_image_url = c.welcome_image_url;
-    draft.welcome_text_position = c.welcome_text_position === "above" ? "above" : "below";
     draft.welcome_footer_text = c.welcome_footer_text;
     draft.welcome_dm_enabled = c.welcome_dm_enabled;
     draft.welcome_dm_message = c.welcome_dm_message;
@@ -144,7 +142,6 @@ async function onSave() {
     welcome_title: draft.welcome_title,
     welcome_embed_color: draft.welcome_embed_color,
     welcome_image_url: draft.welcome_image_url,
-    welcome_text_position: draft.welcome_text_position,
     welcome_footer_text: draft.welcome_footer_text,
     welcome_dm_enabled: draft.welcome_dm_enabled,
     welcome_dm_message: draft.welcome_dm_message,
@@ -213,12 +210,6 @@ async function onSave() {
         <label>Image
           <ImagePicker v-model="draft.welcome_image_url" />
         </label>
-        <label v-if="draft.welcome_image_url">Position du texte / à l'image
-          <select v-model="draft.welcome_text_position">
-            <option value="below">Texte en dessous (image en haut)</option>
-            <option value="above">Texte au-dessus (image en bas)</option>
-          </select>
-        </label>
         <label class="full">Message
           <AppTextarea v-model="draft.welcome_message" :rows="6" />
         </label>
@@ -241,14 +232,13 @@ async function onSave() {
       <details v-if="draft.welcome_enabled" class="preview">
         <summary>👁️ Aperçu</summary>
         <div class="preview-stack">
-          <!-- L'image occupe toute la largeur, en grand. -->
-          <figure v-if="draft.welcome_image_url" class="preview-image">
-            <img :src="draft.welcome_image_url" alt="Bannière de bienvenue" loading="lazy" />
-          </figure>
-          <!-- La carte du message vient juste en dessous, plus étroite. -->
+          <!-- Un seul message : l'image est dans l'embed, sous le texte. -->
           <div class="preview-embed" :style="{ borderLeftColor: draft.welcome_embed_color }">
             <strong v-if="draft.welcome_title">{{ draft.welcome_title }}</strong>
             <p>{{ previewWelcomeText }}</p>
+            <figure v-if="draft.welcome_image_url" class="preview-image">
+              <img :src="draft.welcome_image_url" alt="Bannière de bienvenue" loading="lazy" />
+            </figure>
             <small v-if="draft.welcome_footer_text">{{ draft.welcome_footer_text }}</small>
           </div>
         </div>
@@ -599,7 +589,7 @@ async function onSave() {
   margin-bottom: 10px;
 }
 
-/* Aperçu empilé : image en grand, puis la carte plus petite en dessous. */
+/* Aperçu : une seule carte embed, image incluse sous le texte. */
 .preview-stack {
   display: flex;
   flex-direction: column;
@@ -609,7 +599,7 @@ async function onSave() {
 }
 
 .preview-image {
-  margin: 0;
+  margin: 10px 0 0;
   width: 100%;
   line-height: 0;
   border: 1px solid var(--border);
@@ -624,7 +614,7 @@ async function onSave() {
 }
 
 .preview-embed {
-  /* La carte « rétrécit » sous l'image : largeur d'un embed Discord. */
+  /* Largeur d'un embed Discord. */
   width: 100%;
   max-width: 440px;
   padding: 14px;

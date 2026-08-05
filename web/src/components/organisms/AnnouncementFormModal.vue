@@ -55,7 +55,7 @@ interface FormState {
   embed_color_hex: string;
   embed_image_url: string;
   embed_thumbnail_url: string;
-  text_position: "above" | "below";
+  embed_footer_text: string;
   mention_everyone: boolean;
   mention_here: boolean;
   selected_role_ids: string[];
@@ -81,7 +81,7 @@ function emptyForm(): FormState {
     embed_color_hex: "#5865f2",
     embed_image_url: "",
     embed_thumbnail_url: "",
-    text_position: "below",
+    embed_footer_text: "",
     mention_everyone: false,
     mention_here: false,
     selected_role_ids: [],
@@ -128,7 +128,7 @@ watch(
         embed_color_hex: a.embed_color != null ? `#${a.embed_color.toString(16).padStart(6, "0")}` : "#5865f2",
         embed_image_url: a.embed_image_url ?? "",
         embed_thumbnail_url: a.embed_thumbnail_url ?? "",
-        text_position: a.text_position === "above" ? "above" : "below",
+        embed_footer_text: a.embed_footer_text ?? "",
         mention_everyone: a.mention_everyone,
         mention_here: a.mention_here,
         selected_role_ids: [...a.mention_role_ids],
@@ -242,7 +242,7 @@ function buildBody(): CreateAnnouncementBody {
     embed_color: f.content_type === "embed" && !Number.isNaN(colorInt) ? colorInt : null,
     embed_image_url: f.content_type === "embed" ? f.embed_image_url || null : null,
     embed_thumbnail_url: f.content_type === "embed" ? f.embed_thumbnail_url || null : null,
-    text_position: f.text_position,
+    embed_footer_text: f.content_type === "embed" ? f.embed_footer_text || null : null,
     mention_everyone: f.mention_everyone,
     mention_here: f.mention_here,
     mention_role_ids: f.selected_role_ids,
@@ -375,19 +375,20 @@ async function save() {
         </label>
       </div>
       <label>
-        Image (envoyée en grand, dans un message séparé)
+        Image (affichée en grand sous le texte de l'embed)
         <ImagePicker v-model="form.embed_image_url" />
-      </label>
-      <label v-if="form.embed_image_url">
-        Position du texte par rapport à l'image
-        <AppSelect v-model="form.text_position">
-          <option value="below">Texte en dessous (image en haut)</option>
-          <option value="above">Texte au-dessus (image en bas)</option>
-        </AppSelect>
       </label>
       <label>
         Vignette (petite, à droite)
         <ImagePicker v-model="form.embed_thumbnail_url" />
+      </label>
+      <label>
+        Texte sous l'image (footer)
+        <AppInput v-model="form.embed_footer_text" type="text" maxlength="2048" />
+        <small class="hint">
+          Seule zone de texte que Discord place sous l'image. Affichée en petit et en gris,
+          sans mise en forme ni mentions.
+        </small>
       </label>
     </template>
 

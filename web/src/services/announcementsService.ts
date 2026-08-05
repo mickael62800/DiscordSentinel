@@ -2,7 +2,6 @@ import { httpDelete, httpGet, httpPatch, httpPost } from "@/api/http";
 
 export type RecurrenceType = "once" | "daily" | "weekly" | "monthly" | "yearly";
 export type ContentType = "text" | "embed";
-export type TextPosition = "above" | "below";
 export type RunStatus = "pending" | "success" | "partial" | "error";
 
 export interface ScheduledAnnouncement {
@@ -25,7 +24,7 @@ export interface ScheduledAnnouncement {
   embed_color: number | null;
   embed_image_url: string | null;
   embed_thumbnail_url: string | null;
-  text_position: TextPosition;
+  embed_footer_text: string | null;
   mention_everyone: boolean;
   mention_here: boolean;
   mention_role_ids: string[];
@@ -45,6 +44,7 @@ export interface RenderedEmbed {
   color: number | null;
   image_url: string | null;
   thumbnail_url: string | null;
+  footer_text: string | null;
 }
 
 export interface AnnouncementButton {
@@ -112,7 +112,7 @@ export interface CreateAnnouncementBody {
   embed_color?: number | null;
   embed_image_url?: string | null;
   embed_thumbnail_url?: string | null;
-  text_position?: TextPosition;
+  embed_footer_text?: string | null;
   mention_everyone?: boolean;
   mention_here?: boolean;
   mention_role_ids?: string[];
