@@ -25,6 +25,7 @@ export const BANNIERES: Banniere[] = [
   { fichier: "reglement_embed_banner.jpg", libelle: "Règlement (illustré)", categorie: "Arrivées et départs" },
 
   // ── Communauté ──
+  { fichier: "site_banner.jpg", libelle: "Bannière du site (La Bande du Canapé)", categorie: "Communauté" },
   { fichier: "anniv_serveur_banner.jpg", libelle: "Anniversaire du serveur", categorie: "Communauté" },
   { fichier: "anniv_membre_banner.jpg", libelle: "Anniversaire d'arrivée (année de plus)", categorie: "Communauté" },
   { fichier: "member_mois_banner.jpg", libelle: "Membre du mois", categorie: "Communauté" },
