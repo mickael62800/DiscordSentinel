@@ -874,6 +874,123 @@ impl sentinel_api::ports::inbound::community::manage_announcements::ManageAnnoun
 }
 
 #[allow(dead_code)]
+pub struct StubEmbeds;
+#[async_trait]
+impl sentinel_api::ports::inbound::community::manage_embeds::ManageEmbedsUseCase for StubEmbeds {
+    async fn create(
+        &self,
+        _: &str,
+        _: &str,
+        _: sentinel_api::ports::inbound::community::manage_embeds::EmbedInput,
+    ) -> Result<sentinel_core::domain::entities::community::embed::Embed, DomainError> {
+        unimplemented!()
+    }
+    async fn update(
+        &self,
+        _: uuid::Uuid,
+        _: sentinel_api::ports::inbound::community::manage_embeds::EmbedInput,
+    ) -> Result<sentinel_core::domain::entities::community::embed::Embed, DomainError> {
+        unimplemented!()
+    }
+    async fn delete(&self, _: uuid::Uuid) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn get(
+        &self,
+        _: uuid::Uuid,
+    ) -> Result<sentinel_core::domain::entities::community::embed::Embed, DomainError> {
+        unimplemented!()
+    }
+    async fn list_by_guild(
+        &self,
+        _: &str,
+    ) -> Result<Vec<sentinel_core::domain::entities::community::embed::Embed>, DomainError> {
+        unimplemented!()
+    }
+    async fn prepare_post(
+        &self,
+        _: uuid::Uuid,
+        _: &str,
+    ) -> Result<sentinel_core::domain::entities::community::embed::RenderedEmbedPost, DomainError>
+    {
+        unimplemented!()
+    }
+    async fn prepare_edit(
+        &self,
+        _: uuid::Uuid,
+    ) -> Result<sentinel_core::domain::entities::community::embed::RenderedEmbedPost, DomainError>
+    {
+        unimplemented!()
+    }
+    async fn record_posted(&self, _: uuid::Uuid, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+}
+
+#[allow(dead_code)]
+pub struct StubIdeas;
+#[async_trait]
+impl sentinel_api::ports::inbound::community::manage_ideas::ManageIdeasUseCase for StubIdeas {
+    async fn list(
+        &self,
+        _: sentinel_api::ports::outbound::community::idea_repository::IdeaFilters<'_>,
+        _: i64,
+        _: i64,
+    ) -> Result<Vec<sentinel_core::domain::entities::community::idea::Idea>, DomainError> {
+        unimplemented!()
+    }
+    async fn get(
+        &self,
+        _: uuid::Uuid,
+    ) -> Result<sentinel_core::domain::entities::community::idea::Idea, DomainError> {
+        unimplemented!()
+    }
+    async fn get_detail(
+        &self,
+        _: uuid::Uuid,
+    ) -> Result<sentinel_core::domain::entities::community::idea::IdeaDetail, DomainError> {
+        unimplemented!()
+    }
+    async fn get_by_channel(
+        &self,
+        _: &str,
+    ) -> Result<Option<sentinel_core::domain::entities::community::idea::Idea>, DomainError> {
+        unimplemented!()
+    }
+    async fn create(
+        &self,
+        _: sentinel_api::ports::inbound::community::manage_ideas::CreateIdeaCommand,
+    ) -> Result<sentinel_core::domain::entities::community::idea::Idea, DomainError> {
+        unimplemented!()
+    }
+    async fn decide(
+        &self,
+        _: sentinel_api::ports::inbound::community::manage_ideas::DecideIdeaCommand,
+    ) -> Result<sentinel_core::domain::entities::community::idea::Idea, DomainError> {
+        unimplemented!()
+    }
+    async fn set_channel(
+        &self,
+        _: uuid::Uuid,
+        _: Option<&str>,
+    ) -> Result<sentinel_core::domain::entities::community::idea::Idea, DomainError> {
+        unimplemented!()
+    }
+    async fn add_message(
+        &self,
+        _: sentinel_api::ports::inbound::community::manage_ideas::AddIdeaMessageCommand,
+    ) -> Result<sentinel_core::domain::entities::community::idea::IdeaMessage, DomainError> {
+        unimplemented!()
+    }
+    async fn delete(&self, _: uuid::Uuid) -> Result<(), DomainError> {
+        unimplemented!()
+    }
+    async fn count_open_by_author(&self, _: &str, _: &str) -> Result<i64, DomainError> {
+        unimplemented!()
+    }
+}
+
+#[allow(dead_code)]
 pub struct StubConfessions;
 #[async_trait]
 impl sentinel_api::ports::inbound::community::manage_confessions::ManageConfessionsUseCase
@@ -2642,6 +2759,8 @@ fn base_state() -> AppState {
         snapshots_uc: Arc::new(StubSnapshots),
         levels_uc: Arc::new(StubLevels),
         announcements_uc: Arc::new(StubAnnouncements),
+        embeds_uc: Arc::new(StubEmbeds),
+        ideas_uc: Arc::new(StubIdeas),
         confessions_uc: Arc::new(StubConfessions),
         role_panels_uc: Arc::new(StubRolePanels),
         notes_uc: Arc::new(StubNotes),
