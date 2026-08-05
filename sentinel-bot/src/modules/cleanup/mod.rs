@@ -3,6 +3,7 @@
 pub const MODULE_BOT_NAME: &str = "cleanup";
 
 mod api_client;
+pub mod autopurge;
 pub mod cleanup_cmd;
 pub mod purge;
 

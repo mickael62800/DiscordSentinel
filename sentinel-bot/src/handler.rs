@@ -230,6 +230,7 @@ impl EventHandler for Handler {
         // publiees par announcement-worker.
         modules::announcements::spawn(ctx.clone());
         modules::embeds::spawn(ctx.clone());
+        modules::cleanup::autopurge::spawn(ctx.clone());
 
         // Confessions : consumer Redis stream pour synchroniser les
         // suppressions web -> Discord (delete confession ou reply).
