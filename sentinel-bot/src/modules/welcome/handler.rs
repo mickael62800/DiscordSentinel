@@ -78,8 +78,22 @@ async fn update_counter(
         return;
     };
     let Ok(ch) = ch_id.parse::<u64>() else { return };
+    let channel_id = ChannelId::new(ch);
     let name = counter_format.replace("{count}", &member_count.to_string());
-    if let Err(e) = ChannelId::new(ch)
+    // N'ecrit QUE si le nom change reellement : Discord limite les renommages a
+    // 2 / 10 min par salon. Un no-op gaspillerait ce quota (et le rafraichissement
+    // periodique renommerait sans arret).
+    if let Some(current) = channel_id
+        .to_channel(&ctx.http)
+        .await
+        .ok()
+        .and_then(|c| c.guild().map(|g| g.name))
+    {
+        if current == name {
+            return;
+        }
+    }
+    if let Err(e) = channel_id
         .edit(&ctx.http, EditChannel::new().name(&name))
         .await
     {
@@ -123,12 +137,80 @@ async fn update_voice_counter(
     }
     let Some(ch_id) = channel_id else { return };
     let Ok(ch) = ch_id.parse::<u64>() else { return };
+    let channel_id = ChannelId::new(ch);
     let name = format.replace("{count}", &voice_count.to_string());
-    if let Err(e) = ChannelId::new(ch)
+    // N'ecrit que si le nom change (cf. limite de rename Discord).
+    if let Some(current) = channel_id
+        .to_channel(&ctx.http)
+        .await
+        .ok()
+        .and_then(|c| c.guild().map(|g| g.name))
+    {
+        if current == name {
+            return;
+        }
+    }
+    if let Err(e) = channel_id
         .edit(&ctx.http, EditChannel::new().name(&name))
         .await
     {
         warn!(error = %e, "Echec mise a jour compteur vocal");
+    }
+}
+
+/// Recalcule et met a jour les compteurs (membres + vocal) pour une guild,
+/// SANS dependre d'un event join/leave. Appele periodiquement et au demarrage :
+/// sinon un compteur active alors que personne ne rejoint/part ne se met jamais
+/// a jour. Ne renomme le salon que si le nombre a change (rate limit Discord).
+pub async fn refresh_counters(ctx: &Context, guild_id: GuildId) {
+    if !is_module_enabled(
+        &ctx,
+        &guild_id.to_string(),
+        crate::modules::welcome::MODULE_BOT_NAME,
+    )
+    .await
+    {
+        return;
+    }
+
+    let (base, grpc) = {
+        let data = ctx.data.read().await;
+        let base = data.get::<ApiClientKey>().map(Arc::clone);
+        let grpc = data
+            .get::<crate::shared::grpc_client::GrpcClientKey>()
+            .map(Arc::clone);
+        match (base, grpc) {
+            (Some(b), Some(g)) => (b, g),
+            _ => return,
+        }
+    };
+    let api = WelcomeApiClient::new(base, grpc);
+    let config = match api.get_config(&guild_id.to_string()).await {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+
+    if config.counter_enabled {
+        let count = human_member_count(ctx, guild_id).await;
+        update_counter(
+            ctx,
+            true,
+            config.counter_channel_id.as_ref(),
+            &config.counter_format,
+            count,
+        )
+        .await;
+    }
+    if config.voice_counter_enabled {
+        let vcount = voice_member_count(ctx, guild_id);
+        update_voice_counter(
+            ctx,
+            true,
+            config.voice_counter_channel_id.as_ref(),
+            &config.voice_counter_format,
+            vcount,
+        )
+        .await;
     }
 }
 

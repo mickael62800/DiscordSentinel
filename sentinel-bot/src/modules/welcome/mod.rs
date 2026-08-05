@@ -71,6 +71,26 @@ pub fn spawn(ctx: Context) {
     if SPAWNED.swap(true, Ordering::SeqCst) {
         return;
     }
+
+    // Boucle de rafraichissement des compteurs (membres + vocal). Les events
+    // join/leave ne suffisent pas : un compteur active alors que personne ne
+    // bouge ne se mettrait jamais a jour. On repasse periodiquement sur chaque
+    // guild. `update_counter` ne renomme que si le nombre a change (rate limit).
+    {
+        let ctx = ctx.clone();
+        tokio::spawn(async move {
+            // Laisse le cache (membres, voice states) se peupler apres le boot.
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+            loop {
+                for guild_id in ctx.cache.guilds() {
+                    handler::refresh_counters(&ctx, guild_id).await;
+                }
+                // 10 min : sous la limite Discord de 2 renommages / 10 min / salon.
+                tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+            }
+        });
+    }
+
     tokio::spawn(async move {
         let consumer = crate::shared::event_bus::default_consumer_name();
         crate::shared::event_bus::listen_stream_group(
