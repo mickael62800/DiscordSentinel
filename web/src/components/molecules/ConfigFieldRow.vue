@@ -10,6 +10,7 @@ import CategorySelect from "../atoms/CategorySelect.vue";
 import RoleSelect from "../atoms/RoleSelect.vue";
 import IdMultiplierMapField from "./IdMultiplierMapField.vue";
 import IdsListPickerField from "./IdsListPickerField.vue";
+import ChannelScheduleEditor from "./ChannelScheduleEditor.vue";
 
 // Champs config qui stockent un mapping "id:valeur" en lignes/CSV. On
 // remplace le textarea brut par un picker (channel ou role) + valeur +
@@ -218,6 +219,13 @@ const mapDefaults = computed(() => {
       :model-value="modelValue"
       :guild-id="guildId"
       :kind="isRoleList ? 'role' : (isVoiceChannelList ? 'channel-voice' : 'channel')"
+      @update:model-value="update"
+    />
+
+    <ChannelScheduleEditor
+      v-else-if="field.type === 'channel_schedule_list'"
+      :model-value="modelValue"
+      :guild-id="guildId"
       @update:model-value="update"
     />
 

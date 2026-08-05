@@ -58,7 +58,8 @@ const enumFields = computed(() => configFields.value.filter((f) => f.type === "e
 const voiceFields = computed(() => configFields.value.filter((f) => f.type === "voice"));
 const listFields = computed(() =>
   configFields.value.filter((f) =>
-    f.type === "channel_list" || f.type === "role_list" || f.type === "voice_list",
+    f.type === "channel_list" || f.type === "role_list" || f.type === "voice_list"
+    || f.type === "channel_schedule_list",
   ),
 );
 
@@ -78,7 +79,7 @@ const shortTextFields = computed(() =>
  */
 const TYPES_CLASSES = new Set([
   "boolean", "number", "enum", "channel", "voice", "category", "role",
-  "channel_list", "role_list", "voice_list", "text",
+  "channel_list", "role_list", "voice_list", "channel_schedule_list", "text",
 ]);
 
 /**

@@ -25,6 +25,17 @@ const DISCORD_BULK_DELETE_MAX_AGE_SECS: i64 = 14 * 24 * 60 * 60;
 /// historique au 1er nettoyage ; le reste part au tick suivant).
 const MAX_PAGES_PER_RUN: usize = 30;
 
+/// Une entree du programme d'auto-nettoyage : un salon + sa frequence en heures.
+#[derive(serde::Deserialize)]
+struct ScheduleEntry {
+    channel_id: String,
+    #[serde(default = "default_hours")]
+    hours: u64,
+}
+fn default_hours() -> u64 {
+    24
+}
+
 pub fn spawn(ctx: Context) {
     use std::sync::atomic::{AtomicBool, Ordering};
     static STARTED: AtomicBool = AtomicBool::new(false);
@@ -57,16 +68,20 @@ async fn tick(ctx: &Context, last: &mut HashMap<(u64, u64), Instant>) {
         {
             continue;
         }
-        let interval_h = BaseApiClient::config_u64(&cfg, "autopurge_interval_hours", 24).max(1);
         let grace_h = BaseApiClient::config_u64(&cfg, "autopurge_grace_hours", 0);
         let keep_bot = BaseApiClient::config_bool(&cfg, "autopurge_keep_bot", false);
         let do_log = BaseApiClient::config_bool(&cfg, "autopurge_log", true);
-        let channels_csv = BaseApiClient::config_or(&cfg, "autopurge_channel_ids", "");
 
-        for id_str in channels_csv.split(',') {
-            let Ok(cid) = id_str.trim().parse::<u64>() else {
+        // Programme par salon : [{channel_id, hours}, ...] (JSON).
+        let schedule_json = BaseApiClient::config_or(&cfg, "autopurge_schedule", "");
+        let schedule: Vec<ScheduleEntry> =
+            serde_json::from_str(&schedule_json).unwrap_or_default();
+
+        for entry in &schedule {
+            let Ok(cid) = entry.channel_id.trim().parse::<u64>() else {
                 continue;
             };
+            let interval_h = entry.hours.max(1);
             let key = (guild_id.get(), cid);
             let due = match last.get(&key) {
                 Some(t) => t.elapsed() >= Duration::from_secs(interval_h * 3600),
