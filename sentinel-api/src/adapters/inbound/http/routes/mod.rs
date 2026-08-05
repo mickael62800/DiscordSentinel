@@ -13,6 +13,7 @@ pub mod community;
 pub mod dashboard;
 pub mod guild_backup;
 pub mod guild_structure;
+pub mod idea;
 pub mod members;
 pub mod moderation;
 pub mod progression;

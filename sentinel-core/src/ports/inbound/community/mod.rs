@@ -1,6 +1,7 @@
 pub mod check_eligibility;
 pub mod manage_announcements;
 pub mod manage_embeds;
+pub mod manage_ideas;
 pub mod manage_bump;
 pub mod evaluate_age_declaration;
 pub mod manage_confessions;

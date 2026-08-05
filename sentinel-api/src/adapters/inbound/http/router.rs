@@ -90,6 +90,7 @@ fn protected_domain_routes() -> Router<AppState> {
         .merge(routes::bot::routes())
         // App-facing routes (nested by domain)
         .merge(routes::ticket::routes())
+        .merge(routes::idea::routes())
         .merge(routes::security::routes())
         .merge(routes::automod::routes())
         .merge(routes::moderation::routes())

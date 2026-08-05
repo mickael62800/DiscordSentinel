@@ -73,6 +73,7 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "community.life", path: "/vie-communaute", label: "Vie de la communauté", icon: "heart" },
   { key: "community.confessions", path: "/confessions", label: "Confessions", icon: "edit-3" },
   { key: "community.tickets", path: "/tickets", label: "Tickets", icon: "ticket", requiredBot: "ticket-bot" },
+  { key: "community.ideas", path: "/ideas", label: "Idées", icon: "lightbulb", requiredBot: "idea-bot" },
   { key: "community.voice-channels", path: "/voice-channels", label: "Vocaux", icon: "mic", requiredBot: "voice-bot" },
   { key: "community.role-panels", path: "/role-panels", label: "Panneaux de rôles", icon: "users", requiredBot: "community-bot" },
   { key: "community.levels", path: "/levels", label: "Niveaux", icon: "trending-up", requiredBot: "progression-bot" },

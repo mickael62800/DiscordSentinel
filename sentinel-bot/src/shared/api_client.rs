@@ -537,6 +537,33 @@ impl BaseApiClient {
         }
     }
 
+    /// PATCH JSON vers l'API, avec la reponse deserialisee. A utiliser quand
+    /// l'appelant doit confirmer le resultat (ex : afficher l'erreur de
+    /// validation renvoyee par l'API a l'utilisateur Discord).
+    pub async fn patch_json<B: serde::Serialize, T: serde::de::DeserializeOwned>(
+        &self,
+        path: &str,
+        body: &B,
+    ) -> Result<T, String> {
+        let req = self
+            .client
+            .patch(format!("{}{}", self.base_url, path))
+            .json(body);
+        let resp = self
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| network_error_message("PATCH", path, &e.to_string()))?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(friendly_api_error("PATCH", path, status, &text));
+        }
+        resp.json::<T>()
+            .await
+            .map_err(|e| parse_error_message("PATCH", path, &e.to_string()))
+    }
+
     /// PATCH JSON vers l'API. Fire-and-forget avec log d'erreur.
     pub async fn patch_fire_and_forget<B: serde::Serialize>(&self, path: &str, body: &B) {
         let req = self

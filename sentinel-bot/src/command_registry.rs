@@ -34,6 +34,7 @@ pub(crate) fn module_commands(bot_name: &str) -> Vec<CreateCommand> {
         "moderation-bot" => modules::moderation::register_commands(),
         "voice-bot" => modules::voice::register_commands(),
         "ticket-bot" => modules::tickets::register_commands(),
+        "idea-bot" => modules::ideas::register_commands(),
         // confessions a deux commandes /confess et /confess-admin :
         // register_commands() existe sur le module mais avec attribut allow.
         // On l'utilise ici officiellement.
@@ -57,6 +58,7 @@ pub const BOT_NAMES_WITH_COMMANDS: &[&str] = &[
     "moderation-bot",
     "voice-bot",
     "ticket-bot",
+    "idea-bot",
     "confessions",
     "guild-backup-bot",
     "nasa-apod-bot",

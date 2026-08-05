@@ -7,6 +7,7 @@ pub mod daily_activity;
 pub mod eligibility;
 pub mod embed;
 pub mod guild_member;
+pub mod idea;
 pub mod guild_member_reset;
 pub mod level;
 pub mod monthly_ranking;

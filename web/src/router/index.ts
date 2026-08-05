@@ -80,6 +80,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/vie-communaute", name: "community-life", component: () => import("../components/pages/CommunityLifePage.vue") },
   { path: "/confessions", name: "confessions", component: () => import("../components/pages/ConfessionsPage.vue") },
   { path: "/tickets", name: "tickets", component: () => import("../components/pages/TicketsPage.vue") },
+  { path: "/ideas", name: "ideas", component: () => import("../components/pages/IdeasPage.vue") },
   // Vocaux : salons + thèmes réunis en onglets (VoiceHubPage).
   { path: "/voice-channels", name: "voice-channels", component: () => import("../components/pages/VoiceHubPage.vue") },
   { path: "/voice-themes", redirect: "/voice-channels" },

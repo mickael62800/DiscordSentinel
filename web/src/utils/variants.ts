@@ -227,3 +227,21 @@ export function eventIcon(type: string): string {
   };
   return icons[type] ?? "?";
 }
+
+/** Couleur du badge de statut d'une idee (voir IdeaStatus cote Rust). */
+export function ideaStatusVariant(status: string): BadgeVariant {
+  switch (status) {
+    case "nouvelle":
+      return "info";
+    case "en_discussion":
+      return "warning";
+    case "acceptee":
+      return "success";
+    case "refusee":
+      return "danger";
+    case "realisee":
+      return "success";
+    default:
+      return "default";
+  }
+}

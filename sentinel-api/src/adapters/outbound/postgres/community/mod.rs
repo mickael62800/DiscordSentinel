@@ -1,6 +1,7 @@
 pub mod age_ban_repository;
 pub mod announcement_repository;
 pub mod embed_repository;
+pub mod idea_repository;
 pub mod bump_repository;
 pub mod confession_repository;
 pub mod daily_activity_repository;

@@ -20,6 +20,7 @@ pub mod presence;
 pub mod progression;
 pub mod rotation;
 pub mod security;
+pub mod ideas;
 pub mod tickets;
 pub mod voice;
 pub mod welcome;

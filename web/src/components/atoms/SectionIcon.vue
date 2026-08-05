@@ -28,6 +28,9 @@ defineProps<{ name: string }>();
     <template v-else-if="name === 'ticket'">
       <path d="M2 9a3 3 0 013-3h14a3 3 0 013 3v6a3 3 0 01-3 3H5a3 3 0 01-3-3V9z" /><path d="M9 6v12" /><path d="M15 6v12" />
     </template>
+    <template v-else-if="name === 'lightbulb'">
+      <path d="M9 18h6" /><path d="M10 22h4" /><path d="M12 2a7 7 0 00-4 12.7V17h8v-2.3A7 7 0 0012 2z" />
+    </template>
     <template v-else-if="name === 'mic'">
       <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" /><path d="M19 10v2a7 7 0 01-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" />
     </template>

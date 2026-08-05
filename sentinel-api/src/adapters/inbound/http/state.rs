@@ -69,6 +69,7 @@ pub struct AppState {
     pub levels_uc: Arc<dyn ManageLevelsUseCase>,
     pub announcements_uc: Arc<dyn crate::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase>,
     pub embeds_uc: Arc<dyn crate::ports::inbound::community::manage_embeds::ManageEmbedsUseCase>,
+    pub ideas_uc: Arc<dyn crate::ports::inbound::community::manage_ideas::ManageIdeasUseCase>,
     pub confessions_uc: Arc<dyn crate::ports::inbound::community::manage_confessions::ManageConfessionsUseCase>,
     pub role_panels_uc: Arc<dyn ManageRolePanelsUseCase>,
     pub notes_uc: Arc<dyn ManageNotesUseCase>,

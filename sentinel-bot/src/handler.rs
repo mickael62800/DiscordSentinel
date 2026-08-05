@@ -37,6 +37,7 @@ fn command_module(name: &str) -> &'static str {
         | "modstats" | "evidence" | "review" | "template" | "transcript" | "export"
         | "massmute" | "massban" | "copilote" => "moderation",
         "ticket" | "ticket-admin" => "tickets",
+        "idee" => "ideas",
         "confess" | "confess-admin" => "confessions",
         "backup" => "guild_backup",
         "logs-init" => "logs_setup",
@@ -212,6 +213,10 @@ impl EventHandler for Handler {
         modules::tickets::on_ready(&ctx, &ready).await;
         modules::tickets::spawn_background(ctx.clone());
 
+        // Idees: consumer des decisions prises depuis le web
+        modules::ideas::on_ready(&ctx, &ready).await;
+        modules::ideas::spawn_background(ctx.clone());
+
         // Progression: hydrate voice sessions + tick periodique credit XP
         modules::progression::on_ready(&ctx, &ready).await;
         modules::progression::spawn_voice_tick(ctx.clone());
@@ -271,6 +276,7 @@ impl EventHandler for Handler {
         modules::progression::on_message(&ctx, &msg).await;
         modules::voice::on_message(&ctx, &msg).await;
         modules::tickets::on_message(&ctx, &msg).await;
+        modules::ideas::on_message(&ctx, &msg).await;
         modules::ai_dataset::on_message(&ctx, &msg).await;
     }
 
@@ -624,6 +630,7 @@ impl EventHandler for Handler {
                         "ticket" | "ticket-admin" => {
                             modules::tickets::handle_command(&ctx, &command).await
                         }
+                        "idee" => modules::ideas::handle_command(&ctx, &command).await,
                         "confess" | "confess-admin" => {
                             modules::confessions::handle_command(&ctx, &command).await
                         }
@@ -694,6 +701,8 @@ impl EventHandler for Handler {
                     modules::voice::on_component(&ctx, &component).await;
                 } else if modules::tickets::handles_component(cid) {
                     modules::tickets::on_component(&ctx, &component).await;
+                } else if modules::ideas::handles_component(cid) {
+                    modules::ideas::on_component(&ctx, &component).await;
                 } else if modules::guild_backup::handles_component(cid) {
                     modules::guild_backup::on_component(&ctx, &component).await;
                 }
@@ -704,6 +713,8 @@ impl EventHandler for Handler {
                     modules::voice::on_modal(&ctx, &modal).await;
                 } else if modules::tickets::handles_modal(mcid) {
                     modules::tickets::on_modal(&ctx, &modal).await;
+                } else if modules::ideas::handles_modal(mcid) {
+                    modules::ideas::on_modal(&ctx, &modal).await;
                 } else if modules::confessions::handles_modal(mcid) {
                     modules::confessions::on_modal(&ctx, &modal).await;
                 } else if modules::welcome::handles_modal(mcid) {
