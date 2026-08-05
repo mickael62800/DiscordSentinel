@@ -11,7 +11,7 @@
 use std::time::Duration;
 
 use sentinel_core::domain::services::bump::detection::{
-    is_provider_bot, provider_by_key, provider_for_message, resolve_bumper, BumpAction,
+    is_provider_bot, provider_by_key, provider_for_message_configured, resolve_bumper, BumpAction,
     BumpMessageFacts, EmbedFacts, UserFacts, DISBOARD,
 };
 use serenity::all::MessageInteractionMetadata;
@@ -112,11 +112,36 @@ pub async fn on_message_update(
 /// Appele pour chaque message : si c'est une confirmation de bump reussie d'un
 /// provider connu, recompense l'auteur du /bump.
 pub async fn on_message(ctx: &Context, msg: &Message) {
+    // Seuls les bots (plateformes) postent des confirmations de bump.
+    if !msg.author.bot {
+        return;
+    }
+    let Some(guild_id) = msg.guild_id else { return };
+    let guild_id = guild_id.to_string();
+
+    // Config lue AVANT le matching : les bot_id des plateformes sont configures
+    // par serveur (`{provider}_bot_id`). Master switch d'abord.
+    let cfg =
+        crate::shared::discord_helpers::guild_config_or_default(ctx, &guild_id, MODULE_BOT_NAME)
+            .await;
+    if !BaseApiClient::config_bool(&cfg, "enabled", false) {
+        return;
+    }
+
     let facts = message_facts(msg);
-    let Some(provider) = provider_for_message(&facts) else {
-        // Un bot PROVIDER connu (bon bot_id) a poste un embed qu'aucune action
-        // (bump/vote) n'a reconnu : probablement un changement de format du
-        // provider -> a recalibrer. Log defensif (rare, uniquement en cas de casse).
+
+    // Resolveur : bot_id configure pour une plateforme (0 = non defini -> le
+    // core retombe sur le bot_id par defaut, non nul pour Disboard/DiscordL).
+    let bot_id_for = |key: &str| -> u64 {
+        BaseApiClient::config_or(&cfg, &format!("{key}_bot_id"), "")
+            .trim()
+            .parse::<u64>()
+            .unwrap_or(0)
+    };
+
+    let Some(provider) = provider_for_message_configured(&facts, bot_id_for) else {
+        // Un bot a poste un embed sans correspondre a une plateforme connue :
+        // log defensif si c'est un provider a bot_id par defaut (format change ?).
         if is_provider_bot(msg.author.id.get()) && !msg.embeds.is_empty() {
             warn!(
                 bot_id = msg.author.id.get(),
@@ -127,8 +152,6 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         }
         return;
     };
-    let Some(guild_id) = msg.guild_id else { return };
-    let guild_id = guild_id.to_string();
 
     let detected_success = (provider.detect)(&facts);
     let bumper_id = resolve_bumper(&facts).map(UserId::new);
@@ -143,14 +166,6 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
     let Some(bumper_id) = bumper_id else { return };
     if !detected_success {
-        return;
-    }
-
-    // Module actif pour cette guild ?
-    let cfg =
-        crate::shared::discord_helpers::guild_config_or_default(ctx, &guild_id, MODULE_BOT_NAME)
-            .await;
-    if !BaseApiClient::config_bool(&cfg, "enabled", false) {
         return;
     }
 

@@ -55,6 +55,10 @@ impl ManageBumpUseCase for ManageBumpService {
         let cooldown_default = match provider.as_str() {
             "discordl" => 240,
             "discordl_vote" => 720,
+            "frenchgg" => 120,
+            "discadia" => 1440,
+            "topgg" => 720,
+            "spacebump" => 360,
             _ => cfg_i64(&cfg, "bump_cooldown_minutes", 120),
         };
         let cooldown = cfg_i64(&cfg, &format!("{provider}_cooldown_minutes"), cooldown_default)

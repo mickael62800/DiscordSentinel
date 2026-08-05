@@ -109,19 +109,133 @@ pub const DISCORDL_VOTE: BumpProvider = BumpProvider {
     detect: detect_discordl_vote,
 };
 
-/// Registre des plateformes supportees.
-pub static PROVIDERS: &[BumpProvider] = &[DISBOARD, DISCORDL, DISCORDL_VOTE];
+// ── Plateformes a bot_id CONFIGURABLE (French GG, Discadia, top.gg, Spacebump) ─
+//
+// Leur bot_id n'est pas universel : il se regle par serveur (cle `{key}_bot_id`
+// dans la config bump-bot). Tant qu'aucun bot_id n'est configure, elles restent
+// inertes (`bot_id: 0` -> aucune correspondance). La detection est GENERIQUE :
+// un succes = un embed present et aucun mot de cooldown/echec. C'est ce qui
+// fiabilise ces plateformes sans parser leur format exact.
 
-/// Provider correspondant a CE message : bon bot_id ET bonne action.
+/// `matches` generique : le bot a poste un embed (les plateformes repondent au
+/// /bump par un embed). Comme chaque plateforme a un bot_id distinct, pas besoin
+/// de discriminer l'action ici.
+fn generic_matches(facts: &BumpMessageFacts) -> bool {
+    !facts.embeds.is_empty()
+}
+
+/// `detect` generique : succes = embed present ET aucun mot de cooldown/echec.
+fn generic_success(facts: &BumpMessageFacts) -> bool {
+    if facts.embeds.is_empty() {
+        return false;
+    }
+    let text = facts
+        .embeds
+        .iter()
+        .flat_map(|e| {
+            [
+                e.title.as_deref().unwrap_or(""),
+                e.description.as_deref().unwrap_or(""),
+            ]
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase();
+    const COOLDOWN_WORDS: &[&str] = &[
+        "wait", "minute", "patient", "cooldown", "seconde", "second", "already",
+        "deja", "déjà", "prochain", "heure", "hour", "attends", "encore",
+        "trop tot", "trop tôt", "next bump", "come back", "revenir", "reviens",
+    ];
+    !COOLDOWN_WORDS.iter().any(|w| text.contains(w))
+}
+
+/// French GG (bot_id configurable).
+pub const FRENCH_GG: BumpProvider = BumpProvider {
+    bot_id: 0,
+    key: "frenchgg",
+    display: "French GG",
+    bump_hint: "/bump (French GG)",
+    action: BumpAction::Bump,
+    default_cooldown_min: 120,
+    matches: generic_matches,
+    detect: generic_success,
+};
+
+/// Discadia (bot_id configurable).
+pub const DISCADIA: BumpProvider = BumpProvider {
+    bot_id: 0,
+    key: "discadia",
+    display: "Discadia",
+    bump_hint: "/bump (Discadia)",
+    action: BumpAction::Bump,
+    default_cooldown_min: 1440,
+    matches: generic_matches,
+    detect: generic_success,
+};
+
+/// top.gg — vote (bot_id configurable).
+pub const TOPGG: BumpProvider = BumpProvider {
+    bot_id: 0,
+    key: "topgg",
+    display: "top.gg",
+    bump_hint: "/vote (top.gg)",
+    action: BumpAction::Vote,
+    default_cooldown_min: 720,
+    matches: generic_matches,
+    detect: generic_success,
+};
+
+/// Spacebump (bot_id configurable).
+pub const SPACEBUMP: BumpProvider = BumpProvider {
+    bot_id: 0,
+    key: "spacebump",
+    display: "Spacebump",
+    bump_hint: "/bump (Spacebump)",
+    action: BumpAction::Bump,
+    default_cooldown_min: 360,
+    matches: generic_matches,
+    detect: generic_success,
+};
+
+/// Registre des plateformes supportees.
+pub static PROVIDERS: &[BumpProvider] = &[
+    DISBOARD,
+    DISCORDL,
+    DISCORDL_VOTE,
+    FRENCH_GG,
+    DISCADIA,
+    TOPGG,
+    SPACEBUMP,
+];
+
+/// Provider correspondant a CE message, en utilisant les bot_id CONFIGURES par
+/// guild. `bot_id_for(key)` renvoie le bot_id configure (0 = non defini -> on
+/// retombe sur le bot_id par defaut du provider, non nul pour Disboard/DiscordL).
+/// Un provider ne matche que si son bot_id effectif est non nul ET egal a
+/// l'auteur du message ET que son `matches` (action) est satisfait.
+pub fn provider_for_message_configured<F: Fn(&str) -> u64>(
+    facts: &BumpMessageFacts,
+    bot_id_for: F,
+) -> Option<&'static BumpProvider> {
+    PROVIDERS.iter().find(|p| {
+        let configured = bot_id_for(p.key);
+        let effective = if configured != 0 { configured } else { p.bot_id };
+        effective != 0 && effective == facts.author_id && (p.matches)(facts)
+    })
+}
+
+/// Provider correspondant a CE message via les bot_id PAR DEFAUT uniquement
+/// (Disboard/DiscordL). Conserve pour compat/tests ; le bot utilise la variante
+/// configuree.
 pub fn provider_for_message(facts: &BumpMessageFacts) -> Option<&'static BumpProvider> {
     PROVIDERS
         .iter()
-        .find(|p| p.bot_id == facts.author_id && (p.matches)(facts))
+        .find(|p| p.bot_id != 0 && p.bot_id == facts.author_id && (p.matches)(facts))
 }
 
-/// Un provider connu poste-t-il avec ce bot_id ? (filtre rapide a l'edition).
+/// Un provider a bot_id PAR DEFAUT (Disboard/DiscordL) poste-t-il avec ce bot_id ?
 pub fn is_provider_bot(bot_id: u64) -> bool {
-    PROVIDERS.iter().any(|p| p.bot_id == bot_id)
+    PROVIDERS.iter().any(|p| p.bot_id != 0 && p.bot_id == bot_id)
 }
 
 pub fn provider_by_key(key: &str) -> Option<&'static BumpProvider> {
