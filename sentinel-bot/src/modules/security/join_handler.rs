@@ -146,7 +146,7 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
         }
     };
 
-    if !BaseApiClient::config_bool(&guild_config, "enabled", true) {
+    if !BaseApiClient::config_bool(&guild_config, "enabled", false) {
         return;
     }
 

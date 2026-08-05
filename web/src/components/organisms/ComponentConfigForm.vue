@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
+import { parseBoolConfig } from "@/utils/configFlags";
 import { botConfigService } from "@/services/botConfigService";
 import { useToast } from "../../composables/useToast";
 import { clampNumberValue } from "../../utils/clampNumber";
@@ -111,7 +112,7 @@ const visibleSections = computed(() => {
 
 const allTogglesOn = computed(() =>
   booleanFields.value.length > 0
-  && booleanFields.value.every((f) => formValues.value[f.key] === "true" || formValues.value[f.key] === "1"),
+  && booleanFields.value.every((f) => parseBoolConfig(formValues.value[f.key])),
 );
 
 function enableAllToggles() {
@@ -149,8 +150,8 @@ function isFieldDisabled(field: ConfigField, visited: Set<string> = new Set()): 
   // 1) check direct sur la valeur du parent
   const v = formValues.value[dep.key];
   let directlyDisabled: boolean;
-  if (dep.equals === "true") directlyDisabled = !(v === "true" || v === "1");
-  else if (dep.equals === "false") directlyDisabled = !(v === "false" || v === "0" || v === undefined || v === "");
+  if (dep.equals === "true") directlyDisabled = !parseBoolConfig(v);
+  else if (dep.equals === "false") directlyDisabled = parseBoolConfig(v);
   else if (dep.equals === "") directlyDisabled = v === undefined || v === "" || v === "0" || v === "false";
   else directlyDisabled = v !== dep.equals;
 

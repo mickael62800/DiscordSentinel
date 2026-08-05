@@ -42,7 +42,7 @@ pub async fn handle_voice_state_update(ctx: &Context, old: &Option<VoiceState>, 
                 .await
             {
                 Ok(config) => {
-                    if !BaseApiClient::config_bool(&config, "enabled", true) {
+                    if !BaseApiClient::config_bool(&config, "enabled", false) {
                         return;
                     }
                     let public_id = config

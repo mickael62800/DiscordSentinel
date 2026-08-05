@@ -2,13 +2,15 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import type { BotGuildConfig } from "@/types";
 import { botConfigService } from "@/services/botConfigService";
+import { parseBoolConfig } from "@/utils/configFlags";
 
 /**
  * Store Pinia : etat enabled/disabled des bots pour la guild courante.
  *
- * Convention : un bot est ENABLED par defaut. Il n'est DISABLED que si
- * une row existe avec config_key="enabled" ET config_value="false".
- * (Match la logique cote bot, fail-open.)
+ * Convention : un bot est DISABLED par defaut. Il n'est ENABLED que si une
+ * row existe avec config_key="enabled" et une valeur vraie. Miroir exact de
+ * `parse_enabled_flag` cote Rust (fail-closed) : le dashboard doit montrer
+ * ce que le bot fait reellement, pas l'inverse.
  *
  * Visible dans Vue DevTools sous "botEnabledStatus".
  */
@@ -25,7 +27,7 @@ export const useBotEnabledStatusStore = defineStore("botEnabledStatus", () => {
     const map: Record<string, boolean> = {};
     for (const c of configs.value) {
       if (c.config_key === "enabled") {
-        map[c.bot_name] = c.config_value === "true" || c.config_value === "1";
+        map[c.bot_name] = parseBoolConfig(c.config_value);
       }
     }
     return map;
@@ -74,13 +76,13 @@ export const useBotEnabledStatusStore = defineStore("botEnabledStatus", () => {
   }
 
   /**
-   * True si le bot est actif sur la guild courante (default = true).
-   * Si pas de guild selectionnee → true (mode global).
+   * True si le bot est actif sur la guild courante (default = false).
+   * Tant que les configs ne sont pas chargees, on ne prejuge de rien et on
+   * repond false : mieux vaut afficher un module inactif une fraction de
+   * seconde que promettre un module actif qui ne l'est pas.
    */
   function isBotEnabled(botName: string): boolean {
-    if (configs.value.length === 0) return true;
-    const v = enabledMap.value[botName];
-    return v === undefined ? true : v;
+    return enabledMap.value[botName] === true;
   }
 
   return {

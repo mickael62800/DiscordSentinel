@@ -188,7 +188,7 @@ pub async fn shutdown_signal() {
 // ── Worker Enabled Check ──
 
 /// Verifie si un worker est active pour une guild donnee.
-/// Retourne `true` par defaut si la cle n'est pas definie (comportement inclusif).
+/// Fail-closed : sans ligne `enabled` explicite, le worker ne tourne pas.
 pub async fn is_worker_enabled(pool: &PgPool, guild_id: &str, worker_name: &str) -> bool {
     let result: Option<String> = sqlx::query_scalar(
         "SELECT config_value FROM bot_guild_config \

@@ -32,9 +32,9 @@ impl Config {
         Self { raw }
     }
 
-    /// Composant active pour cette guild ? (defaut: true)
+    /// Composant active pour cette guild ? (defaut: false, fail-closed)
     pub fn enabled(&self) -> bool {
-        BaseApiClient::config_bool(&self.raw, "enabled", true)
+        BaseApiClient::config_bool(&self.raw, "enabled", false)
     }
 
     /// Quota de snapshots conserves (defaut: 10). Les plus anciens au-dela sont

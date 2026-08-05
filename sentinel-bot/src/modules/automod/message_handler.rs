@@ -56,7 +56,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     )
     .await;
 
-    if !BaseApiClient::config_bool(&config, "enabled", true) {
+    if !BaseApiClient::config_bool(&config, "enabled", false) {
         return;
     }
 

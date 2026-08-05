@@ -118,7 +118,7 @@ impl ManageMonthlyRankingUseCase for ManageMonthlyRankingService {
             let cfg = self.load_config(guild_id).await;
 
             // Module + feature actifs ?
-            if !cfg_bool(&cfg, "enabled", true) || !cfg_bool(&cfg, "monthly_ranking_enabled", false)
+            if !cfg_bool(&cfg, "enabled", false) || !cfg_bool(&cfg, "monthly_ranking_enabled", false)
             {
                 plan.skipped += 1;
                 continue;

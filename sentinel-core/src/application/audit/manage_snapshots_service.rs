@@ -54,7 +54,7 @@ impl ManageSnapshotsService {
 use crate::domain::entities::system::bot_config::{cfg_bool, cfg_i64, cfg_str};
 
 fn module_enabled(entries: &[BotGuildConfig]) -> bool {
-    cfg_bool(entries, "enabled", true)
+    cfg_bool(entries, "enabled", false)
 }
 
 #[async_trait]

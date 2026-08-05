@@ -299,7 +299,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     };
 
     let guild_config = guild_config_or_default(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await;
-    if !BaseApiClient::config_bool(&guild_config, "enabled", true) {
+    if !BaseApiClient::config_bool(&guild_config, "enabled", false) {
         return;
     }
 

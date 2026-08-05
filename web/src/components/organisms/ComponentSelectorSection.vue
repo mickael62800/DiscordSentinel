@@ -17,9 +17,10 @@ const emit = defineEmits<{
 // apres invalidation du store (la closure casse le tracking).
 const { enabledMap } = useBotEnabledStatus();
 
+// Fail-closed, comme le bot : sans ligne `enabled` explicite, le module est
+// inactif et la carte s'affiche en rouge avec le badge OFF.
 function isOn(botName: string): boolean {
-  const v = enabledMap.value[botName];
-  return v === undefined ? true : v;
+  return enabledMap.value[botName] === true;
 }
 </script>
 

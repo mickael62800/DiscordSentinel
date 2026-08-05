@@ -150,6 +150,11 @@ pub async fn reply_ephemeral_embed(
 
 /// Verifie si le module est active pour un guild. Charge la config sous le
 /// `bot_name` du module (ex: "automod-bot") et check la cle "enabled".
+///
+/// Fail-closed : sans ligne `enabled` explicite, ou si la config est
+/// illisible, le module reste inactif. Un module desactive dans le dashboard
+/// ne doit jamais agir, y compris pendant une panne de l'API — c'etait le cas
+/// avant, ou l'echec de lecture valait « actif ».
 pub async fn is_bot_enabled(
     api: &super::api_client::BaseApiClient,
     guild_id: &str,
@@ -158,16 +163,16 @@ pub async fn is_bot_enabled(
     let config = match api.get_guild_config_for(guild_id, module_bot_name).await {
         Ok(cfg) => cfg,
         Err(e) => {
-            warn!(guild_id = %guild_id, module = %module_bot_name, error = %e, "Impossible de verifier si le module est active, presume actif");
-            return true;
+            warn!(guild_id = %guild_id, module = %module_bot_name, error = %e, "Impossible de verifier si le module est active, presume inactif");
+            return false;
         }
     };
-    super::api_client::BaseApiClient::config_bool(&config, "enabled", true)
+    super::api_client::BaseApiClient::config_bool(&config, "enabled", false)
 }
 
 /// Variante de `is_bot_enabled` qui extrait l'ApiClient du TypeMap directement.
-/// Retourne `true` par defaut si l'ApiClient est absent ou l'appel API echoue
-/// (fail-open : on prefere laisser passer que bloquer tout le bot).
+/// Retourne `false` si l'ApiClient est absent ou si l'appel API echoue
+/// (fail-closed : un module ne tourne que s'il est explicitement active).
 ///
 /// `module_bot_name` doit correspondre a une ligne dans `bot_definitions`
 /// (ex: "automod-bot", "voice-bot", ...).
@@ -175,7 +180,7 @@ pub async fn is_module_enabled(ctx: &Context, guild_id: &str, module_bot_name: &
     let data = ctx.data.read().await;
     match data.get::<super::heartbeat::ApiClientKey>() {
         Some(api) => is_bot_enabled(api, guild_id, module_bot_name).await,
-        None => true,
+        None => false,
     }
 }
 

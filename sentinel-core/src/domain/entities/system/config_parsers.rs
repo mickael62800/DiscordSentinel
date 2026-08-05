@@ -14,11 +14,17 @@ pub fn parse_bool_str(v: &str) -> bool {
     matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes")
 }
 
-/// Flag d'activation d'un module : ABSENT = activé (comportement inclusif),
-/// présent = `parse_bool_str`. Sémantique unique pour tous les gardes
-/// `enabled` per-guild (bot, API, worker).
+/// Flag d'activation d'un module : ABSENT = DÉSACTIVÉ, présent =
+/// `parse_bool_str`. Sémantique unique pour tous les gardes `enabled`
+/// per-guild (bot, API, worker) et miroir de `parseBoolConfig` côté web.
+///
+/// Fail-closed : un module n'agit sur un serveur que si quelqu'un l'a
+/// explicitement activé. Avant, l'absence de ligne valait « actif », ce qui
+/// faisait tourner des modules que le dashboard présentait comme inactifs.
+/// Conséquence assumée : après ce changement, chaque module doit être activé
+/// depuis la page Composants pour reprendre du service.
 pub fn parse_enabled_flag(value: Option<&str>) -> bool {
-    value.map(parse_bool_str).unwrap_or(true)
+    value.map(parse_bool_str).unwrap_or(false)
 }
 
 /// Parse un flag booleen depuis un map de config. Accepte (insensible a

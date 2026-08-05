@@ -175,7 +175,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
         let user_id = cmd.user_id.as_str().to_string();
         let config = self.load_config(&guild_id).await;
 
-        if !config_bool(&config, "enabled", true) {
+        if !config_bool(&config, "enabled", false) {
             return Ok(skipped_result(&guild_id, &user_id, &cmd.username, XpSource::Text));
         }
 
@@ -271,7 +271,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
         let user_id = cmd.user_id.as_str().to_string();
         let config = self.load_config(&guild_id).await;
 
-        if !config_bool(&config, "enabled", true) {
+        if !config_bool(&config, "enabled", false) {
             return Ok(skipped_result(&guild_id, &user_id, &cmd.username, XpSource::Voice));
         }
 
