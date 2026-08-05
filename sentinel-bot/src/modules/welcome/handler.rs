@@ -44,22 +44,40 @@ enum AgeCheckDecisionResponse {
 /// Compte les HUMAINS (hors bots) via le cache de la guild ; repli sur le
 /// compte approximatif Discord (qui inclut les bots) si le cache est vide.
 async fn human_member_count(ctx: &Context, guild_id: GuildId) -> u64 {
-    // On se base sur le TOTAL fiable de Discord (`member_count`, maintenu par
-    // serenity sur add/remove) auquel on retranche les bots vus dans le cache.
-    // Compter directement les humains du cache donnait des resultats faux ("1")
-    // quand le cache n'est pas entierement peuple. Les bots, eux, sont quasi
-    // toujours en cache -> total - bots ≈ humains exacts.
-    if let Some(g) = ctx.cache.guild(guild_id) {
-        let total = g.member_count;
-        let bots = g.members.values().filter(|m| m.user.bot).count() as u64;
-        return total.saturating_sub(bots);
+    // Compte EXACT des humains via la liste HTTP des membres (List Guild
+    // Members, pagine par lots de 1000). On exclut les bots (`user.bot`).
+    //
+    // On ne se fie plus a `member_count - bots_du_cache` : quand le cache des
+    // membres n'est pas (encore) peuple, aucun bot n'y figure -> les bots
+    // etaient comptes comme des humains. L'appel HTTP, lui, renvoie toujours le
+    // flag bot correct (l'intent GUILD_MEMBERS est requis et actif : sans lui
+    // le bot ne se connecterait pas).
+    let mut humans: u64 = 0;
+    let mut after: Option<serenity::model::id::UserId> = None;
+    loop {
+        match guild_id.members(&ctx.http, Some(1000), after).await {
+            Ok(batch) if !batch.is_empty() => {
+                humans += batch.iter().filter(|m| !m.user.bot).count() as u64;
+                if batch.len() < 1000 {
+                    break;
+                }
+                after = batch.last().map(|m| m.user.id);
+            }
+            Ok(_) => break,
+            Err(e) => {
+                warn!(error = %e, "Compteur : echec fetch membres HTTP, repli cache");
+                // Repli sur le cache (total - bots vus). Peut inclure des bots
+                // si le cache est vide, mais mieux que 0.
+                if let Some(g) = ctx.cache.guild(guild_id) {
+                    let total = g.member_count;
+                    let bots = g.members.values().filter(|m| m.user.bot).count() as u64;
+                    return total.saturating_sub(bots);
+                }
+                return humans;
+            }
+        }
     }
-    // Pas de cache : repli sur le compte approximatif (inclut les bots).
-    guild_id
-        .to_partial_guild_with_counts(&ctx.http)
-        .await
-        .map(|g| g.approximate_member_count.unwrap_or(0))
-        .unwrap_or(0)
+    humans
 }
 
 /// Renomme le salon compteur avec le nombre de membres. Independant des
