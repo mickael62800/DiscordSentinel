@@ -5,6 +5,7 @@ import { botConfigService } from "@/services/botConfigService";
 import { useToast } from "../../composables/useToast";
 import { clampNumberValue } from "../../utils/clampNumber";
 import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
+import { RouterLink } from "vue-router";
 import AppToggle from "../atoms/AppToggle.vue";
 import ConfigFieldRow from "../molecules/ConfigFieldRow.vue";
 
@@ -44,9 +45,22 @@ const successMessage = ref("");
 
 const isWorker = computed(() => props.definition.bot_name.endsWith("-worker"));
 
+// Modules dont la config DETAILLEE vit sur une page dediee (UX riche). Ici on
+// n'affiche QUE l'interrupteur `enabled` pour eviter le doublon de reglages
+// (le reste se configure sur la page dediee -> voir DEDICATED_PAGE).
+const DEDICATED_CONFIG: Record<string, { label: string; path: string }> = {
+  "welcome-bot": { label: "la page Bienvenue", path: "/welcome" },
+};
+const dedicated = computed(() => DEDICATED_CONFIG[props.definition.bot_name] ?? null);
+
 const configFields = computed<ConfigField[]>(() => {
   const schema = props.definition.config_schema;
-  return Array.isArray(schema) ? schema : [];
+  const all = Array.isArray(schema) ? schema : [];
+  // Module a page dediee : on ne garde que l'interrupteur principal.
+  if (dedicated.value) {
+    return all.filter((f) => f.key === "enabled");
+  }
+  return all;
 });
 
 const booleanFields = computed(() => configFields.value.filter((f) => f.type === "boolean"));
@@ -269,6 +283,12 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
         effet au prochain redémarrage du worker.
       </div>
 
+      <!-- Notice module a page dediee : ici juste l'interrupteur, le reste ailleurs -->
+      <div v-if="dedicated" class="worker-notice">
+        Ici tu actives/désactives le module. Toute la configuration détaillée
+        se fait sur <RouterLink :to="dedicated.path" class="dedicated-link">{{ dedicated.label }}</RouterLink>.
+      </div>
+
       <!-- Section toggles -->
       <div v-if="booleanFields.length > 0" class="toggles-section">
         <div class="section-title-row">
@@ -374,6 +394,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
 .no-params { color: var(--text-secondary); font-size: 14px; padding: 20px 0; }
 
 /* Notice info discrete pour les workers (config figee au demarrage). */
+.dedicated-link { color: var(--accent); font-weight: 600; }
 .worker-notice {
   display: flex;
   align-items: center;
