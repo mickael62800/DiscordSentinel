@@ -272,7 +272,7 @@ pub fn spawn_background(ctx: Context) {
             for d in due {
                 let provider = provider_by_key(&d.provider).unwrap_or(&DISBOARD);
                 if let Ok(cid) = d.channel_id.parse::<u64>() {
-                    let text = if provider.action == BumpAction::Vote {
+                    let base_text = if provider.action == BumpAction::Vote {
                         format!(
                             "⏰ Tu peux **voter** à nouveau pour le serveur sur **{}** ! Faites `{}` — et gagnez des coins.",
                             provider.display, provider.bump_hint
@@ -283,7 +283,31 @@ pub fn spawn_background(ctx: Context) {
                             provider.display, provider.bump_hint
                         )
                     };
-                    let _ = ChannelId::new(cid).say(&ctx.http, text).await;
+
+                    // Role a pinger (optionnel), configurable sur la page web.
+                    let cfg = crate::shared::discord_helpers::guild_config_or_default(
+                        &ctx,
+                        &d.guild_id,
+                        MODULE_BOT_NAME,
+                    )
+                    .await;
+                    let role_id = BaseApiClient::config_or(&cfg, "bump_reminder_role_id", "")
+                        .trim()
+                        .parse::<u64>()
+                        .ok();
+
+                    let mut msg = serenity::builder::CreateMessage::new();
+                    if let Some(rid) = role_id {
+                        msg = msg
+                            .content(format!("<@&{rid}> {base_text}"))
+                            .allowed_mentions(
+                                serenity::builder::CreateAllowedMentions::new()
+                                    .roles(vec![serenity::model::id::RoleId::new(rid)]),
+                            );
+                    } else {
+                        msg = msg.content(base_text);
+                    }
+                    let _ = ChannelId::new(cid).send_message(&ctx.http, msg).await;
                 }
                 // Best-effort : on marque envoye meme si le post echoue, pour ne
                 // pas spammer le rappel a chaque tick.
