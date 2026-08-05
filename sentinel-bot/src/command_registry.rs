@@ -24,7 +24,7 @@ use crate::modules;
 /// ecoute juste les events Discord, automod-bot scan les messages, etc.).
 pub(crate) fn module_commands(bot_name: &str) -> Vec<CreateCommand> {
     match bot_name {
-        "cleanup-bot" => modules::cleanup::register_commands(),
+        "cleanup" => modules::cleanup::register_commands(),
         "community-bot" => modules::community::register_commands(),
         "audit-bot" => modules::audit::register_commands(),
         "progression-bot" => modules::progression::register_commands(),
@@ -48,7 +48,7 @@ pub(crate) fn module_commands(bot_name: &str) -> Vec<CreateCommand> {
 /// Liste de tous les bot_names qui ont des commandes slash. Utilise
 /// au boot pour iterer.
 pub const BOT_NAMES_WITH_COMMANDS: &[&str] = &[
-    "cleanup-bot",
+    "cleanup",
     "community-bot",
     "audit-bot",
     "progression-bot",

@@ -1,6 +1,6 @@
 //! Module cleanup — /purge et /cleanup (ex cleanup-bot).
 
-pub const MODULE_BOT_NAME: &str = "cleanup-bot";
+pub const MODULE_BOT_NAME: &str = "cleanup";
 
 mod api_client;
 pub mod cleanup_cmd;

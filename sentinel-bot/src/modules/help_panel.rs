@@ -140,7 +140,7 @@ const CATEGORIES: &[Section] = &[
     ("🌌 Espace", &[("nasa-apod-bot", "🌌 Photo de l'espace (NASA)")]),
     ("💾 Sauvegarde", &[("guild-backup-bot", "💾 Sauvegarde")]),
     ("📊 Audit", &[("audit-bot", "📊 Audit")]),
-    ("🧹 Nettoyage", &[("cleanup-bot", "🧹 Nettoyage")]),
+    ("🧹 Nettoyage", &[("cleanup", "🧹 Nettoyage")]),
 ];
 
 /// Deploie les panneaux sur toutes les guilds connues (appele une fois au boot).
