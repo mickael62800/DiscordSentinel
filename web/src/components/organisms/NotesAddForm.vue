@@ -56,7 +56,7 @@ async function onAdd() {
         <AppTextarea v-model="draft.content" :rows="3" required />
       </label>
       <div class="actions">
-        <AppButton variant="primary" type="submit"  :disabled="!canSubmit">Ajouter</AppButton>
+        <AppButton variant="primary" type="submit" :disabled="!canSubmit">Ajouter</AppButton>
       </div>
     </form>
   </section>

@@ -117,7 +117,7 @@ async function onSave() {
       </div>
 
       <div class="actions">
-        <AppButton variant="primary" type="submit"  :disabled="saving">
+        <AppButton variant="primary" type="submit" :disabled="saving">
           {{ saving ? "Enregistrement…" : "Enregistrer la config" }}
         </AppButton>
       </div>

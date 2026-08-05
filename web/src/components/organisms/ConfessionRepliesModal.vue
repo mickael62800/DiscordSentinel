@@ -36,7 +36,7 @@ async function onDelete(r: ConfessionReply) {
             <span v-if="r.is_anonymous" class="badge">anonyme</span>
             <span v-else class="badge">{{ r.author_user_id }}</span>
             <span class="muted small">{{ fmtDate(r.created_at) }}</span>
-            <AppButton variant="danger" size="xs" v-if="!r.deleted_at"  @click="onDelete(r)">🗑</AppButton>
+            <AppButton variant="danger" size="xs" v-if="!r.deleted_at" @click="onDelete(r)">🗑</AppButton>
           </div>
           <div class="reply-content">
             <span v-if="r.deleted_at" class="muted">[supprimée]</span>

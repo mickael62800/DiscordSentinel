@@ -185,7 +185,7 @@ watch(lookupUserId, async (id) => {
           <AppTextarea v-model="draft.description" :rows="2" />
         </label>
         <div class="actions">
-          <AppButton variant="primary" type="submit"  :disabled="!draft.url.trim()">
+          <AppButton variant="primary" type="submit" :disabled="!draft.url.trim()">
             Joindre
           </AppButton>
         </div>

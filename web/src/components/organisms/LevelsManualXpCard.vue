@@ -71,7 +71,7 @@ async function grant() {
         </AppSelect>
       </label>
       <div class="actions full">
-        <AppButton variant="primary" type="submit"  :disabled="granting">
+        <AppButton variant="primary" type="submit" :disabled="granting">
           {{ granting ? "…" : "Attribuer" }}
         </AppButton>
       </div>

@@ -54,7 +54,7 @@ watch(
             placeholder="ID Discord de l'utilisateur (ex: 123456789012345678)"
             type="text"
           />
-          <AppButton variant="secondary" v-if="sharedUserId"  @click="sharedUserId = ''">
+          <AppButton variant="secondary" v-if="sharedUserId" @click="sharedUserId = ''">
             Effacer
           </AppButton>
         </div>

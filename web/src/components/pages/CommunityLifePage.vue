@@ -280,7 +280,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
           </div>
 
           <div class="cl-form-foot">
-            <AppButton variant="primary" type="submit"  :disabled="busy">Enregistrer</AppButton>
+            <AppButton variant="primary" type="submit" :disabled="busy">Enregistrer</AppButton>
             <AppButton variant="ghost" @click="newsEdite = null">Annuler</AppButton>
           </div>
         </form>
@@ -363,7 +363,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
           <AppCheckbox v-model="formPoll.is_public">Visible par les visiteurs non connectés</AppCheckbox>
 
           <div class="cl-form-foot">
-            <AppButton variant="primary" type="submit"  :disabled="busy || !optionsValides">
+            <AppButton variant="primary" type="submit" :disabled="busy || !optionsValides">
               Ouvrir le sondage
             </AppButton>
             <AppButton variant="ghost" @click="sondageOuvert = false">Annuler</AppButton>
@@ -450,7 +450,7 @@ const expire = (iso: string) => new Date(iso) <= new Date();
           </label>
 
           <div class="cl-form-foot">
-            <AppButton variant="primary" type="submit"  :disabled="busy">Désigner</AppButton>
+            <AppButton variant="primary" type="submit" :disabled="busy">Désigner</AppButton>
             <AppButton variant="ghost" @click="designationOuverte = false">Annuler</AppButton>
           </div>
         </form>

@@ -115,10 +115,10 @@ async function doReset() {
 
       <template #footer>
         <button class="btn-ghost" :disabled="submitting" @click="closeDialog">Annuler</button>
-        <AppButton variant="danger" v-if="step === 1"  @click="step = 2">
+        <AppButton variant="danger" v-if="step === 1" @click="step = 2">
           Je comprends, continuer
         </AppButton>
-        <AppButton variant="danger" v-else  :disabled="!canConfirm" @click="doReset">
+        <AppButton variant="danger" v-else :disabled="!canConfirm" @click="doReset">
           {{ submitting ? "Suppression…" : "Tout supprimer définitivement" }}
         </AppButton>
       </template>

@@ -169,7 +169,7 @@ const tabs = [
       Surveillance des attaques, intégrité et protections actives.
     </template>
     <template #actions>
-      <AppButton variant="danger" v-if="canManage"  :disabled="cleaning" @click="showCleanupModal = true">🗑 Tout nettoyer</AppButton>
+      <AppButton variant="danger" v-if="canManage" :disabled="cleaning" @click="showCleanupModal = true">🗑 Tout nettoyer</AppButton>
       <AppButton variant="primary" :disabled="refreshing" @click="refreshAll">
         {{ refreshing ? "Actualisation…" : "↻ Actualiser tout" }}
       </AppButton>
@@ -244,7 +244,7 @@ const tabs = [
             <ul v-if="jail.banned_ips.length > 0" class="ip-list">
               <li v-for="ip in jail.banned_ips" :key="ip" class="ip-pill">
                 <code>{{ ip }}</code>
-                <AppButton variant="secondary" size="xs" v-if="canManage"  @click="unbanIp(ip)" title="Débannir">↻ Débannir</AppButton>
+                <AppButton variant="secondary" size="xs" v-if="canManage" @click="unbanIp(ip)" title="Débannir">↻ Débannir</AppButton>
               </li>
             </ul>
             <div v-else class="muted small">Aucune IP actuellement bannie sur cette jail.</div>
@@ -274,7 +274,7 @@ const tabs = [
               <td class="small mono">{{ b.banned_by ?? "—" }}</td>
               <td class="small">{{ b.reason ?? "—" }}</td>
               <td>
-                <AppButton variant="secondary" size="xs" v-if="canManage"  @click="unbanIp(b.ip)">↻ Débannir</AppButton>
+                <AppButton variant="secondary" size="xs" v-if="canManage" @click="unbanIp(b.ip)">↻ Débannir</AppButton>
               </td>
             </tr>
           </tbody>
