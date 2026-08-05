@@ -9,6 +9,17 @@ pub struct DueReminder {
     pub provider: String,
 }
 
+/// Etat d'un (guild, provider) pour la carte de statut : dernier bump + cooldown
+/// -> permet de calculer quand la plateforme est de nouveau disponible.
+#[derive(Debug, Clone)]
+pub struct BumpState {
+    pub provider: String,
+    pub channel_id: String,
+    /// Instant du dernier bump (RFC3339).
+    pub last_bump_at: chrono::DateTime<chrono::Utc>,
+    pub cooldown_minutes: i64,
+}
+
 /// Resultat d'un enregistrement de bump (recompense + info VIP).
 #[derive(Debug, Clone)]
 pub struct BumpReward {

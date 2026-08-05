@@ -15,8 +15,9 @@ use sentinel_core::domain::services::bump::detection::{
     BumpMessageFacts, EmbedFacts, UserFacts, DISBOARD,
 };
 use serenity::all::MessageInteractionMetadata;
+use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage, EditMessage};
 use serenity::model::channel::Message;
-use serenity::model::id::{ChannelId, UserId};
+use serenity::model::id::{ChannelId, MessageId, UserId};
 use serenity::prelude::*;
 use tracing::{debug, info, warn};
 
@@ -261,6 +262,102 @@ fn default_provider() -> String {
     "disboard".to_string()
 }
 
+/// Etat d'un provider renvoye par `/api/bump/{guild}/status`.
+#[derive(serde::Deserialize)]
+struct BumpStatus {
+    provider: String,
+    ready_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Rafraichit la carte de statut des bumps de chaque guild : un message unique
+/// dans le salon des bumps qui liste chaque plateforme (dispo maintenant, ou
+/// re-dispo `<t:TS:R>` — compte a rebours qui defile en direct cote Discord).
+/// La carte est EDITEE en place (memorisee en memoire par guild).
+async fn refresh_status_cards(ctx: &Context, cards: &mut std::collections::HashMap<u64, (u64, u64)>) {
+    let api = {
+        let data = ctx.data.read().await;
+        data.get::<ApiClientKey>().cloned()
+    };
+    let Some(api) = api else { return };
+
+    for guild_id in ctx.cache.guilds() {
+        let gid = guild_id.to_string();
+        let cfg =
+            crate::shared::discord_helpers::guild_config_or_default(ctx, &gid, MODULE_BOT_NAME)
+                .await;
+        if !BaseApiClient::config_bool(&cfg, "enabled", false) {
+            continue;
+        }
+        let Ok(channel_id) = BaseApiClient::config_or(&cfg, "bump_channel_id", "")
+            .trim()
+            .parse::<u64>()
+        else {
+            continue;
+        };
+
+        let statuses: Vec<BumpStatus> = api
+            .get_json(&format!("/api/bump/{gid}/status"))
+            .await
+            .unwrap_or_default();
+        if statuses.is_empty() {
+            continue; // rien a afficher -> pas de carte vide
+        }
+
+        let now = chrono::Utc::now();
+        let mut lines: Vec<String> = Vec::new();
+        for s in &statuses {
+            let Some(p) = provider_by_key(&s.provider) else {
+                continue;
+            };
+            let line = if s.ready_at <= now {
+                format!(
+                    "✅ **{}** — disponible **maintenant** ! `{}`",
+                    p.display, p.bump_hint
+                )
+            } else {
+                let verb = if p.action == BumpAction::Vote {
+                    "vote"
+                } else {
+                    "bump"
+                };
+                format!(
+                    "⏳ **{}** — {} possible <t:{}:R>",
+                    p.display,
+                    verb,
+                    s.ready_at.timestamp()
+                )
+            };
+            lines.push(line);
+        }
+        if lines.is_empty() {
+            continue;
+        }
+
+        let embed = CreateEmbed::new()
+            .title("🚀 État des bumps & votes")
+            .description(lines.join("\n"))
+            .color(0x5865F2)
+            .footer(CreateEmbedFooter::new(
+                "Mise à jour automatique · les ⏳ défilent en direct",
+            ));
+
+        let ch = ChannelId::new(channel_id);
+        // Edite la carte existante (meme salon), sinon en poste une nouvelle.
+        let edited = match cards.get(&guild_id.get()).copied() {
+            Some((c, m)) if c == channel_id => ch
+                .edit_message(&ctx.http, MessageId::new(m), EditMessage::new().embed(embed.clone()))
+                .await
+                .is_ok(),
+            _ => false,
+        };
+        if !edited {
+            if let Ok(msg) = ch.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
+                cards.insert(guild_id.get(), (channel_id, msg.id.get()));
+            }
+        }
+    }
+}
+
 /// Tache de fond : poste un rappel quand le cooldown de bump est ecoule.
 ///
 /// Idempotent : `ready()` refire a chaque reconnexion Discord, mais on ne veut
@@ -272,6 +369,22 @@ pub fn spawn_background(ctx: Context) {
     if STARTED.swap(true, Ordering::SeqCst) {
         return;
     }
+
+    // Carte de statut : editee toutes les 5 min (les <t:R> defilent en direct
+    // entre deux rafraichissements). Ref du message gardee en memoire par guild.
+    {
+        let ctx = ctx.clone();
+        tokio::spawn(async move {
+            let mut cards: std::collections::HashMap<u64, (u64, u64)> =
+                std::collections::HashMap::new();
+            tokio::time::sleep(Duration::from_secs(45)).await;
+            loop {
+                refresh_status_cards(&ctx, &mut cards).await;
+                tokio::time::sleep(Duration::from_secs(300)).await;
+            }
+        });
+    }
+
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;

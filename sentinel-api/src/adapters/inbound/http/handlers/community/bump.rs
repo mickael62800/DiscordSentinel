@@ -114,3 +114,37 @@ pub async fn mark_reminder_sent(
         .await?;
     Ok(Json(serde_json::json!({ "ok": true })))
 }
+
+#[derive(Debug, serde::Serialize)]
+pub struct BumpStatusDto {
+    pub provider: String,
+    pub channel_id: String,
+    pub last_bump_at: chrono::DateTime<chrono::Utc>,
+    pub cooldown_minutes: i64,
+    /// Instant de re-disponibilite (last_bump_at + cooldown), pour la carte.
+    pub ready_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// GET /api/bump/{guild_id}/status — etat par provider (carte de statut du bot).
+pub async fn guild_status(
+    State(state): State<AppState>,
+    ValidatedGuild { guild_id }: ValidatedGuild,
+) -> Result<Json<Vec<BumpStatusDto>>, ApiError> {
+    let states = state.bump_uc.guild_status(&guild_id).await?;
+    Ok(Json(
+        states
+            .into_iter()
+            .map(|s| {
+                let ready_at =
+                    s.last_bump_at + chrono::Duration::minutes(s.cooldown_minutes.max(0));
+                BumpStatusDto {
+                    provider: s.provider,
+                    channel_id: s.channel_id,
+                    last_bump_at: s.last_bump_at,
+                    cooldown_minutes: s.cooldown_minutes,
+                    ready_at,
+                }
+            })
+            .collect(),
+    ))
+}

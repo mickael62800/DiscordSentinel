@@ -17,6 +17,10 @@ fn inner() -> Router<AppState> {
             post(handlers::community::bump::mark_reminder_sent),
         )
         .route(
+            "/{guild_id}/status",
+            get(handlers::community::bump::guild_status),
+        )
+        .route(
             "/{guild_id}/{user_id}",
             post(handlers::community::bump::record_bump),
         )

@@ -148,4 +148,11 @@ impl ManageBumpUseCase for ManageBumpService {
             .mark_reminder_sent(guild_id, normalized.as_deref())
             .await
     }
+
+    async fn guild_status(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<crate::domain::entities::community::bump::BumpState>, DomainError> {
+        self.repo.guild_states(guild_id).await
+    }
 }

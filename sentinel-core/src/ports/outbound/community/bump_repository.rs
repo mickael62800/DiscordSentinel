@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::community::bump::DueReminder;
+use crate::domain::entities::community::bump::{BumpState, DueReminder};
 use crate::domain::errors::DomainError;
 
 #[async_trait]
@@ -38,4 +38,6 @@ pub trait BumpRepository: Send + Sync {
         guild_id: &str,
         provider: Option<&str>,
     ) -> Result<(), DomainError>;
+    /// Etats bump (par provider) d'une guild, pour la carte de statut.
+    async fn guild_states(&self, guild_id: &str) -> Result<Vec<BumpState>, DomainError>;
 }

@@ -2284,6 +2284,12 @@ impl sentinel_core::ports::inbound::community::manage_bump::ManageBumpUseCase fo
     ) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn guild_status(
+        &self,
+        _: &str,
+    ) -> Result<Vec<sentinel_core::domain::entities::community::bump::BumpState>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 pub struct StubEligibility;

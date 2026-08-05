@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::community::bump::{BumpReward, DueReminder};
+use crate::domain::entities::community::bump::{BumpReward, BumpState, DueReminder};
 use crate::domain::errors::DomainError;
 
 /// Commande d'enregistrement d'un bump constate par le bot.
@@ -27,4 +27,6 @@ pub trait ManageBumpUseCase: Send + Sync {
         guild_id: &str,
         provider: Option<String>,
     ) -> Result<(), DomainError>;
+    /// Etats bump d'une guild (carte de statut : dispo / en cooldown).
+    async fn guild_status(&self, guild_id: &str) -> Result<Vec<BumpState>, DomainError>;
 }
