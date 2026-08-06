@@ -613,6 +613,7 @@ impl EventHandler for Handler {
                         "purge" | "cleanup" => {
                             modules::cleanup::handle_command(&ctx, &command).await
                         }
+                        "bump-statut" => modules::bump::handle_command(&ctx, &command).await,
                         "roles-panel" | "parrain" => {
                             modules::community::handle_command(&ctx, &command).await
                         }

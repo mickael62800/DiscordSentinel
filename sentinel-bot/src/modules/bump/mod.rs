@@ -10,6 +10,20 @@
 
 use std::time::Duration;
 
+mod command;
+
+use serenity::all::{CommandInteraction, CreateCommand};
+
+/// Slash commands du module bump (enregistrees si le module est actif).
+pub fn register_commands() -> Vec<CreateCommand> {
+    vec![command::register()]
+}
+
+/// Dispatch de `/bump-statut`.
+pub async fn handle_command(ctx: &Context, interaction: &CommandInteraction) {
+    command::handle(ctx, interaction).await;
+}
+
 use sentinel_core::domain::services::bump::detection::{
     is_provider_bot, provider_by_key, provider_for_message_configured, resolve_bumper, BumpAction,
     BumpMessageFacts, EmbedFacts, UserFacts, DISBOARD, PROVIDERS,
@@ -273,99 +287,127 @@ struct BumpStatus {
 /// dans le salon des bumps qui liste chaque plateforme (dispo maintenant, ou
 /// re-dispo `<t:TS:R>` — compte a rebours qui defile en direct cote Discord).
 /// La carte est EDITEE en place (memorisee en memoire par guild).
-async fn refresh_status_cards(ctx: &Context, cards: &mut std::collections::HashMap<u64, (u64, u64)>) {
+/// Ref `(channel_id, message_id)` de la carte de statut par guild. PARTAGE entre
+/// la boucle de fond et la commande `/bump-statut`, pour qu'elles editent LA
+/// MEME carte : sinon la commande posterait un doublon que la boucle continue
+/// d'ignorer (elle rafraichit l'ancien message).
+static STATUS_CARDS: once_cell::sync::Lazy<Mutex<std::collections::HashMap<u64, (u64, u64)>>> =
+    once_cell::sync::Lazy::new(|| Mutex::new(std::collections::HashMap::new()));
+
+/// Issue d'un rafraichissement de carte pour une guild — sert a la commande
+/// pour repondre precisement pourquoi rien ne s'affiche.
+pub(crate) enum CardRefresh {
+    Posted,
+    Disabled,
+    NoChannel,
+    NoPlatforms,
+}
+
+/// Rafraichit la carte de CHAQUE guild (boucle de fond).
+async fn refresh_all_cards(ctx: &Context) {
+    for guild_id in ctx.cache.guilds() {
+        let _ = refresh_guild_card(ctx, guild_id.get()).await;
+    }
+}
+
+/// Construit + poste/edite la carte de statut d'UNE guild.
+///
+/// Un message unique dans le salon des bumps, qui liste chaque plateforme
+/// activee (dispo maintenant, ou re-dispo `<t:TS:R>` — compte a rebours qui
+/// defile en direct cote Discord). La carte est EDITEE en place (ref memorisee
+/// dans `STATUS_CARDS`).
+pub(crate) async fn refresh_guild_card(ctx: &Context, guild_id: u64) -> CardRefresh {
     let api = {
         let data = ctx.data.read().await;
         data.get::<ApiClientKey>().cloned()
     };
-    let Some(api) = api else { return };
+    let Some(api) = api else { return CardRefresh::Disabled };
 
-    for guild_id in ctx.cache.guilds() {
-        let gid = guild_id.to_string();
-        let cfg =
-            crate::shared::discord_helpers::guild_config_or_default(ctx, &gid, MODULE_BOT_NAME)
-                .await;
-        if !BaseApiClient::config_bool(&cfg, "enabled", false) {
+    let gid = guild_id.to_string();
+    let cfg =
+        crate::shared::discord_helpers::guild_config_or_default(ctx, &gid, MODULE_BOT_NAME).await;
+    if !BaseApiClient::config_bool(&cfg, "enabled", false) {
+        return CardRefresh::Disabled;
+    }
+    let Ok(channel_id) = BaseApiClient::config_or(&cfg, "bump_channel_id", "")
+        .trim()
+        .parse::<u64>()
+    else {
+        return CardRefresh::NoChannel;
+    };
+
+    // Etats connus (cooldown en cours), indexes par provider. Une plateforme
+    // jamais bumpee n'a PAS de ligne ici -> elle est simplement "dispo".
+    let statuses: Vec<BumpStatus> = api
+        .get_json(&format!("/api/bump/{gid}/status"))
+        .await
+        .unwrap_or_default();
+    let ready_by_provider: std::collections::HashMap<&str, chrono::DateTime<chrono::Utc>> =
+        statuses
+            .iter()
+            .map(|s| (s.provider.as_str(), s.ready_at))
+            .collect();
+
+    // La carte liste TOUTES les plateformes ACTIVEES (config `{key}_enabled`,
+    // defaut vrai comme cote API), qu'elles aient deja ete bumpees ou non.
+    // Sans ca, seule la premiere plateforme bumpee (Disboard) apparaissait.
+    let now = chrono::Utc::now();
+    let mut lines: Vec<String> = Vec::new();
+    for p in PROVIDERS {
+        if !BaseApiClient::config_bool(&cfg, &format!("{}_enabled", p.key), true) {
             continue;
         }
-        let Ok(channel_id) = BaseApiClient::config_or(&cfg, "bump_channel_id", "")
-            .trim()
-            .parse::<u64>()
-        else {
-            continue;
+        let ready_at = ready_by_provider.get(p.key).copied();
+        let line = match ready_at {
+            Some(t) if t > now => {
+                let verb = if p.action == BumpAction::Vote {
+                    "vote"
+                } else {
+                    "bump"
+                };
+                format!(
+                    "⏳ **{}** — {} possible <t:{}:R>",
+                    p.display,
+                    verb,
+                    t.timestamp()
+                )
+            }
+            // Aucun etat, ou cooldown deja ecoule -> disponible maintenant.
+            _ => format!(
+                "✅ **{}** — disponible **maintenant** ! `{}`",
+                p.display, p.bump_hint
+            ),
         };
+        lines.push(line);
+    }
+    if lines.is_empty() {
+        return CardRefresh::NoPlatforms; // aucune plateforme activee
+    }
 
-        // Etats connus (cooldown en cours), indexes par provider. Une plateforme
-        // jamais bumpee n'a PAS de ligne ici -> elle est simplement "dispo".
-        let statuses: Vec<BumpStatus> = api
-            .get_json(&format!("/api/bump/{gid}/status"))
+    let embed = CreateEmbed::new()
+        .title("🚀 État des bumps & votes")
+        .description(lines.join("\n"))
+        .color(0x5865F2)
+        .footer(CreateEmbedFooter::new(
+            "Mise à jour automatique · les ⏳ défilent en direct",
+        ));
+
+    let ch = ChannelId::new(channel_id);
+    let mut cards = STATUS_CARDS.lock().await;
+    // Edite la carte existante (meme salon), sinon en poste une nouvelle.
+    let edited = match cards.get(&guild_id).copied() {
+        Some((c, m)) if c == channel_id => ch
+            .edit_message(&ctx.http, MessageId::new(m), EditMessage::new().embed(embed.clone()))
             .await
-            .unwrap_or_default();
-        let ready_by_provider: std::collections::HashMap<&str, chrono::DateTime<chrono::Utc>> =
-            statuses
-                .iter()
-                .map(|s| (s.provider.as_str(), s.ready_at))
-                .collect();
-
-        // La carte liste TOUTES les plateformes ACTIVEES (config `{key}_enabled`,
-        // defaut vrai comme cote API), qu'elles aient deja ete bumpees ou non.
-        // Sans ca, seule la premiere plateforme bumpee (Disboard) apparaissait.
-        let now = chrono::Utc::now();
-        let mut lines: Vec<String> = Vec::new();
-        for p in PROVIDERS {
-            if !BaseApiClient::config_bool(&cfg, &format!("{}_enabled", p.key), true) {
-                continue;
-            }
-            let ready_at = ready_by_provider.get(p.key).copied();
-            let line = match ready_at {
-                Some(t) if t > now => {
-                    let verb = if p.action == BumpAction::Vote {
-                        "vote"
-                    } else {
-                        "bump"
-                    };
-                    format!(
-                        "⏳ **{}** — {} possible <t:{}:R>",
-                        p.display,
-                        verb,
-                        t.timestamp()
-                    )
-                }
-                // Aucun etat, ou cooldown deja ecoule -> disponible maintenant.
-                _ => format!(
-                    "✅ **{}** — disponible **maintenant** ! `{}`",
-                    p.display, p.bump_hint
-                ),
-            };
-            lines.push(line);
-        }
-        if lines.is_empty() {
-            continue; // aucune plateforme activee -> pas de carte vide
-        }
-
-        let embed = CreateEmbed::new()
-            .title("🚀 État des bumps & votes")
-            .description(lines.join("\n"))
-            .color(0x5865F2)
-            .footer(CreateEmbedFooter::new(
-                "Mise à jour automatique · les ⏳ défilent en direct",
-            ));
-
-        let ch = ChannelId::new(channel_id);
-        // Edite la carte existante (meme salon), sinon en poste une nouvelle.
-        let edited = match cards.get(&guild_id.get()).copied() {
-            Some((c, m)) if c == channel_id => ch
-                .edit_message(&ctx.http, MessageId::new(m), EditMessage::new().embed(embed.clone()))
-                .await
-                .is_ok(),
-            _ => false,
-        };
-        if !edited {
-            if let Ok(msg) = ch.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
-                cards.insert(guild_id.get(), (channel_id, msg.id.get()));
-            }
+            .is_ok(),
+        _ => false,
+    };
+    if !edited {
+        if let Ok(msg) = ch.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
+            cards.insert(guild_id, (channel_id, msg.id.get()));
         }
     }
+    CardRefresh::Posted
 }
 
 /// Tache de fond : poste un rappel quand le cooldown de bump est ecoule.
@@ -385,11 +427,9 @@ pub fn spawn_background(ctx: Context) {
     {
         let ctx = ctx.clone();
         tokio::spawn(async move {
-            let mut cards: std::collections::HashMap<u64, (u64, u64)> =
-                std::collections::HashMap::new();
             tokio::time::sleep(Duration::from_secs(45)).await;
             loop {
-                refresh_status_cards(&ctx, &mut cards).await;
+                refresh_all_cards(&ctx).await;
                 tokio::time::sleep(Duration::from_secs(300)).await;
             }
         });
