@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use sentinel_core::domain::services::bump::detection::{
     is_provider_bot, provider_by_key, provider_for_message_configured, resolve_bumper, BumpAction,
-    BumpMessageFacts, EmbedFacts, UserFacts, DISBOARD,
+    BumpMessageFacts, EmbedFacts, UserFacts, DISBOARD, PROVIDERS,
 };
 use serenity::all::MessageInteractionMetadata;
 use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage, EditMessage};
@@ -295,42 +295,52 @@ async fn refresh_status_cards(ctx: &Context, cards: &mut std::collections::HashM
             continue;
         };
 
+        // Etats connus (cooldown en cours), indexes par provider. Une plateforme
+        // jamais bumpee n'a PAS de ligne ici -> elle est simplement "dispo".
         let statuses: Vec<BumpStatus> = api
             .get_json(&format!("/api/bump/{gid}/status"))
             .await
             .unwrap_or_default();
-        if statuses.is_empty() {
-            continue; // rien a afficher -> pas de carte vide
-        }
+        let ready_by_provider: std::collections::HashMap<&str, chrono::DateTime<chrono::Utc>> =
+            statuses
+                .iter()
+                .map(|s| (s.provider.as_str(), s.ready_at))
+                .collect();
 
+        // La carte liste TOUTES les plateformes ACTIVEES (config `{key}_enabled`,
+        // defaut vrai comme cote API), qu'elles aient deja ete bumpees ou non.
+        // Sans ca, seule la premiere plateforme bumpee (Disboard) apparaissait.
         let now = chrono::Utc::now();
         let mut lines: Vec<String> = Vec::new();
-        for s in &statuses {
-            let Some(p) = provider_by_key(&s.provider) else {
+        for p in PROVIDERS {
+            if !BaseApiClient::config_bool(&cfg, &format!("{}_enabled", p.key), true) {
                 continue;
-            };
-            let line = if s.ready_at <= now {
-                format!(
+            }
+            let ready_at = ready_by_provider.get(p.key).copied();
+            let line = match ready_at {
+                Some(t) if t > now => {
+                    let verb = if p.action == BumpAction::Vote {
+                        "vote"
+                    } else {
+                        "bump"
+                    };
+                    format!(
+                        "⏳ **{}** — {} possible <t:{}:R>",
+                        p.display,
+                        verb,
+                        t.timestamp()
+                    )
+                }
+                // Aucun etat, ou cooldown deja ecoule -> disponible maintenant.
+                _ => format!(
                     "✅ **{}** — disponible **maintenant** ! `{}`",
                     p.display, p.bump_hint
-                )
-            } else {
-                let verb = if p.action == BumpAction::Vote {
-                    "vote"
-                } else {
-                    "bump"
-                };
-                format!(
-                    "⏳ **{}** — {} possible <t:{}:R>",
-                    p.display,
-                    verb,
-                    s.ready_at.timestamp()
-                )
+                ),
             };
             lines.push(line);
         }
         if lines.is_empty() {
-            continue;
+            continue; // aucune plateforme activee -> pas de carte vide
         }
 
         let embed = CreateEmbed::new()
