@@ -155,14 +155,26 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     };
 
     let Some(provider) = provider_for_message_configured(&facts, bot_id_for) else {
-        // Un bot a poste un embed sans correspondre a une plateforme connue :
-        // log defensif si c'est un provider a bot_id par defaut (format change ?).
-        if is_provider_bot(msg.author.id.get()) && !msg.embeds.is_empty() {
+        // Echec de reconnaissance. On le rend VISIBLE si l'auteur est un bot
+        // dont l'ID est configure comme plateforme (ou un provider a bot_id par
+        // defaut) : sinon un bump non detecte reste totalement silencieux et
+        // impossible a diagnostiquer. La cause la plus frequente : la plateforme
+        // confirme en TEXTE SIMPLE (embeds=0), or la detection generique exige
+        // un embed.
+        let author = msg.author.id.get();
+        let est_plateforme_configuree = PROVIDERS.iter().any(|p| {
+            let configure = bot_id_for(p.key);
+            let effectif = if configure != 0 { configure } else { p.bot_id };
+            effectif != 0 && effectif == author
+        });
+        if est_plateforme_configuree {
             warn!(
-                bot_id = msg.author.id.get(),
+                bot_id = author,
                 bot_name = %msg.author.name,
+                embeds = msg.embeds.len(),
+                content = %msg.content.chars().take(200).collect::<String>(),
                 embed_desc = msg.embeds.first().and_then(|e| e.description.as_deref()).unwrap_or("<aucune>"),
-                "bump: message d'un provider connu non reconnu (format change ?)"
+                "bump: message d'une plateforme configuree NON reconnu (texte simple sans embed ? format change ?)"
             );
         }
         return;
