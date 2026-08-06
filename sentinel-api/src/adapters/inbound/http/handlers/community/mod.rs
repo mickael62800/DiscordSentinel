@@ -1,6 +1,7 @@
 pub mod age_bans;
 pub mod announcements;
 pub mod embeds;
+pub mod messages;
 pub mod ideas;
 pub mod bump;
 pub mod confessions;

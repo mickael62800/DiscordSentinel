@@ -348,6 +348,10 @@ pub fn routes() -> Router<AppState> {
         .nest("/api/levels", level_inner())
         .nest("/api/announcements", announcement_inner())
         .nest("/api/embeds", embed_inner())
+        .route(
+            "/api/messages/{guild_id}/{channel_id}",
+            post(handlers::community::messages::send_message),
+        )
         .nest("/api/confessions", confession_inner())
         .nest("/api/role-panels", role_panel_inner())
         .nest("/api/auto-roles", auto_role_inner())

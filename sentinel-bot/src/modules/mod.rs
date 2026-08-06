@@ -3,6 +3,7 @@
 pub mod ai_dataset;
 pub mod announcements;
 pub mod embeds;
+pub mod messages;
 pub mod audit;
 pub mod automod;
 pub mod bump;

@@ -77,6 +77,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/rotation-dashboard", name: "rotation-dashboard", component: () => import("../components/pages/RotationDashboardPage.vue") },
   { path: "/announcements", name: "announcements", component: () => import("../components/pages/AnnouncementsPage.vue") },
   { path: "/embeds", name: "embeds", component: () => import("../components/pages/EmbedBuilderPage.vue") },
+  { path: "/message", name: "send-message", component: () => import("../components/pages/SendMessagePage.vue") },
   { path: "/vie-communaute", name: "community-life", component: () => import("../components/pages/CommunityLifePage.vue") },
   { path: "/confessions", name: "confessions", component: () => import("../components/pages/ConfessionsPage.vue") },
   { path: "/tickets", name: "tickets", component: () => import("../components/pages/TicketsPage.vue") },
