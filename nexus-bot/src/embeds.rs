@@ -23,6 +23,21 @@ fn color_for(payout: i64, is_memorable: bool) -> u32 {
     0x95a5a6 // gris (blanche)
 }
 
+/// Embed d'attente, affiche pendant que la roue « tourne ».
+///
+/// Il est poste APRES que l'API a valide le tirage : annoncer un tirage qui
+/// se fera refuser laisserait un message mensonger dans le salon.
+pub fn build_spinning_embed(username: &str) -> CreateEmbed {
+    CreateEmbed::new()
+        .title("\u{1f300} La Roue du Destin tourne...")
+        .description(format!(
+            "\u{1f3b2} La roue tourne pour **{username}** !\n\n\
+             # \u{1fa99} . . . \u{1fa99} . . . \u{1fa99}\n\n*Tic... tic... tic...*"
+        ))
+        .color(0xf1c40f)
+        .footer(CreateEmbedFooter::new("Le destin se decide..."))
+}
+
 /// Embed final avec le resultat.
 pub fn build_result_embed(resp: &WheelSpinResponse, username: &str) -> CreateEmbed {
     let net_str = if resp.payout > 0 {

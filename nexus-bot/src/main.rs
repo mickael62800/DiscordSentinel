@@ -19,6 +19,7 @@ mod embeds;
 mod event_bus;
 mod game_portal;
 mod games;
+mod wheel_panel;
 
 use std::sync::Arc;
 
@@ -517,6 +518,7 @@ impl EventHandler for Handler {
         let commands: Vec<CreateCommand> = commands
             .into_iter()
             .chain(games::register_commands())
+            .chain(std::iter::once(wheel_panel::register()))
             .collect();
         for command in commands {
             if let Err(e) = Command::create_global_command(&ctx.http, command).await {
@@ -524,7 +526,7 @@ impl EventHandler for Handler {
             }
         }
         tracing::info!(
-            "commandes slash /roue /solde /donner /classement /game /game-admin enregistrees (globales)"
+            "commandes slash /roue /roue-panel /solde /donner /classement /game /game-admin enregistrees (globales)"
         );
     }
 
@@ -545,6 +547,7 @@ impl EventHandler for Handler {
                 "contrat" => self.handle_prime(&ctx, &cmd).await,
                 "inventaire" => self.handle_inventory(&ctx, &cmd).await,
                 "pari" => self.handle_bet(&ctx, &cmd).await,
+                "roue-panel" => wheel_panel::handle_command(&ctx, &cmd).await,
                 "game" | "game-admin" => games::handle_command(&self.api, &ctx, &cmd).await,
                 _ => {}
             },
@@ -552,6 +555,8 @@ impl EventHandler for Handler {
                 let cid = component.data.custom_id.as_str();
                 if cid.starts_with("c:") {
                     self.handle_coussin_component(&ctx, &component).await;
+                } else if wheel_panel::handles_component(cid) {
+                    wheel_panel::handle_spin(&self.api, &ctx, &component).await;
                 } else if games::handles_component(cid) {
                     games::on_component(&self.api, &ctx, &component).await;
                 } else if game_portal::handles_component(cid) {
