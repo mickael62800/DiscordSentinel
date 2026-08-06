@@ -92,12 +92,44 @@ async fn guild_id_from_route_param(
         .map(|(_, v)| v.to_string())
 }
 
+/// Segments qui signalent que l'identifiant SUIVANT n'est PAS un guild_id mais
+/// l'id d'une autre entite (salon, message, utilisateur...).
+///
+/// Sans ce garde, une route comme `/api/voice-channels/by-channel/{channel_id}/purge`
+/// voyait son `channel_id` (un snowflake de 17-20 chiffres, indiscernable d'un
+/// guild_id) pris pour le guild et refusait la requete a tort (403). La source
+/// autoritaire reste le parametre de route `{guild_id}` ; cette heuristique
+/// n'est qu'un filet, et ne doit pas se declencher sur un id d'entite.
+const NON_GUILD_MARKERS: &[&str] = &[
+    "by-channel",
+    "by-id",
+    "by-message",
+    "by-message-id",
+    "by-user",
+    "detail",
+    "replies",
+    "reports",
+    "bans",
+    "co-admins",
+    "invites",
+];
+
 fn guild_id_from_path(path: &str) -> Option<String> {
-    path.split('/')
-        .find(|seg| {
-            (17..=20).contains(&seg.len()) && seg.chars().all(|c| c.is_ascii_digit())
-        })
-        .map(str::to_string)
+    let segs: Vec<&str> = path.split('/').collect();
+    segs.iter().enumerate().find_map(|(i, seg)| {
+        let ressemble =
+            (17..=20).contains(&seg.len()) && seg.chars().all(|c| c.is_ascii_digit());
+        if !ressemble {
+            return None;
+        }
+        // Ignore l'id s'il suit un marqueur d'entite : c'est un channel_id,
+        // message_id, user_id... pas un guild_id.
+        let precedent = i.checked_sub(1).map(|j| segs[j]).unwrap_or("");
+        if NON_GUILD_MARKERS.contains(&precedent) {
+            return None;
+        }
+        Some(seg.to_string())
+    })
 }
 
 #[cfg(test)]

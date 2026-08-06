@@ -58,6 +58,27 @@ fn un_segment_alphanumerique_est_ignore() {
     );
 }
 
+/// Un channel_id derriere `by-channel` NE doit PAS etre pris pour un guild :
+/// sinon toutes les mutations vocales (`/by-channel/{id}/purge`, `.../bans`...)
+/// etaient refusees a tort (403).
+#[test]
+fn un_id_derriere_un_marqueur_d_entite_est_ignore() {
+    let chan = "1534683694302756935";
+    let user = "1534683450097799390";
+    assert_eq!(
+        guild_id_from_path(&format!("/api/voice-channels/by-channel/{chan}/purge")),
+        None
+    );
+    assert_eq!(
+        guild_id_from_path(&format!("/api/voice-channels/by-channel/{chan}/bans/{user}")),
+        None
+    );
+    assert_eq!(
+        guild_id_from_path(&format!("/api/confessions/by-message-id/{chan}")),
+        None
+    );
+}
+
 /// Le premier segment plausible gagne : les routes reelles portent le
 /// `guild_id` avant tout autre identifiant numerique.
 #[test]
