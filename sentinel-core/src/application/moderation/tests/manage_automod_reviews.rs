@@ -198,6 +198,7 @@ impl AutomodReviewRepository for MockRepo {
     }
 }
 
+/// Admin / fondateur : pleins pouvoirs (peut passer outre le garde anti-conflit).
 fn moderator_facts() -> ModeratorFacts {
     ModeratorFacts {
         is_admin: true,
@@ -208,8 +209,20 @@ fn moderator_facts() -> ModeratorFacts {
     }
 }
 
+/// Moderateur ORDINAIRE : peut voter, mais reste soumis au garde anti-conflit
+/// (ne peut pas statuer sur sa propre detection).
+fn mod_ordinaire_facts() -> ModeratorFacts {
+    ModeratorFacts {
+        is_admin: false,
+        has_moderate_members: true,
+        has_manage_messages: true,
+        has_mod_role: true,
+        has_admin_role: false,
+    }
+}
+
 #[tokio::test]
-async fn cast_vote_rejette_son_propre_dossier() {
+async fn cast_vote_rejette_le_propre_dossier_d_un_mod_ordinaire() {
     let repo = Arc::new(MockRepo::new(review_for("flagged_user", "voting")));
     let svc = ManageAutomodReviewsService::new(repo.clone());
     let err = svc
@@ -218,13 +231,50 @@ async fn cast_vote_rejette_son_propre_dossier() {
             voter_id: "flagged_user".to_string(),
             voter_name: "Flagged".to_string(),
             vote_action: "warn".to_string(),
-            requester: moderator_facts(),
+            requester: mod_ordinaire_facts(),
         })
         .await
         .unwrap_err();
     assert!(matches!(err, DomainError::ValidationError(_)));
     // La règle S2 court-circuite AVANT l'écriture du vote.
     assert!(!*repo.upsert_called.lock().unwrap());
+}
+
+/// Pleins pouvoirs : un admin/fondateur PEUT agir sur sa propre detection.
+#[tokio::test]
+async fn cast_vote_admin_peut_agir_sur_son_propre_dossier() {
+    let repo = Arc::new(MockRepo::new(review_for("flagged_user", "voting")));
+    let svc = ManageAutomodReviewsService::new(repo.clone());
+    let res = svc
+        .cast_vote(CastVoteCommand {
+            review_id: Uuid::new_v4(),
+            voter_id: "flagged_user".to_string(),
+            voter_name: "Flagged".to_string(),
+            vote_action: "warn".to_string(),
+            requester: moderator_facts(),
+        })
+        .await;
+    assert!(res.is_ok(), "un admin doit pouvoir voter sur son propre dossier");
+    assert!(*repo.upsert_called.lock().unwrap());
+}
+
+/// Pleins pouvoirs : un admin/fondateur PEUT finaliser sa propre detection
+/// (c'est le cas du fondateur en back-office web : facts Owner -> bypass).
+#[tokio::test]
+async fn resolve_admin_peut_finaliser_son_propre_dossier() {
+    let repo = Arc::new(MockRepo::new(review_for("flagged_user", "decided")));
+    let svc = ManageAutomodReviewsService::new(repo);
+    let res = svc
+        .resolve(ResolveAutomodReviewCommand {
+            review_id: Uuid::new_v4(),
+            applied_action: "ban".to_string(),
+            resolved_by_id: "flagged_user".to_string(),
+            resolved_by_name: "Flagged".to_string(),
+            resolved_source: "web".to_string(),
+            requester: Some(moderator_facts()),
+        })
+        .await;
+    assert!(res.is_ok(), "un admin/fondateur doit pouvoir finaliser son propre dossier");
 }
 
 #[tokio::test]

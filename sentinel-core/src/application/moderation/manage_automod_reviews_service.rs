@@ -15,6 +15,7 @@ use crate::domain::entities::moderation::review::automod::tally_votes;
 use crate::domain::entities::moderation::review::automod::AppliedAction;
 use crate::domain::entities::moderation::review::automod::AutomodReview;
 use crate::domain::entities::moderation::review::automod::ExpiredReviewCard;
+use crate::domain::entities::moderation::review::automod::ModeratorFacts;
 use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::entities::moderation::review::automod::ReviewVote;
 use crate::domain::entities::moderation::review::automod::TallyResult;
@@ -40,12 +41,25 @@ impl ManageAutomodReviewsService {
     /// cloture) sur une detection qui le vise lui-meme (`actor_id` ==
     /// `review.user_id`). No-op si la review est introuvable (le repo renverra
     /// l'erreur appropriee plus loin).
+    ///
+    /// EXCEPTION — pleins pouvoirs : un administrateur / fondateur (au sens de
+    /// `can_finalize_review`) peut passer outre. Le garde protege le conflit
+    /// d'interet entre moderateurs ordinaires ; il ne doit pas menotter
+    /// l'autorite qui, precisement, tranche en dernier ressort. Cote web, tout
+    /// appelant a franchi `SUPERADMIN_USER_IDS` -> facts Owner -> bypass.
     async fn reject_self_action(
         &self,
         review_id: Uuid,
         actor_id: &str,
         verb: &str,
+        requester: Option<&ModeratorFacts>,
     ) -> Result<(), DomainError> {
+        let privilegie = requester
+            .map(crate::domain::entities::moderation::review::automod::can_finalize_review)
+            .unwrap_or(false);
+        if privilegie {
+            return Ok(());
+        }
         if let Some(review) = self.repo.get(review_id).await? {
             if review.user_id.as_str() == actor_id {
                 return Err(DomainError::ValidationError(format!(
@@ -127,8 +141,13 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         crate::application::validation::validate_non_empty(&cmd.resolved_by_id, "resolved_by_id")?;
         // Conflit d'interet : l'utilisateur flagge ne peut pas finaliser sa
         // propre detection.
-        self.reject_self_action(cmd.review_id, &cmd.resolved_by_id, "finaliser")
-            .await?;
+        self.reject_self_action(
+            cmd.review_id,
+            &cmd.resolved_by_id,
+            "finaliser",
+            cmd.requester.as_ref(),
+        )
+        .await?;
         // Regle d'acces (domaine) : finalisation Discord reservee aux admins.
         // La source "web" est autorisee en amont par le middleware guild_auth.
         if let Some(facts) = &cmd.requester {
@@ -158,8 +177,13 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         crate::application::validation::validate_non_empty(&cmd.actor_id, "actor_id")?;
         // Conflit d'interet : l'utilisateur flagge ne peut pas clore sa propre
         // detection.
-        self.reject_self_action(cmd.review_id, &cmd.actor_id, "clore")
-            .await?;
+        self.reject_self_action(
+            cmd.review_id,
+            &cmd.actor_id,
+            "clore",
+            cmd.requester.as_ref(),
+        )
+        .await?;
         // Regle d'acces (domaine) : tout moderateur peut clore (source discord).
         // La source "web" est autorisee en amont par le middleware guild_auth.
         if let Some(facts) = &cmd.requester {
@@ -205,8 +229,13 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         crate::application::validation::validate_non_empty(&cmd.voter_id, "voter_id")?;
         // Conflit d'interet : l'utilisateur flagge ne peut pas voter sur sa
         // propre detection.
-        self.reject_self_action(cmd.review_id, &cmd.voter_id, "voter sur")
-            .await?;
+        self.reject_self_action(
+            cmd.review_id,
+            &cmd.voter_id,
+            "voter sur",
+            Some(&cmd.requester),
+        )
+        .await?;
         self.repo
             .upsert_vote(
                 cmd.review_id,
