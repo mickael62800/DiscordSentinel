@@ -48,6 +48,7 @@ impl CoussinPrimeUseCase for CoussinPrimeService {
         }
 
         let cfg = load_coussin(&self.config_repo, guild_id).await?;
+        cfg.ensure_enabled()?;
         if !cfg.prime_enabled {
             return Err(DomainError::Validation(
                 "les primes sont desactivees sur ce serveur".into(),

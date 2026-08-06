@@ -67,6 +67,21 @@ pub struct SpinResult {
     pub is_memorable: bool,
 }
 
+/// Une case de la roue, telle que le serveur l'a definie.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WheelCase {
+    pub key: String,
+    pub label: String,
+    pub payout: i64,
+    pub weight: u32,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct WheelCases {
+    pub cases: Vec<WheelCase>,
+    pub customized: bool,
+}
+
 /// Profil Coussin Piégé : classe, statistiques, palmares.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoussinProfile {
@@ -212,6 +227,16 @@ impl NexusGamesClient {
                 .json(&serde_json::json!({ "username": username })),
         )
         .await
+    }
+
+    /// Les cases de la roue du serveur.
+    ///
+    /// Le site les DESSINE : sans cet appel il afficherait les dix cases
+    /// d'origine a un serveur qui a change les siennes, et la fleche
+    /// s'arreterait sur un secteur qui n'est pas celui tire.
+    pub async fn wheel_cases(&self, guild_id: &str) -> Result<WheelCases, DomainError> {
+        let url = self.url(&format!("/api/wheel/{guild_id}/cases"));
+        self.envoyer(self.client.get(url)).await
     }
 
     /// Le joueur peut-il encore tirer aujourd'hui ? Lecture seule.

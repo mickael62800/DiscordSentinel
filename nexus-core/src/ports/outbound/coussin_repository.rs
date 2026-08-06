@@ -148,6 +148,12 @@ pub trait CoussinRepository: Send + Sync {
     async fn accept_combat(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError>;
     async fn refuse_combat(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError>;
     async fn resolution_snapshot(&self, id: uuid::Uuid) -> Result<Option<CoussinCombatSnapshot>, DomainError>;
+    /// Regle une bagarre : transfert de la mise, primes, paris, statistiques.
+    ///
+    /// `bet_payout_pct` est le gain d'un pari gagnant en pourcentage de la
+    /// mise (200 = double). Il est PASSE par le cas d'usage : la valeur etait
+    /// ecrite dans la requete SQL, ce qui rendait tout reglage impossible.
+    #[allow(clippy::too_many_arguments)]
     async fn resolve_combat(
         &self,
         id: uuid::Uuid,
@@ -157,5 +163,6 @@ pub trait CoussinRepository: Send + Sync {
         transferred: i64,
         attacker_hp: i32,
         defender_hp: i32,
+        bet_payout_pct: i64,
     ) -> Result<bool, DomainError>;
 }

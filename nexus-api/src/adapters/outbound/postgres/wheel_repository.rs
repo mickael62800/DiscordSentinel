@@ -1,7 +1,7 @@
 //! Adapter Postgres du port `WheelRepository`.
 
 use async_trait::async_trait;
-use nexus_core::domain::entities::wheel::WheelSpin;
+use nexus_core::domain::entities::wheel::{WheelCaseData, WheelSpin};
 use nexus_core::domain::errors::DomainError;
 use nexus_core::ports::outbound::wheel_repository::WheelRepository;
 use sqlx::PgPool;
@@ -92,5 +92,58 @@ impl WheelRepository for PgWheelRepository {
         .await
         .map_err(pg_err)?;
         Ok(())
+    }
+
+    async fn list_cases(&self, guild_id: &str) -> Result<Vec<WheelCaseData>, DomainError> {
+        let rows: Vec<(String, String, i64, i32)> = sqlx::query_as(
+            "SELECT key, label, payout, weight FROM nexus_wheel_cases
+             WHERE guild_id = $1 ORDER BY position, key",
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows
+            .into_iter()
+            .map(|(key, label, payout, weight)| WheelCaseData {
+                key,
+                label,
+                payout,
+                // Le CHECK garantit >= 1 ; la borne ici protege des lignes
+                // ecrites a la main avant lui.
+                weight: weight.max(1) as u32,
+            })
+            .collect())
+    }
+
+    async fn replace_cases(
+        &self,
+        guild_id: &str,
+        cases: &[WheelCaseData],
+    ) -> Result<(), DomainError> {
+        // Une seule transaction : entre le DELETE et les INSERT, la roue
+        // n'existe pas. Un tirage concurrent ne doit pas tomber dessus.
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        sqlx::query("DELETE FROM nexus_wheel_cases WHERE guild_id = $1")
+            .bind(guild_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(pg_err)?;
+        for (position, case) in cases.iter().enumerate() {
+            sqlx::query(
+                "INSERT INTO nexus_wheel_cases (guild_id, key, label, payout, weight, position)
+                 VALUES ($1, $2, $3, $4, $5, $6)",
+            )
+            .bind(guild_id)
+            .bind(case.key.trim())
+            .bind(case.label.trim())
+            .bind(case.payout)
+            .bind(case.weight.max(1) as i32)
+            .bind(position as i32)
+            .execute(&mut *tx)
+            .await
+            .map_err(pg_err)?;
+        }
+        tx.commit().await.map_err(pg_err)
     }
 }

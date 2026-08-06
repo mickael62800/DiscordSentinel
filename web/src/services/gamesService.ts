@@ -64,6 +64,13 @@ export const gamesService = {
 
   /// Tire la Roue. Un tirage par jour et par personne, tous canaux confondus :
   /// avoir déjà tiré sur Discord fait échouer cet appel, et réciproquement.
+  /// Les cases de la roue du serveur, pour la DESSINER. Sans cet appel, le
+  /// site afficherait les dix cases d'origine à un serveur qui a changé les
+  /// siennes, et la flèche s'arrêterait sur un secteur qui n'est pas celui
+  /// tiré.
+  wheelCases(): Promise<WheelCasesResult> {
+    return httpGet<WheelCasesResult>("/api/me/games/wheel/cases");
+  },
   spinWheel(): Promise<SpinResult> {
     return httpPost<SpinResult>("/api/me/games/wheel/spin", {});
   },
@@ -77,6 +84,19 @@ export const gamesService = {
 };
 
 // ── Coussin Piégé ──
+
+export interface WheelCaseInfo {
+  key: string;
+  label: string;
+  payout: number;
+  weight: number;
+}
+
+export interface WheelCasesResult {
+  cases: WheelCaseInfo[];
+  /// `false` = le serveur joue la roue d'origine.
+  customized: boolean;
+}
 
 export interface CoussinProfile {
   username: string;

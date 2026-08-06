@@ -9,6 +9,9 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Plafond historique. Reste le DEFAUT, mais n'est plus la loi : les
+/// fonctions de progression prennent desormais le plafond en parametre, pour
+/// qu'un serveur puisse allonger ou raccourcir la course.
 pub const MAX_LEVEL: i32 = 25;
 
 /// Les quatre manieres d'occuper un canape.
@@ -90,17 +93,33 @@ impl PlayerClass {
     }
 }
 
-/// XP cumulée requise pour atteindre un niveau. La progression est plafonnée.
-pub fn xp_for_level(level: i32) -> i64 {
-    let level = level.clamp(1, MAX_LEVEL) as i64;
+/// XP cumulée requise pour atteindre un niveau, plafond donne.
+///
+/// Le plafond est un PARAMETRE et non plus une constante : c'est le reglage
+/// qui decide de la longueur de la course. Il est borne a 1..=200 ici pour
+/// qu'une valeur absurde en base ne produise pas une courbe infinie.
+pub fn xp_for_level_capped(level: i32, max_level: i32) -> i64 {
+    let max_level = max_level.clamp(1, 200);
+    let level = level.clamp(1, max_level) as i64;
     50 * level * (level + 1)
 }
 
-pub fn level_for_xp(xp: i64) -> i32 {
-    (1..=MAX_LEVEL)
+pub fn level_for_xp_capped(xp: i64, max_level: i32) -> i32 {
+    let max_level = max_level.clamp(1, 200);
+    (1..=max_level)
         .rev()
-        .find(|&level| xp >= xp_for_level(level))
+        .find(|&level| xp >= xp_for_level_capped(level, max_level))
         .unwrap_or(1)
+}
+
+/// Variantes au plafond historique, gardees pour les appelants qui n'ont pas
+/// de configuration sous la main (tests, outillage).
+pub fn xp_for_level(level: i32) -> i64 {
+    xp_for_level_capped(level, MAX_LEVEL)
+}
+
+pub fn level_for_xp(xp: i64) -> i32 {
+    level_for_xp_capped(xp, MAX_LEVEL)
 }
 
 /// Le titre raconte la place gagnee sur le canape, pas un grade militaire :
@@ -116,13 +135,34 @@ pub fn title_for_level(level: i32) -> &'static str {
     }
 }
 
-pub fn matchmaking_handicap(first_level: i32, second_level: i32) -> Option<f32> {
-    match (first_level - second_level).unsigned_abs() {
-        0..=2 => Some(1.0),
-        3..=5 => Some(0.8),
-        6..=9 => Some(0.6),
-        _ => None,
+/// Handicap applique au plus haut niveau, ou `None` si l'ecart interdit la
+/// bagarre.
+///
+/// `gap_max` est l'ecart TOLERE, configurable : au-dela, on refuse. Les
+/// paliers intermediaires restent proportionnels a ce plafond, sinon
+/// l'allonger creerait un trou ou personne n'est penalise.
+pub fn matchmaking_handicap_capped(
+    first_level: i32,
+    second_level: i32,
+    gap_max: i32,
+) -> Option<f32> {
+    let gap_max = gap_max.max(0);
+    let ecart = (first_level - second_level).unsigned_abs() as i32;
+    if ecart > gap_max {
+        return None;
     }
+    // Trois tiers : intact, puis -20 %, puis -40 %. A gap_max = 9 on retrouve
+    // exactement les paliers historiques 0-2 / 3-5 / 6-9.
+    let tiers = (gap_max as f32 / 3.0).max(1.0);
+    match ecart as f32 {
+        e if e <= tiers => Some(1.0),
+        e if e <= tiers * 2.0 => Some(0.8),
+        _ => Some(0.6),
+    }
+}
+
+pub fn matchmaking_handicap(first_level: i32, second_level: i32) -> Option<f32> {
+    matchmaking_handicap_capped(first_level, second_level, 9)
 }
 
 pub fn max_hp(defense: i32, class: PlayerClass) -> i32 {
@@ -165,6 +205,26 @@ pub struct CombatResult {
     pub rounds: i32,
 }
 
+/// Les regles de bagarre reglables par serveur.
+///
+/// Regroupees dans une structure plutot qu'ajoutees a la liste d'arguments :
+/// `resolve_combat` en comptait deja neuf, deux entiers nus de plus se
+/// seraient inverses tot ou tard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CombatRules {
+    /// Ecart de niveau tolere. Au-dela, la bagarre est refusee.
+    pub level_gap_max: i32,
+    /// Nombre de manches impose. 0 = automatique, selon le Confort total.
+    pub max_rounds: i32,
+}
+
+impl Default for CombatRules {
+    /// Le comportement historique, a l'identique.
+    fn default() -> Self {
+        Self { level_gap_max: 9, max_rounds: 0 }
+    }
+}
+
 pub fn resolve_combat(
     attacker_atk: i32,
     attacker_def: i32,
@@ -175,14 +235,27 @@ pub fn resolve_combat(
     defender_class: PlayerClass,
     defender_level: i32,
     rolls: &[(i32, i32)],
+    rules: CombatRules,
 ) -> Result<CombatResult, &'static str> {
-    let handicap = matchmaking_handicap(attacker_level, defender_level).ok_or("ecart de niveau trop important")?;
+    let handicap = matchmaking_handicap_capped(attacker_level, defender_level, rules.level_gap_max)
+        .ok_or("ecart de niveau trop important")?;
     let attacker_is_higher = attacker_level > defender_level;
     let mut attacker_hp = max_hp(attacker_def, attacker_class);
     let mut defender_hp = max_hp(defender_def, defender_class);
     let mut attacker_damage_total = 0;
     let mut defender_damage_total = 0;
-    let max_rounds = if attacker_hp + defender_hp < 250 { 3 } else if attacker_hp + defender_hp <= 400 { 5 } else { 7 };
+    // 0 = automatique : le nombre de manches suit la resistance des deux
+    // joueurs, comme avant. Une valeur imposee prime, bornee a 1..=10 pour
+    // qu'un reglage absurde ne fasse pas durer une bagarre indefiniment.
+    let max_rounds = if rules.max_rounds > 0 {
+        rules.max_rounds.clamp(1, 10)
+    } else if attacker_hp + defender_hp < 250 {
+        3
+    } else if attacker_hp + defender_hp <= 400 {
+        5
+    } else {
+        7
+    };
     for (index, (attacker_roll, defender_roll)) in rolls.iter().take(max_rounds as usize).enumerate() {
         let attacker_atk = if attacker_is_higher { (attacker_atk as f32 * handicap) as i32 } else { attacker_atk };
         let defender_atk = if !attacker_is_higher { (defender_atk as f32 * handicap) as i32 } else { defender_atk };
@@ -255,7 +328,7 @@ mod tests {
     }
     #[test]
     fn multi_round_combat_produces_a_result() {
-        let result = resolve_combat(25, 8, PlayerClass::Ecraseur, 1, 8, 25, PlayerClass::Couette, 1, &[(6, 1), (6, 1), (6, 1)]).unwrap();
+        let result = resolve_combat(25, 8, PlayerClass::Ecraseur, 1, 8, 25, PlayerClass::Couette, 1, &[(6, 1), (6, 1), (6, 1)], CombatRules::default()).unwrap();
         assert!(result.attacker_damage > 0);
         assert!(result.rounds >= 1);
     }

@@ -62,10 +62,10 @@ const indisponible = ref(false);
 
 // ── Roue ──
 
-/// Les dix cases, dans l'ordre où elles sont dessinées. Les libellés viennent
-/// du serveur à chaque tirage ; cette liste ne sert qu'au rendu de la roue au
-/// repos, et les clés doivent correspondre à celles de `wheel.rs`.
-const CASES = [
+/// Habillage des cases HISTORIQUES : emoji et couleur, que le serveur ne
+/// stocke pas. Un serveur qui ajoute ses propres cases retombe sur un
+/// habillage déduit du gain (voir `habillage`).
+const HABILLAGE = [
   { key: "blanche", court: "Rien", emoji: "🌀", couleur: "#6b7280" },
   { key: "pq", court: "+50", emoji: "🧻", couleur: "#94a3b8" },
   { key: "sieste", court: "+200", emoji: "💤", couleur: "#38bdf8" },
@@ -78,7 +78,34 @@ const CASES = [
   { key: "licorne", court: "+10000", emoji: "🦄", couleur: "#e879f9" },
 ];
 
-const SECTEUR = 360 / CASES.length;
+/// Les cases réellement en jeu, telles que le serveur les définit. Tant
+/// qu'elles ne sont pas chargées, on dessine celles d'origine : une roue vide
+/// pendant une seconde serait pire qu'une roue approximative.
+const casesServeur = ref<{ key: string; label: string; payout: number }[]>([]);
+
+/// Habillage d'une case : celui d'origine si la clé est connue, sinon déduit
+/// du gain. Vert quand ça rapporte, rouge quand ça coûte, gris quand c'est
+/// blanc — c'est la seule information dont on soit sûr pour une case inventée
+/// par un serveur.
+function habillage(key: string, payout: number) {
+  const connu = HABILLAGE.find((c) => c.key === key);
+  if (connu) return connu;
+  const court = payout > 0 ? `+${payout}` : payout < 0 ? `${payout}` : "Rien";
+  if (payout > 0) return { key, court, emoji: "🎁", couleur: "#22c55e" };
+  if (payout < 0) return { key, court, emoji: "💥", couleur: "#f43f5e" };
+  return { key, court, emoji: "🌀", couleur: "#6b7280" };
+}
+
+const CASES = computed(() =>
+  (casesServeur.value.length
+    ? casesServeur.value
+    : HABILLAGE.map((h) => ({ key: h.key, label: h.court, payout: 0 }))
+  ).map((c) => habillage(c.key, c.payout)),
+);
+
+/// L'angle d'un secteur dépend du NOMBRE de cases : une roue de six cases se
+/// découpe en soixante degrés, pas en trente-six.
+const SECTEUR = computed(() => 360 / Math.max(1, CASES.value.length));
 
 const enCours = ref(false);
 const resultat = ref<SpinResult | null>(null);
@@ -95,7 +122,7 @@ const dejaJoue = ref(false);
 /// désigner la licorne à chaque position de repos — y compris après un tirage
 /// refusé, qui ramène la roue à son point de départ. Le hasard n'y était pour
 /// rien, seule la géométrie.
-const angle = ref(-SECTEUR / 2);
+const angle = ref(-360 / 20);
 
 async function tirer() {
   if (enCours.value || dejaJoue.value || !user.value) return;
@@ -113,9 +140,10 @@ async function tirer() {
   try {
     const r = await gamesService.spinWheel();
 
-    const index = Math.max(0, CASES.findIndex((c) => c.key === r.case_key));
+    const index = Math.max(0, CASES.value.findIndex((c) => c.key === r.case_key));
     // On complète jusqu'au secteur voulu, en restant dans le même sens.
-    const vise = 360 - index * SECTEUR - SECTEUR / 2;
+    const secteur = SECTEUR.value;
+    const vise = 360 - index * secteur - secteur / 2;
     const restant = (vise - (angle.value % 360) + 360) % 360;
     angle.value += restant;
 
@@ -241,6 +269,16 @@ function objet(cle: string): string {
 // ── Chargement ──
 
 onMounted(async () => {
+  // Tentative silencieuse : l'endpoint demande d'être connecté, et un
+  // visiteur anonyme gardera donc les cases d'origine à l'écran. C'est le bon
+  // repli — une roue non dessinée serait pire qu'une roue approximative.
+  gamesService
+    .wheelCases()
+    .then((r) => {
+      casesServeur.value = r.cases;
+    })
+    .catch(() => {});
+
   if (!user.value) {
     chargement.value = false;
     return;
@@ -292,12 +330,13 @@ function icone(source: string): string {
   return "🪙";
 }
 
-/// Dégradé conique dessinant les dix secteurs. Calculé une fois : le
-/// recalculer à chaque rendu ferait clignoter la roue pendant sa rotation.
+/// Dégradé conique dessinant les secteurs. Recalculé seulement quand les
+/// cases changent : le recalculer à chaque rendu ferait clignoter la roue
+/// pendant sa rotation.
 const fondRoue = computed(() => {
-  const parts = CASES.map((c, i) => {
-    const de = i * SECTEUR;
-    const a = (i + 1) * SECTEUR;
+  const parts = CASES.value.map((c, i) => {
+    const de = i * SECTEUR.value;
+    const a = (i + 1) * SECTEUR.value;
     return `${c.couleur} ${de}deg ${a}deg`;
   });
   return `conic-gradient(${parts.join(", ")})`;

@@ -123,6 +123,11 @@ export const routes: RouteRecordRaw[] = [
     component: () => import("@/components/pages/NexusEconomyPage.vue"),
   },
   {
+    path: "/nexus/roue",
+    name: "nexus-roue",
+    component: () => import("@/components/pages/NexusWheelPage.vue"),
+  },
+  {
     path: "/nexus/coussin",
     name: "nexus-coussin",
     component: () => import("@/components/pages/NexusCoussinPage.vue"),

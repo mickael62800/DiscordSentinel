@@ -54,6 +54,7 @@ impl CoussinStealUseCase for CoussinStealService {
         }
 
         let cfg = load_coussin(&self.config_repo, guild_id).await?;
+        cfg.ensure_enabled()?;
         if !cfg.steal_enabled {
             return Err(DomainError::Validation(
                 "les vols sont desactives sur ce serveur".into(),

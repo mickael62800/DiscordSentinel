@@ -40,6 +40,7 @@ impl CoussinInsuranceService {
 impl CoussinInsuranceUseCase for CoussinInsuranceService {
     async fn buy(&self, guild_id: &str, user_id: &str) -> Result<CoussinInsurance, DomainError> {
         let cfg = load_coussin(&self.config_repo, guild_id).await?;
+        cfg.ensure_enabled()?;
         if !cfg.insurance_enabled {
             return Err(DomainError::Validation(
                 "l'assurance n'est pas disponible sur ce serveur".into(),
@@ -47,7 +48,15 @@ impl CoussinInsuranceUseCase for CoussinInsuranceService {
         }
 
         let is_scam = rand::thread_rng().gen_range(0..100) < SCAM_PERCENT;
-        self.repo.buy(guild_id, user_id, is_scam).await
+        self.repo
+            .buy(
+                guild_id,
+                user_id,
+                is_scam,
+                cfg.insurance_cost.max(1),
+                cfg.insurance_duration_minutes.max(1),
+            )
+            .await
     }
 
     /// Lecture seule : consultable meme si l'assurance a ete desactivee

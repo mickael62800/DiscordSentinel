@@ -55,6 +55,10 @@ pub fn build_router(state: AppState) -> Router {
             "/api/config/{guild_id}/{bot_name}",
             get(handlers::bot_config::get_config).put(handlers::bot_config::set_config),
         )
+        .route(
+            "/api/wheel/{guild_id}/cases",
+            get(handlers::wheel::list_cases).put(handlers::wheel::replace_cases),
+        )
         .route("/api/coussin/{guild_id}/{user_id}/profile", get(handlers::coussin::profile))
         .route("/api/coussin/{guild_id}/{user_id}/class", post(handlers::coussin::choose_class))
         .route("/api/coussin/{guild_id}/{user_id}/train", post(handlers::coussin::train))

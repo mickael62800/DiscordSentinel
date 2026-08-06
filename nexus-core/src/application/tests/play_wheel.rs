@@ -44,6 +44,22 @@ impl WheelRepository for MockWheelRepo {
         self.logged.lock().unwrap().push(spin.clone());
         Ok(())
     }
+    /// Aucune case personnalisee : le service doit retomber sur la roue
+    /// historique. C'est le cas de tous les serveurs qui n'ouvriront jamais
+    /// l'editeur, donc celui qu'il faut couvrir par defaut.
+    async fn list_cases(
+        &self,
+        _g: &str,
+    ) -> Result<Vec<crate::domain::entities::wheel::WheelCaseData>, DomainError> {
+        Ok(vec![])
+    }
+    async fn replace_cases(
+        &self,
+        _g: &str,
+        _cases: &[crate::domain::entities::wheel::WheelCaseData],
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 #[derive(Default)]

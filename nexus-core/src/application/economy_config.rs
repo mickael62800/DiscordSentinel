@@ -100,6 +100,24 @@ pub struct CoussinConfig {
     pub bet_min: i64,
     pub insurance_enabled: bool,
     pub insurance_cost: i64,
+    pub insurance_duration_minutes: i64,
+    /// Gain d'un pari gagnant, en % de la mise. 200 = mise doublee.
+    pub bet_payout_pct: i64,
+    // ── Bagarres ──
+    pub combat_mise_min: i64,
+    /// 0 = pas de plafond.
+    pub combat_mise_max: i64,
+    /// Ecart de niveau au-dela duquel une bagarre est refusee.
+    pub level_gap_max: i32,
+    /// 0 = automatique (3, 5 ou 7 manches selon le Confort total).
+    pub combat_max_rounds: i32,
+    // ── Progression ──
+    pub max_level: i32,
+    pub xp_winner: i64,
+    pub xp_loser: i64,
+    pub stat_points_per_level: i32,
+    /// Prix des objets du coffre, en % du tarif catalogue. 100 = inchange.
+    pub shop_price_pct: i64,
 }
 
 impl Default for CoussinConfig {
@@ -120,12 +138,72 @@ impl Default for CoussinConfig {
             bet_enabled: true,
             bet_min: 10,
             insurance_enabled: true,
-            insurance_cost: 100,
+            // 50 et non 100 : c'est ce que le SQL prelevait reellement, et
+            // c'est ce prix-la que les joueurs connaissent.
+            insurance_cost: 50,
+            insurance_duration_minutes: 60,
+            bet_payout_pct: 200,
+            combat_mise_min: 1,
+            combat_mise_max: 0,
+            level_gap_max: 9,
+            combat_max_rounds: 0,
+            max_level: 25,
+            xp_winner: 15,
+            xp_loser: 5,
+            stat_points_per_level: 3,
+            shop_price_pct: 100,
         }
     }
 }
 
 impl CoussinConfig {
+    /// Interrupteur maitre du jeu.
+    ///
+    /// Il PRIME sur les interrupteurs de detail : jeu ferme, on ne fouille
+    /// pas, on ne parie pas, on n'achete pas — meme si ces reglages-la sont
+    /// restes a « autorise ». Sans cette regle, fermer le jeu demanderait de
+    /// penser a decocher cinq cases, et il en resterait toujours une.
+    ///
+    /// A appeler dans chaque cas d'usage qui MODIFIE l'etat. Les lectures
+    /// (profil, classement, historique, inventaire) restent ouvertes : un jeu
+    /// ferme ne doit pas rendre illisible ce que les joueurs ont deja
+    /// accompli.
+    pub fn ensure_enabled(&self) -> Result<(), DomainError> {
+        if self.enabled {
+            return Ok(());
+        }
+        Err(DomainError::Validation(
+            "Coussin Piege est desactive sur ce serveur.".into(),
+        ))
+    }
+
+    /// La mise proposee est-elle acceptable ?
+    pub fn validate_mise(&self, mise: i64) -> Result<(), DomainError> {
+        if mise < self.combat_mise_min {
+            return Err(DomainError::Validation(format!(
+                "la mise minimum est de {} coins",
+                self.combat_mise_min
+            )));
+        }
+        // 0 = pas de plafond.
+        if self.combat_mise_max > 0 && mise > self.combat_mise_max {
+            return Err(DomainError::Validation(format!(
+                "la mise maximum est de {} coins",
+                self.combat_mise_max
+            )));
+        }
+        Ok(())
+    }
+
+    /// Prix reel d'un objet, tarif catalogue module par le reglage du serveur.
+    /// Jamais moins de 1 : un objet gratuit se prend en boucle.
+    pub fn shop_price(&self, catalogue: i64) -> i64 {
+        if self.shop_price_pct == 100 {
+            return catalogue;
+        }
+        (catalogue.saturating_mul(self.shop_price_pct) / 100).max(1)
+    }
+
     /// Chance de reussite d'un vol, selon la classe du voleur.
     pub fn steal_chance(&self, is_piegeur: bool) -> u32 {
         if is_piegeur {
@@ -221,6 +299,21 @@ pub async fn load_coussin(
         bet_min: n(&items, "bet_min", d.bet_min),
         insurance_enabled: b(&items, "insurance_enabled", d.insurance_enabled),
         insurance_cost: n(&items, "insurance_cost", d.insurance_cost),
+        insurance_duration_minutes: n(
+            &items,
+            "insurance_duration_minutes",
+            d.insurance_duration_minutes,
+        ),
+        bet_payout_pct: n(&items, "bet_payout_pct", d.bet_payout_pct),
+        combat_mise_min: n(&items, "combat_mise_min", d.combat_mise_min),
+        combat_mise_max: n(&items, "combat_mise_max", d.combat_mise_max),
+        level_gap_max: n(&items, "level_gap_max", d.level_gap_max),
+        combat_max_rounds: n(&items, "combat_max_rounds", d.combat_max_rounds),
+        max_level: n(&items, "max_level", d.max_level),
+        xp_winner: n(&items, "xp_winner", d.xp_winner),
+        xp_loser: n(&items, "xp_loser", d.xp_loser),
+        stat_points_per_level: n(&items, "stat_points_per_level", d.stat_points_per_level),
+        shop_price_pct: n(&items, "shop_price_pct", d.shop_price_pct),
     })
 }
 

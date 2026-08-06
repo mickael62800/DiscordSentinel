@@ -262,6 +262,19 @@ pub async fn leaderboard(
     ))
 }
 
+/// GET /api/me/games/wheel/cases
+///
+/// Sert au DESSIN de la roue. En cas d'echec, le site retombe sur ses cases
+/// par defaut : une roue non dessinee serait pire qu'une roue approximative.
+pub async fn wheel_cases(
+    State(state): State<AppState>,
+    user: Option<Extension<WebUser>>,
+) -> Result<Json<crate::adapters::outbound::nexus_games::WheelCases>, ApiError> {
+    require_ctx(&user)?;
+    let g = guild(&state)?;
+    Ok(Json(client(&state)?.wheel_cases(g).await?))
+}
+
 /// POST /api/me/games/wheel/spin
 ///
 /// Un tirage par jour et par personne. La regle est arbitree par nexus-core

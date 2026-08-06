@@ -18,8 +18,9 @@ use uuid::Uuid;
 use crate::application::wallet_service::get_or_create_wallet;
 use crate::domain::entities::wallet::Wallet;
 use crate::domain::entities::wallet::WalletMutation;
+use crate::domain::entities::wheel::default_cases;
 use crate::domain::entities::wheel::is_memorable_case;
-use crate::domain::entities::wheel::spin_with_rng;
+use crate::domain::entities::wheel::spin_cases_with_rng;
 use crate::domain::entities::wheel::WheelSpin;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::get_wallet::GetWalletUseCase;
@@ -84,9 +85,26 @@ impl PlayWheelUseCase for PlayWheelService {
             }));
         }
 
-        // 2. Spin RNG (entropie OS).
+        // 2. Spin RNG (entropie OS) sur les cases DU SERVEUR.
+        //
+        // Aucune case enregistree = roue historique. C'est ce qui permet a un
+        // serveur qui n'a jamais ouvert l'editeur de continuer a jouer
+        // exactement la meme roue qu'avant.
+        let cases = {
+            let personnalisees = self.wheel_repo.list_cases(&cmd.guild_id).await?;
+            if personnalisees.is_empty() {
+                default_cases()
+            } else {
+                personnalisees
+            }
+        };
         let mut rng = rand::rngs::StdRng::from_entropy();
-        let outcome = spin_with_rng(&mut rng);
+        let outcome = spin_cases_with_rng(&cases, &mut rng).map_err(|e| {
+            // La roue du serveur est cassee : on le DIT, plutot que de tirer
+            // en douce sur la roue par defaut. Un tirage sur des cases que
+            // personne n'a choisies serait pire qu'une erreur.
+            DomainError::Validation(format!("La roue de ce serveur est mal reglee : {e}"))
+        })?;
         // Le multiplicateur s'applique aux gains COMME aux pertes : ne
         // multiplier que les gains transformerait la roue en distributeur.
         let payout = cfg.apply_payout(outcome.case.payout);

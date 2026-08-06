@@ -9,4 +9,5 @@ pub mod coussin_steal_service;
 pub mod coussin_prime_service;
 pub mod coussin_bet_service;
 pub mod play_wheel_service;
+pub mod wheel_cases_service;
 pub mod wallet_service;

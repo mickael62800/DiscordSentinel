@@ -291,6 +291,7 @@ impl CoussinRepository for PgCoussinRepository {
         transferred: i64,
         attacker_hp: i32,
         defender_hp: i32,
+        bet_payout_pct: i64,
     ) -> Result<bool, DomainError> {
         if !(1..=6).contains(&attacker_roll) || !(1..=6).contains(&defender_roll) || transferred < 0 {
             return Err(DomainError::Validation("resultat de duel invalide".into()));
@@ -326,8 +327,8 @@ impl CoussinRepository for PgCoussinRepository {
                 let (balance_after,): (i64,) = sqlx::query_as("SELECT coins FROM nexus_wallets WHERE guild_id=$1 AND user_id=$2").bind(&guild_id).bind(user_id).fetch_one(&mut *tx).await.map_err(pg_err)?;
                 sqlx::query("INSERT INTO nexus_wallet_transactions (guild_id,user_id,amount,balance_after,source,description) VALUES ($1,$2,$3,$4,$5,'Coussin Piégé')").bind(&guild_id).bind(user_id).bind(amount).bind(balance_after).bind(source).execute(&mut *tx).await.map_err(pg_err)?;
             }
-            let winners: Vec<(String, i64)> = sqlx::query_as("UPDATE nexus_coussin_bets SET won=TRUE,payout=amount*2 WHERE combat_id=$1 AND backed_id=$2 RETURNING bettor_id,payout")
-                .bind(id).bind(winner).fetch_all(&mut *tx).await.map_err(pg_err)?;
+            let winners: Vec<(String, i64)> = sqlx::query_as("UPDATE nexus_coussin_bets SET won=TRUE,payout=amount*$3/100 WHERE combat_id=$1 AND backed_id=$2 RETURNING bettor_id,payout")
+                .bind(id).bind(winner).bind(bet_payout_pct.clamp(100, 1000)).fetch_all(&mut *tx).await.map_err(pg_err)?;
             sqlx::query("UPDATE nexus_coussin_bets SET won=FALSE,payout=0 WHERE combat_id=$1 AND backed_id<>$2")
                 .bind(id).bind(winner).execute(&mut *tx).await.map_err(pg_err)?;
             for (bettor, payout) in winners { sqlx::query("UPDATE nexus_wallets SET coins=coins+$3,total_earned=total_earned+$3 WHERE guild_id=$1 AND user_id=$2").bind(&guild_id).bind(bettor).bind(payout).execute(&mut *tx).await.map_err(pg_err)?; }

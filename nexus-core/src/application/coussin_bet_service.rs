@@ -44,6 +44,7 @@ impl CoussinBetUseCase for CoussinBetService {
         amount: i64,
     ) -> Result<(), DomainError> {
         let cfg = load_coussin(&self.config_repo, guild).await?;
+        cfg.ensure_enabled()?;
         if !cfg.bet_enabled {
             return Err(DomainError::Validation(
                 "les paris sont desactives sur ce serveur".into(),

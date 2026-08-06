@@ -182,14 +182,19 @@ redémarrage.
 
 | Groupe | Réglages |
 |---|---|
-| Général | Module actif |
+| Général | Module actif — **interrupteur maître** : jeu fermé, plus rien ne se joue, même si les cases ci-dessous restent cochées. Consulter son profil, son inventaire et le classement reste possible. |
+| Bagarres | Mise min/max · écart de niveau toléré · nombre de manches |
 | Fouille | Autorisée · chance de réussite · chance Piégeur · part prise · part perdue en cas d'échec · délai · solde minimum d'une cible |
 | Contrats | Autorisés · minimum · maximum |
-| Paris | Autorisés · minimum |
-| Coffre à coussins | Garantie disponible · prix |
+| Paris | Autorisés · minimum · gain d'un pari gagnant |
+| Coffre à coussins | Garantie disponible · prix · durée · prix des objets |
+| Progression | Niveau maximum · XP du vainqueur · XP du perdant · points gagnés par niveau |
 
 Les curseurs affichés sont **exactement** ceux qu'un service lit réellement. Un réglage sans
 effet est pire que son absence : il fait croire au problème résolu.
+
+Un seul chiffre reste volontairement en dur : **les 5 % d'arnaque de la garantie**. C'est la
+blague de la mécanique — à 0 l'achat n'a plus d'histoire, à 100 ce n'est plus une garantie.
 
 ---
 

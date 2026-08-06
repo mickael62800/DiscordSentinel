@@ -8,8 +8,16 @@ impl PgCoussinStealRepository { pub fn new(pool: PgPool) -> Self { Self { pool }
 #[async_trait]
 impl CoussinStealRepository for PgCoussinStealRepository {
     async fn balances(&self, guild:&str, thief:&str, victim:&str) -> Result<(i64,i64),DomainError> {
-        let cooldown: Option<(bool,)> = sqlx::query_as("SELECT TRUE FROM nexus_coussin_cooldowns WHERE guild_id=$1 AND user_id=$2 AND action='steal' AND available_at>NOW()").bind(guild).bind(thief).fetch_optional(&self.pool).await.map_err(pg_err)?;
-        if cooldown.is_some() { return Err(DomainError::RateLimited("vol disponible dans 30 minutes".into())); }
+        // Le delai RESTANT, pas une duree en dur : le message annoncait
+        // « 30 minutes » quel que soit le reglage du serveur, et restait faux
+        // meme une seconde avant la fin du delai.
+        let cooldown: Option<(f64,)> = sqlx::query_as("SELECT EXTRACT(EPOCH FROM (available_at - NOW())) FROM nexus_coussin_cooldowns WHERE guild_id=$1 AND user_id=$2 AND action='steal' AND available_at>NOW()").bind(guild).bind(thief).fetch_optional(&self.pool).await.map_err(pg_err)?;
+        if let Some((secondes,)) = cooldown {
+            let minutes = (secondes / 60.0).ceil().max(1.0) as i64;
+            return Err(DomainError::RateLimited(format!(
+                "tu as deja fouille recemment : reessaie dans {minutes} min"
+            )));
+        }
         let a: Option<(i64,)> = sqlx::query_as("SELECT coins FROM nexus_wallets WHERE guild_id=$1 AND user_id=$2").bind(guild).bind(thief).fetch_optional(&self.pool).await.map_err(pg_err)?;
         let b: Option<(i64,)> = sqlx::query_as("SELECT coins FROM nexus_wallets WHERE guild_id=$1 AND user_id=$2").bind(guild).bind(victim).fetch_optional(&self.pool).await.map_err(pg_err)?;
         Ok((a.ok_or_else(||DomainError::NotFound("wallet voleur".into()))?.0,b.ok_or_else(||DomainError::NotFound("wallet cible".into()))?.0))

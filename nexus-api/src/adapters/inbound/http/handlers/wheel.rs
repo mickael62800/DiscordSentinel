@@ -73,3 +73,71 @@ pub async fn status(
     let can_spin = state.play_wheel.can_spin(&guild_id, &user_id).await?;
     Ok(Json(WheelStatusDto { can_spin }))
 }
+
+// ── Cases de la roue (edition par serveur) ──
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WheelCaseDto {
+    pub key: String,
+    pub label: String,
+    pub payout: i64,
+    pub weight: u32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WheelCasesDto {
+    pub cases: Vec<WheelCaseDto>,
+    /// `false` = ce sont les cases historiques, faute de personnalisation.
+    pub customized: bool,
+}
+
+impl From<nexus_core::ports::inbound::wheel_cases::WheelCases> for WheelCasesDto {
+    fn from(w: nexus_core::ports::inbound::wheel_cases::WheelCases) -> Self {
+        Self {
+            cases: w
+                .cases
+                .into_iter()
+                .map(|c| WheelCaseDto {
+                    key: c.key,
+                    label: c.label,
+                    payout: c.payout,
+                    weight: c.weight,
+                })
+                .collect(),
+            customized: w.customized,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReplaceWheelCasesDto {
+    /// Liste VIDE = revenir a la roue historique.
+    pub cases: Vec<WheelCaseDto>,
+}
+
+/// GET /api/wheel/{guild_id}/cases
+pub async fn list_cases(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<WheelCasesDto>, ApiError> {
+    Ok(Json(state.wheel_cases.list(&guild_id).await?.into()))
+}
+
+/// PUT /api/wheel/{guild_id}/cases — remplace INTEGRALEMENT la roue.
+pub async fn replace_cases(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(dto): Json<ReplaceWheelCasesDto>,
+) -> Result<Json<WheelCasesDto>, ApiError> {
+    let cases = dto
+        .cases
+        .into_iter()
+        .map(|c| nexus_core::domain::entities::wheel::WheelCaseData {
+            key: c.key,
+            label: c.label,
+            payout: c.payout,
+            weight: c.weight,
+        })
+        .collect();
+    Ok(Json(state.wheel_cases.replace(&guild_id, cases).await?.into()))
+}

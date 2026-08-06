@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::wheel::WheelSpin;
+use crate::domain::entities::wheel::{WheelCaseData, WheelSpin};
 use crate::domain::errors::DomainError;
 
 #[async_trait]
@@ -37,4 +37,22 @@ pub trait WheelRepository: Send + Sync {
 
     /// Journalise un spin dans `nexus_wheel_spin_log`.
     async fn log_spin(&self, spin: &WheelSpin) -> Result<(), DomainError>;
+
+    /// Les cases definies par ce serveur, dans l'ordre d'affichage.
+    ///
+    /// Une liste VIDE signifie « ce serveur n'a rien personnalise » et non
+    /// « ce serveur n'a pas de roue » : l'appelant retombe alors sur les cases
+    /// historiques. C'est ce qui evite de semer dix lignes par guilde.
+    async fn list_cases(&self, guild_id: &str) -> Result<Vec<WheelCaseData>, DomainError>;
+
+    /// Remplace INTEGRALEMENT les cases d'un serveur.
+    ///
+    /// Remplacement et non fusion : l'editeur envoie la roue complete, et une
+    /// fusion laisserait vivre une case supprimee a l'ecran. Une liste vide
+    /// efface tout et fait revenir la roue historique.
+    async fn replace_cases(
+        &self,
+        guild_id: &str,
+        cases: &[WheelCaseData],
+    ) -> Result<(), DomainError>;
 }

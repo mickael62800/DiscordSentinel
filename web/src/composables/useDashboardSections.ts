@@ -43,6 +43,13 @@ const ALL_SECTIONS: DashboardSection[] = [
     universe: "nexus",
   },
   {
+    key: "nexus.roue",
+    path: "/nexus/roue",
+    label: "Roue du Destin",
+    icon: "zap",
+    universe: "nexus",
+  },
+  {
     key: "nexus.coussin",
     path: "/nexus/coussin",
     label: "Coussin Piégé",
