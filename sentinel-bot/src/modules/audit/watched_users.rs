@@ -82,17 +82,37 @@ pub async fn bootstrap_watched_users(ctx: &Context) {
         return;
     };
     let api = ApiClient::new(base);
-    match api.get_all_watched_user_ids().await {
-        Ok(ids) => {
-            watched_set.clear();
-            for id in ids {
-                watched_set.insert(id);
+    refresh_watched_for_guilds(ctx, &api, &watched_set, "bootstrap").await;
+}
+
+/// Recharge le cache des surveilles pour TOUS les serveurs du bot. Le guild_id
+/// est obligatoire cote API : on interroge donc par guilde (mono-serveur = un
+/// appel) et on unione les resultats avant de remplacer le cache d'un bloc.
+async fn refresh_watched_for_guilds(
+    ctx: &Context,
+    api: &ApiClient,
+    watched_set: &std::sync::Arc<dashmap::DashSet<String>>,
+    origine: &str,
+) {
+    let mut collected: Vec<String> = Vec::new();
+    let mut ok = true;
+    for guild_id in ctx.cache.guilds() {
+        match api.get_all_watched_user_ids(&guild_id.to_string()).await {
+            Ok(ids) => collected.extend(ids),
+            Err(e) => {
+                ok = false;
+                warn!(error = %e, guild_id = %guild_id, origine, "watched_users: refresh API echoue pour ce serveur");
             }
-            info!(count = watched_set.len(), "watched_users bootstrap via API");
         }
-        Err(e) => {
-            warn!(error = %e, "bootstrap_watched_users: API call failed, cache reste vide");
+    }
+    // Ne remplace le cache que si AU MOINS un appel a reussi : sur echec total
+    // (API down), on garde l'ancien cache plutot que de le vider a tort.
+    if ok || !collected.is_empty() {
+        watched_set.clear();
+        for id in collected {
+            watched_set.insert(id);
         }
+        info!(count = watched_set.len(), origine, "watched_users cache rafraichi via API");
     }
 }
 
@@ -125,19 +145,5 @@ pub async fn handle_watched_refresh_event(ctx: &Context, payload_json: &str) {
         return;
     };
     let api = ApiClient::new(base);
-    match api.get_all_watched_user_ids().await {
-        Ok(ids) => {
-            watched_set.clear();
-            for id in ids {
-                watched_set.insert(id);
-            }
-            info!(
-                count = watched_set.len(),
-                "watched_users cache refresh depuis event (via API)"
-            );
-        }
-        Err(e) => {
-            warn!(error = %e, "handle_watched_refresh_event: API call failed");
-        }
-    }
+    refresh_watched_for_guilds(ctx, &api, &watched_set, "event").await;
 }

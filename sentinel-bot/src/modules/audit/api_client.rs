@@ -59,11 +59,12 @@ impl ApiClient {
         self.base.get_json(&path).await
     }
 
-    /// Recupere les IDs de tous les utilisateurs surveilles (batch, tous les serveurs).
-    /// Un seul appel API au lieu de N appels par guild.
-    pub async fn get_all_watched_user_ids(&self) -> Result<Vec<String>, String> {
-        let users: Vec<serde_json::Value> =
-            self.base.get_json("/api/watched-users?limit=1000").await?;
+    /// Recupere les IDs des utilisateurs surveilles d'un serveur. Le `guild_id`
+    /// est OBLIGATOIRE cote API (durcissement IDOR : sans lui, la liste serait
+    /// globale et echapperait au scope par guilde) -> l'omettre renvoyait 422.
+    pub async fn get_all_watched_user_ids(&self, guild_id: &str) -> Result<Vec<String>, String> {
+        let path = format!("/api/watched-users?guild_id={guild_id}&limit=1000");
+        let users: Vec<serde_json::Value> = self.base.get_json(&path).await?;
 
         Ok(users
             .iter()
