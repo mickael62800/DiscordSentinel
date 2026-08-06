@@ -1,4 +1,8 @@
-//! Regles pures de Coup de Coude.
+//! Regles pures de Coussin Piégé.
+//!
+//! Le jeu : on planque un coussin piégé sur le canapé et on s'arrange pour
+//! que le voisin s'assoie dessus. Ce qu'on perd n'est pas de la vie, c'est du
+//! CONFORT — a zero on ne meurt pas, on se leve du canape.
 //!
 //! Aucun acces DB/Discord : ces fonctions sont reutilisables par l'API et
 //! testables sans infrastructure.
@@ -7,58 +11,81 @@ use serde::{Deserialize, Serialize};
 
 pub const MAX_LEVEL: i32 = 25;
 
+/// Les quatre manieres d'occuper un canape.
+///
+/// Chacune reprend un archetype reel de la bande : celui qui se laisse tomber
+/// sans regarder, celui qui bondit, celui qui prepare son coup, et celui qui
+/// ne bougera plus de la soiree.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum PlayerClass {
-    Bourrin,
-    Agile,
-    Fourbe,
-    Tank,
+    /// Se laisse tomber de tout son poids. Fait mal, encaisse mal.
+    Ecraseur,
+    /// Rebondit d'un accoudoir a l'autre. Vif, mais leger.
+    Ressort,
+    /// Planque les coussins. Frappe correctement et chipe mieux que les autres.
+    Piegeur,
+    /// Roule dans la couette et ne bouge plus. Encaisse tout.
+    Couette,
 }
 
 impl PlayerClass {
     pub fn parse(value: &str) -> Option<Self> {
         match value {
-            "bourrin" => Some(Self::Bourrin),
-            "agile" => Some(Self::Agile),
-            "fourbe" => Some(Self::Fourbe),
-            "tank" => Some(Self::Tank),
+            "ecraseur" => Some(Self::Ecraseur),
+            "ressort" => Some(Self::Ressort),
+            "piegeur" => Some(Self::Piegeur),
+            "couette" => Some(Self::Couette),
             _ => None,
         }
     }
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::Bourrin => "bourrin",
-            Self::Agile => "agile",
-            Self::Fourbe => "fourbe",
-            Self::Tank => "tank",
+            Self::Ecraseur => "ecraseur",
+            Self::Ressort => "ressort",
+            Self::Piegeur => "piegeur",
+            Self::Couette => "couette",
         }
     }
 
+    /// (Impact, Moelleux) de depart. L'equilibre est celui d'avant la
+    /// refonte : seuls les noms changent, pas les chiffres — un joueur ne
+    /// doit pas retrouver son personnage affaibli parce que le jeu a change
+    /// de titre.
     pub fn base_stats(self) -> (i32, i32) {
         match self {
-            Self::Bourrin => (25, 8),
-            Self::Agile => (12, 18),
-            Self::Fourbe => (18, 14),
-            Self::Tank => (8, 25),
+            Self::Ecraseur => (25, 8),
+            Self::Ressort => (12, 18),
+            Self::Piegeur => (18, 14),
+            Self::Couette => (8, 25),
         }
     }
 
     pub fn growth(self) -> (i32, i32) {
         match self {
-            Self::Bourrin => (4, 1),
-            Self::Agile => (2, 3),
-            Self::Fourbe => (3, 2),
-            Self::Tank => (1, 4),
+            Self::Ecraseur => (4, 1),
+            Self::Ressort => (2, 3),
+            Self::Piegeur => (3, 2),
+            Self::Couette => (1, 4),
         }
     }
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Bourrin => "💪 Bourrin",
-            Self::Agile => "🏃 Agile",
-            Self::Fourbe => "🗡️ Fourbe",
-            Self::Tank => "🛡️ Tank",
+            Self::Ecraseur => "🪑 Écraseur",
+            Self::Ressort => "🤸 Ressort",
+            Self::Piegeur => "🪡 Piégeur",
+            Self::Couette => "🛌 Couette",
+        }
+    }
+
+    /// Une phrase pour choisir sans lire un tableau de stats.
+    pub fn pitch(self) -> &'static str {
+        match self {
+            Self::Ecraseur => "Tu t'assois sans regarder. Ça fait mal aux deux.",
+            Self::Ressort => "Tu rebondis d'un accoudoir a l'autre.",
+            Self::Piegeur => "Tu places les coussins. Et tu fouilles sous les autres.",
+            Self::Couette => "Tu es dans la couette. Tu n'en sortiras pas.",
         }
     }
 }
@@ -76,14 +103,16 @@ pub fn level_for_xp(xp: i64) -> i32 {
         .unwrap_or(1)
 }
 
+/// Le titre raconte la place gagnee sur le canape, pas un grade militaire :
+/// on commence sur l'accoudoir et on finit au milieu, telecommande en main.
 pub fn title_for_level(level: i32) -> &'static str {
     match level {
-        1..=4 => "Debutant",
-        5..=9 => "Bagarreur",
-        10..=14 => "Guerrier",
-        15..=19 => "Veteran",
-        20..=24 => "Champion",
-        _ => "Inarretable",
+        1..=4 => "Bout d'Accoudoir",
+        5..=9 => "Squatteur",
+        10..=14 => "Poseur de Coussins",
+        15..=19 => "Gardien de la Telecommande",
+        20..=24 => "Roi du Canape",
+        _ => "Le Canape, c'est Lui",
     }
 }
 
@@ -99,7 +128,7 @@ pub fn matchmaking_handicap(first_level: i32, second_level: i32) -> Option<f32> 
 pub fn max_hp(defense: i32, class: PlayerClass) -> i32 {
     let base = 100 + defense.max(0) * 10;
     match class {
-        PlayerClass::Tank => base * 13 / 10,
+        PlayerClass::Couette => base * 13 / 10,
         _ => base,
     }
 }
@@ -108,10 +137,10 @@ pub fn max_hp(defense: i32, class: PlayerClass) -> i32 {
 /// par le cas d'usage afin de garder le domaine reproductible en tests.
 pub fn damage(attack: i32, defense: i32, attacker: PlayerClass, defender: PlayerClass) -> i32 {
     let mut value = (10 + attack.max(0) * 4 - defense.max(0) * 2).max(1);
-    if attacker == PlayerClass::Bourrin {
+    if attacker == PlayerClass::Ecraseur {
         value = value * 125 / 100;
     }
-    if defender == PlayerClass::Tank {
+    if defender == PlayerClass::Couette {
         value = value * 80 / 100;
     }
     value.max(1)
@@ -159,10 +188,10 @@ pub fn resolve_combat(
         let defender_atk = if !attacker_is_higher { (defender_atk as f32 * handicap) as i32 } else { defender_atk };
         let mut to_defender = damage(attacker_atk, defender_def, attacker_class, defender_class) * (*attacker_roll).clamp(1, 6);
         let mut to_attacker = damage(defender_atk, attacker_def, defender_class, attacker_class) * (*defender_roll).clamp(1, 6);
-        if attacker_class == PlayerClass::Bourrin && attacker_hp * 100 < max_hp(attacker_def, attacker_class) * 30 { to_defender = to_defender * 125 / 100; }
-        if defender_class == PlayerClass::Bourrin && defender_hp * 100 < max_hp(defender_def, defender_class) * 30 { to_attacker = to_attacker * 125 / 100; }
-        if attacker_class == PlayerClass::Tank { to_attacker = (to_attacker - 5).max(1); }
-        if defender_class == PlayerClass::Tank { to_defender = (to_defender - 5).max(1); }
+        if attacker_class == PlayerClass::Ecraseur && attacker_hp * 100 < max_hp(attacker_def, attacker_class) * 30 { to_defender = to_defender * 125 / 100; }
+        if defender_class == PlayerClass::Ecraseur && defender_hp * 100 < max_hp(defender_def, defender_class) * 30 { to_attacker = to_attacker * 125 / 100; }
+        if attacker_class == PlayerClass::Couette { to_attacker = (to_attacker - 5).max(1); }
+        if defender_class == PlayerClass::Couette { to_defender = (to_defender - 5).max(1); }
         attacker_hp = (attacker_hp - to_attacker).max(0);
         defender_hp = (defender_hp - to_defender).max(0);
         attacker_damage_total += to_defender;
@@ -207,16 +236,16 @@ mod tests {
     }
     #[test]
     fn tank_is_tougher() {
-        assert!(max_hp(5, PlayerClass::Tank) > max_hp(5, PlayerClass::Agile));
+        assert!(max_hp(5, PlayerClass::Couette) > max_hp(5, PlayerClass::Ressort));
     }
     #[test]
     fn damage_never_zero() {
-        assert_eq!(damage(0, 999, PlayerClass::Agile, PlayerClass::Tank), 1);
+        assert_eq!(damage(0, 999, PlayerClass::Ressort, PlayerClass::Couette), 1);
     }
     #[test]
     fn duel_declares_winner_or_draw() {
         assert_eq!(
-            resolve_duel(10, 1, PlayerClass::Bourrin, 1, 1, PlayerClass::Agile, 6, 1).attacker_won,
+            resolve_duel(10, 1, PlayerClass::Ecraseur, 1, 1, PlayerClass::Ressort, 6, 1).attacker_won,
             Some(true)
         );
     }
@@ -226,7 +255,7 @@ mod tests {
     }
     #[test]
     fn multi_round_combat_produces_a_result() {
-        let result = resolve_combat(25, 8, PlayerClass::Bourrin, 1, 8, 25, PlayerClass::Tank, 1, &[(6, 1), (6, 1), (6, 1)]).unwrap();
+        let result = resolve_combat(25, 8, PlayerClass::Ecraseur, 1, 8, 25, PlayerClass::Couette, 1, &[(6, 1), (6, 1), (6, 1)]).unwrap();
         assert!(result.attacker_damage > 0);
         assert!(result.rounds >= 1);
     }

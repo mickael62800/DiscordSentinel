@@ -99,7 +99,7 @@ pub fn build_transfer_embed(
 }
 
 /// Embed du classement (`/classement`), style medailles des anciens
-/// leaderboards (`format_leaderboard` du module coude).
+/// leaderboards (`format_leaderboard` du module coussin).
 pub fn build_leaderboard_embed(entries: &[crate::api_client::WalletResponse]) -> CreateEmbed {
     let body = if entries.is_empty() {
         "Aucun joueur pour le moment.".to_string()
@@ -133,21 +133,99 @@ pub fn build_error_embed(message: &str) -> CreateEmbed {
         .color(0xed4245)
 }
 
-pub fn build_coude_challenge_embed(attacker_id: u64, defender_id: u64, mise: i64) -> CreateEmbed {
+pub fn build_coussin_challenge_embed(attacker_id: u64, defender_id: u64, mise: i64) -> CreateEmbed {
     CreateEmbed::new()
-        .title("👊 Coup de Coude !")
-        .description(format!("<@{attacker_id}> defie <@{defender_id}> pour **{mise} coins**.\n\n<@{defender_id}>, acceptes-tu le duel ?"))
+        .title("🛋️💣 Coussin Piégé !")
+        .description(format!(
+            "<@{attacker_id}> vient de glisser un coussin sous <@{defender_id}> — **{mise} coins** sur la table.\n\n\
+             <@{defender_id}>, tu t'assois ou tu restes debout ?"
+        ))
         .color(0xF39C12)
-        .footer(CreateEmbedFooter::new("Le defi expire lorsqu'il est refuse ou resolu."))
+        .footer(CreateEmbedFooter::new("Rester debout devant tout le monde, ca se remarque."))
 }
 
-pub fn build_coude_profile_embed(p: &crate::api_client::CoudeProfileResponse) -> CreateEmbed {
-    CreateEmbed::new().title(format!("👊 Profil Coude — {}", p.username)).color(0x5865F2)
-        .description(format!("**{}** · Niveau **{}** — {} XP\n❤️ {}/{} HP · 🪙 {} coins", p.title, p.level, p.xp, p.hp_current, p.hp_max, p.coins))
-        .field("Classe", &p.class, true).field("ATK / DEF", format!("{} / {}", p.atk, p.def), true)
-        .field("Points de stats", p.stat_points.to_string(), true)
-        .field("Palmares", format!("{}V · {}D · {}N", p.total_wins, p.total_losses, p.total_draws), false)
-        .field("Vols", format!("{} coins", p.total_stolen), true)
-        .field("Lâcheté", p.cowardice_count.to_string(), true)
-        .field("Chaos", p.chaos_events.to_string(), true)
+/// Nom lisible d'un objet du coffre a coussins.
+///
+/// Le catalogue est celui du domaine : dupliquer les libelles ici les aurait
+/// laisses diverger de la boutique des la premiere retouche.
+fn nom_objet(cle: &str) -> String {
+    nexus_core::domain::entities::coussin_shop::item(cle)
+        .map(|i| i.name.to_string())
+        .unwrap_or_else(|| cle.to_string())
+}
+
+/// Libelle de la classe, emoji compris. L'API renvoie la cle technique
+/// (`ecraseur`) ; l'afficher telle quelle donnerait « Maniere : ecraseur ».
+fn nom_classe(cle: &str) -> String {
+    nexus_core::domain::entities::coussin::PlayerClass::parse(cle)
+        .map(|c| c.label().to_string())
+        .unwrap_or_else(|| "🧍 Debout".to_string())
+}
+
+/// Le profil parle de CONFORT et de place sur le canape, pas de points de vie :
+/// c'est le meme chiffre, mais il raconte enfin quelque chose.
+pub fn build_coussin_profile_embed(p: &crate::api_client::CoussinProfileResponse) -> CreateEmbed {
+    CreateEmbed::new().title(format!("🛋️ Place de {} sur le canape", p.username)).color(0x5865F2)
+        .description(format!("**{}** · Niveau **{}** — {} XP\n🛋️ Confort {}/{} · 🪙 {} coins", p.title, p.level, p.xp, p.hp_current, p.hp_max, p.coins))
+        .field("Maniere de s'asseoir", nom_classe(&p.class), true)
+        .field("Impact / Moelleux", format!("{} / {}", p.atk, p.def), true)
+        .field("Points a placer", p.stat_points.to_string(), true)
+        .field("Palmares", format!("{} assis · {} leves · {} match nuls", p.total_wins, p.total_losses, p.total_draws), false)
+        .field("Trouve sous les coussins", format!("{} coins", p.total_stolen), true)
+        .field("Fois reste debout", p.cowardice_count.to_string(), true)
+        .field("Bazar declenche", p.chaos_events.to_string(), true)
+}
+
+/// Achat au coffre a coussins. Reponse privee : c'est une transaction
+/// personnelle, et surtout annoncer publiquement qu'on vient d'acheter une
+/// Punaise dans le Coussin ruinerait l'objet avant meme de s'en servir.
+pub fn build_coussin_purchase_embed(item_key: &str, balance: i64) -> CreateEmbed {
+    CreateEmbed::new()
+        .title("🛋️ Planque effectuee")
+        .description(format!(
+            "**{}** est maintenant sous ton coussin.",
+            nom_objet(item_key)
+        ))
+        .field("Solde", format!("{balance} coins"), true)
+        .color(0xF39C12)
+}
+
+/// Garantie anti-tache. Le caractere douteux du contrat fait partie du jeu :
+/// on le signale sans dire ce qu'il changera, sinon il n'y aurait plus de
+/// mauvaise surprise a avoir.
+pub fn build_coussin_insurance_embed(is_scam: bool, expires_at: &str) -> CreateEmbed {
+    if is_scam {
+        CreateEmbed::new()
+            .title("⚠️ Garantie signee")
+            .description(format!(
+                "Le vendeur a souri un peu trop vite et les petites lignes sont illisibles.\n\
+                 Couverture annoncee jusqu'a **{expires_at}**."
+            ))
+            .color(0xE67E22)
+    } else {
+        CreateEmbed::new()
+            .title("🧼 Garantie anti-tache active")
+            .description(format!("Tes pertes sont couvertes jusqu'a **{expires_at}**."))
+            .color(0x2ECC71)
+    }
+}
+
+/// Ce qu'on planque sous son coussin. Prive par nature : la moitie de ces
+/// objets ne valent que par l'effet de surprise.
+pub fn build_coussin_inventory_embed(
+    items: &[crate::api_client::CoussinInventoryItem],
+) -> CreateEmbed {
+    let body = if items.is_empty() {
+        "Rien sous ton coussin. Le coffre s'ouvre avec `/shop`.".to_string()
+    } else {
+        items
+            .iter()
+            .map(|i| format!("• **{}** ×{}", nom_objet(&i.item_key), i.quantity))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    CreateEmbed::new()
+        .title("🛋️ Sous ton coussin")
+        .description(body)
+        .color(0x5865F2)
 }

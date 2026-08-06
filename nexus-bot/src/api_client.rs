@@ -54,7 +54,7 @@ pub struct TransferRequest {
     pub reason: Option<String>,
 }
 #[derive(Debug, Serialize)]
-pub struct CoudeChallengeRequest {
+pub struct CoussinChallengeRequest {
     pub channel_id: String,
     pub attacker_id: String,
     pub attacker_name: String,
@@ -63,7 +63,7 @@ pub struct CoudeChallengeRequest {
     pub mise: i64,
 }
 #[derive(Debug, Deserialize)]
-pub struct CoudeChallengeResponse {
+pub struct CoussinChallengeResponse {
     pub id: String,
     #[allow(dead_code)]
     pub status: String,
@@ -71,13 +71,13 @@ pub struct CoudeChallengeResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct CoudeDefenderRequest {
+pub struct CoussinDefenderRequest {
     pub defender_id: String,
 }
 
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct CoudeProfileResponse {
+pub struct CoussinProfileResponse {
     pub username: String, pub class: String, pub level: i32, pub xp: i64,
     pub atk: i32, pub def: i32, pub hp_current: i32, pub hp_max: i32,
     pub coins: i64, pub stat_points: i32, pub title: String,
@@ -86,14 +86,14 @@ pub struct CoudeProfileResponse {
 }
 
 #[derive(Debug, Serialize)]
-pub struct CoudeClassRequest { pub username: String, pub class: String }
+pub struct CoussinClassRequest { pub username: String, pub class: String }
 #[derive(Debug, Serialize)]
-pub struct CoudeTrainRequest { pub username: String, pub stat: String }
-#[derive(Debug, Serialize)] pub struct CoudeBuyItemRequest { pub item_key: String }
-#[derive(Debug, Serialize)] pub struct CoudeStealRequest { pub thief_name: String, pub victim_id: String, pub victim_name: String }
-#[derive(Debug, Serialize)] pub struct CoudePrimeRequest { pub target_id: String, pub target_name: String, pub placer_name: String, pub amount: i64 }
-#[derive(Debug, Deserialize)] pub struct CoudeInventoryItem { pub item_key: String, pub quantity: i32 }
-#[derive(Debug, Serialize)] pub struct CoudeBetRequest { pub combat_id: String, pub bettor_name: String, pub backed_id: String, pub amount: i64 }
+pub struct CoussinTrainRequest { pub username: String, pub stat: String }
+#[derive(Debug, Serialize)] pub struct CoussinBuyItemRequest { pub item_key: String }
+#[derive(Debug, Serialize)] pub struct CoussinStealRequest { pub thief_name: String, pub victim_id: String, pub victim_name: String }
+#[derive(Debug, Serialize)] pub struct CoussinPrimeRequest { pub target_id: String, pub target_name: String, pub placer_name: String, pub amount: i64 }
+#[derive(Debug, Deserialize)] pub struct CoussinInventoryItem { pub item_key: String, pub quantity: i32 }
+#[derive(Debug, Serialize)] pub struct CoussinBetRequest { pub combat_id: String, pub bettor_name: String, pub backed_id: String, pub amount: i64 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TransferResponse {
@@ -548,65 +548,65 @@ impl ApiClient {
         }
     }
 
-    pub async fn challenge_coude(
+    pub async fn challenge_coussin(
         &self,
         guild_id: &str,
-        body: &CoudeChallengeRequest,
-    ) -> Result<CoudeChallengeResponse, String> {
+        body: &CoussinChallengeRequest,
+    ) -> Result<CoussinChallengeResponse, String> {
         let url = format!(
-            "{}/api/coude/{}/combats",
+            "{}/api/coussin/{}/combats",
             self.base_url,
             encode_segment(guild_id)
         );
         self.send(self.http.post(url).json(body)).await
     }
 
-    pub async fn accept_coude(&self, id: &str, defender_id: &str) -> Result<bool, String> {
-        let url = format!("{}/api/coude/combats/{}/accept", self.base_url, encode_segment(id));
+    pub async fn accept_coussin(&self, id: &str, defender_id: &str) -> Result<bool, String> {
+        let url = format!("{}/api/coussin/combats/{}/accept", self.base_url, encode_segment(id));
         let response: serde_json::Value = self
-            .send(self.http.post(url).json(&CoudeDefenderRequest { defender_id: defender_id.into() }))
+            .send(self.http.post(url).json(&CoussinDefenderRequest { defender_id: defender_id.into() }))
             .await?;
         response["ok"].as_bool().ok_or_else(|| "reponse nexus-api invalide".into())
     }
 
-    pub async fn refuse_coude(&self, id: &str, defender_id: &str) -> Result<bool, String> {
-        let url = format!("{}/api/coude/combats/{}/refuse", self.base_url, encode_segment(id));
+    pub async fn refuse_coussin(&self, id: &str, defender_id: &str) -> Result<bool, String> {
+        let url = format!("{}/api/coussin/combats/{}/refuse", self.base_url, encode_segment(id));
         let response: serde_json::Value = self
-            .send(self.http.post(url).json(&CoudeDefenderRequest { defender_id: defender_id.into() }))
+            .send(self.http.post(url).json(&CoussinDefenderRequest { defender_id: defender_id.into() }))
             .await?;
         response["ok"].as_bool().ok_or_else(|| "reponse nexus-api invalide".into())
     }
 
-    pub async fn resolve_coude(&self, id: &str) -> Result<bool, String> {
-        let url = format!("{}/api/coude/combats/{}/resolve", self.base_url, encode_segment(id));
+    pub async fn resolve_coussin(&self, id: &str) -> Result<bool, String> {
+        let url = format!("{}/api/coussin/combats/{}/resolve", self.base_url, encode_segment(id));
         let response: serde_json::Value = self.send(self.http.post(url)).await?;
         response["ok"].as_bool().ok_or_else(|| "reponse nexus-api invalide".into())
     }
 
-    pub async fn coude_profile(&self, guild_id: &str, user_id: &str, username: &str) -> Result<CoudeProfileResponse, String> {
-        let url = format!("{}/api/coude/{}/{}/profile?username={}", self.base_url, encode_segment(guild_id), encode_segment(user_id), encode_segment(username));
+    pub async fn coussin_profile(&self, guild_id: &str, user_id: &str, username: &str) -> Result<CoussinProfileResponse, String> {
+        let url = format!("{}/api/coussin/{}/{}/profile?username={}", self.base_url, encode_segment(guild_id), encode_segment(user_id), encode_segment(username));
         self.send(self.http.get(url)).await
     }
-    pub async fn choose_coude_class(&self, guild_id: &str, user_id: &str, username: &str, class: &str) -> Result<CoudeProfileResponse, String> {
-        let url = format!("{}/api/coude/{}/{}/class", self.base_url, encode_segment(guild_id), encode_segment(user_id));
-        self.send(self.http.post(url).json(&CoudeClassRequest { username: username.into(), class: class.into() })).await
+    pub async fn choose_coussin_class(&self, guild_id: &str, user_id: &str, username: &str, class: &str) -> Result<CoussinProfileResponse, String> {
+        let url = format!("{}/api/coussin/{}/{}/class", self.base_url, encode_segment(guild_id), encode_segment(user_id));
+        self.send(self.http.post(url).json(&CoussinClassRequest { username: username.into(), class: class.into() })).await
     }
-    pub async fn train_coude(&self, guild_id: &str, user_id: &str, username: &str, stat: &str) -> Result<CoudeProfileResponse, String> {
-        let url = format!("{}/api/coude/{}/{}/train", self.base_url, encode_segment(guild_id), encode_segment(user_id));
-        self.send(self.http.post(url).json(&CoudeTrainRequest { username: username.into(), stat: stat.into() })).await
+    pub async fn train_coussin(&self, guild_id: &str, user_id: &str, username: &str, stat: &str) -> Result<CoussinProfileResponse, String> {
+        let url = format!("{}/api/coussin/{}/{}/train", self.base_url, encode_segment(guild_id), encode_segment(user_id));
+        self.send(self.http.post(url).json(&CoussinTrainRequest { username: username.into(), stat: stat.into() })).await
     }
-    pub async fn buy_coude_item(&self, guild_id: &str, user_id: &str, item_key: &str) -> Result<i64, String> {
-        let url = format!("{}/api/coude/{}/{}/shop", self.base_url, encode_segment(guild_id), encode_segment(user_id));
-        let value: serde_json::Value = self.send(self.http.post(url).json(&CoudeBuyItemRequest { item_key: item_key.into() })).await?;
+    pub async fn buy_coussin_item(&self, guild_id: &str, user_id: &str, item_key: &str) -> Result<i64, String> {
+        let url = format!("{}/api/coussin/{}/{}/shop", self.base_url, encode_segment(guild_id), encode_segment(user_id));
+        let value: serde_json::Value = self.send(self.http.post(url).json(&CoussinBuyItemRequest { item_key: item_key.into() })).await?;
         value["balance_after"].as_i64().ok_or_else(|| "reponse nexus-api invalide".into())
     }
-    pub async fn buy_coude_insurance(&self, guild_id: &str, user_id: &str) -> Result<(bool, String), String> {
-        let url = format!("{}/api/coude/{}/{}/insurance", self.base_url, encode_segment(guild_id), encode_segment(user_id));
+    pub async fn buy_coussin_insurance(&self, guild_id: &str, user_id: &str) -> Result<(bool, String), String> {
+        let url = format!("{}/api/coussin/{}/{}/insurance", self.base_url, encode_segment(guild_id), encode_segment(user_id));
         let value: serde_json::Value = self.send(self.http.post(url)).await?;
         Ok((value["is_scam"].as_bool().ok_or_else(|| "reponse nexus-api invalide".to_string())?, value["expires_at"].as_str().unwrap_or("").to_string()))
     }
-    pub async fn steal_coude(&self, guild: &str, user: &str, body: &CoudeStealRequest) -> Result<(bool, i64), String> { let url=format!("{}/api/coude/{}/{}/steal",self.base_url,encode_segment(guild),encode_segment(user)); let v:serde_json::Value=self.send(self.http.post(url).json(body)).await?; Ok((v["success"].as_bool().unwrap_or(false),v["amount"].as_i64().unwrap_or(0))) }
-    pub async fn prime_coude(&self, guild: &str, user: &str, body: &CoudePrimeRequest) -> Result<(), String> { let url=format!("{}/api/coude/{}/{}/prime",self.base_url,encode_segment(guild),encode_segment(user)); let _:serde_json::Value=self.send(self.http.post(url).json(body)).await?; Ok(()) }
-    pub async fn inventory_coude(&self, guild: &str, user: &str) -> Result<Vec<CoudeInventoryItem>, String> { let url=format!("{}/api/coude/{}/{}/inventory",self.base_url,encode_segment(guild),encode_segment(user)); self.send(self.http.get(url)).await }
-    pub async fn bet_coude(&self,guild:&str,user:&str,body:&CoudeBetRequest)->Result<(),String>{let url=format!("{}/api/coude/{}/{}/bets",self.base_url,encode_segment(guild),encode_segment(user));let _:serde_json::Value=self.send(self.http.post(url).json(body)).await?;Ok(())}
+    pub async fn steal_coussin(&self, guild: &str, user: &str, body: &CoussinStealRequest) -> Result<(bool, i64), String> { let url=format!("{}/api/coussin/{}/{}/steal",self.base_url,encode_segment(guild),encode_segment(user)); let v:serde_json::Value=self.send(self.http.post(url).json(body)).await?; Ok((v["success"].as_bool().unwrap_or(false),v["amount"].as_i64().unwrap_or(0))) }
+    pub async fn prime_coussin(&self, guild: &str, user: &str, body: &CoussinPrimeRequest) -> Result<(), String> { let url=format!("{}/api/coussin/{}/{}/prime",self.base_url,encode_segment(guild),encode_segment(user)); let _:serde_json::Value=self.send(self.http.post(url).json(body)).await?; Ok(()) }
+    pub async fn inventory_coussin(&self, guild: &str, user: &str) -> Result<Vec<CoussinInventoryItem>, String> { let url=format!("{}/api/coussin/{}/{}/inventory",self.base_url,encode_segment(guild),encode_segment(user)); self.send(self.http.get(url)).await }
+    pub async fn bet_coussin(&self,guild:&str,user:&str,body:&CoussinBetRequest)->Result<(),String>{let url=format!("{}/api/coussin/{}/{}/bets",self.base_url,encode_segment(guild),encode_segment(user));let _:serde_json::Value=self.send(self.http.post(url).json(body)).await?;Ok(())}
 }

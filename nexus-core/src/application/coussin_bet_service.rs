@@ -8,24 +8,24 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::application::economy_config::load_coude;
+use crate::application::economy_config::load_coussin;
 use crate::domain::errors::DomainError;
 use crate::ports::{
-    inbound::coude_bet::CoudeBetUseCase,
+    inbound::coussin_bet::CoussinBetUseCase,
     outbound::{
-        coude_bet_repository::CoudeBetRepository,
+        coussin_bet_repository::CoussinBetRepository,
         system::bot_config_repository::BotConfigRepository,
     },
 };
 
-pub struct CoudeBetService {
-    repo: Arc<dyn CoudeBetRepository>,
+pub struct CoussinBetService {
+    repo: Arc<dyn CoussinBetRepository>,
     config_repo: Arc<dyn BotConfigRepository>,
 }
 
-impl CoudeBetService {
+impl CoussinBetService {
     pub fn new(
-        repo: Arc<dyn CoudeBetRepository>,
+        repo: Arc<dyn CoussinBetRepository>,
         config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
         Self { repo, config_repo }
@@ -33,7 +33,7 @@ impl CoudeBetService {
 }
 
 #[async_trait]
-impl CoudeBetUseCase for CoudeBetService {
+impl CoussinBetUseCase for CoussinBetService {
     async fn place(
         &self,
         guild: &str,
@@ -43,7 +43,7 @@ impl CoudeBetUseCase for CoudeBetService {
         backed: &str,
         amount: i64,
     ) -> Result<(), DomainError> {
-        let cfg = load_coude(&self.config_repo, guild).await?;
+        let cfg = load_coussin(&self.config_repo, guild).await?;
         if !cfg.bet_enabled {
             return Err(DomainError::Validation(
                 "les paris sont desactives sur ce serveur".into(),

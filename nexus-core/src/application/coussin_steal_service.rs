@@ -5,7 +5,7 @@
 //! configuration du serveur. Elles etaient en dur : regler un vol trop
 //! punitif demandait de recompiler, autrement dit de ne jamais le regler.
 //!
-//! Les defauts de `CoudeConfig` reproduisent exactement les anciennes
+//! Les defauts de `CoussinConfig` reproduisent exactement les anciennes
 //! constantes, donc rien ne change tant que personne ne touche a la
 //! configuration.
 
@@ -14,24 +14,24 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rand::Rng;
 
-use crate::application::economy_config::load_coude;
+use crate::application::economy_config::load_coussin;
 use crate::domain::errors::DomainError;
 use crate::ports::{
-    inbound::coude_steal::{CoudeStealUseCase, StealResult},
+    inbound::coussin_steal::{CoussinStealUseCase, StealResult},
     outbound::{
-        coude_steal_repository::CoudeStealRepository,
+        coussin_steal_repository::CoussinStealRepository,
         system::bot_config_repository::BotConfigRepository,
     },
 };
 
-pub struct CoudeStealService {
-    repo: Arc<dyn CoudeStealRepository>,
+pub struct CoussinStealService {
+    repo: Arc<dyn CoussinStealRepository>,
     config_repo: Arc<dyn BotConfigRepository>,
 }
 
-impl CoudeStealService {
+impl CoussinStealService {
     pub fn new(
-        repo: Arc<dyn CoudeStealRepository>,
+        repo: Arc<dyn CoussinStealRepository>,
         config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
         Self { repo, config_repo }
@@ -39,13 +39,13 @@ impl CoudeStealService {
 }
 
 #[async_trait]
-impl CoudeStealUseCase for CoudeStealService {
+impl CoussinStealUseCase for CoussinStealService {
     async fn steal(
         &self,
         guild_id: &str,
         thief_id: &str,
         victim_id: &str,
-        is_fourbe: bool,
+        is_piegeur: bool,
     ) -> Result<StealResult, DomainError> {
         if thief_id == victim_id {
             return Err(DomainError::Validation(
@@ -53,7 +53,7 @@ impl CoudeStealUseCase for CoudeStealService {
             ));
         }
 
-        let cfg = load_coude(&self.config_repo, guild_id).await?;
+        let cfg = load_coussin(&self.config_repo, guild_id).await?;
         if !cfg.steal_enabled {
             return Err(DomainError::Validation(
                 "les vols sont desactives sur ce serveur".into(),
@@ -71,7 +71,7 @@ impl CoudeStealUseCase for CoudeStealService {
             )));
         }
 
-        let success = rand::thread_rng().gen_range(0..100) < cfg.steal_chance(is_fourbe);
+        let success = rand::thread_rng().gen_range(0..100) < cfg.steal_chance(is_piegeur);
         let amount = if success {
             cfg.steal_gain(victim)
         } else {

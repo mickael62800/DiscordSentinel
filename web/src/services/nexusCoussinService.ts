@@ -1,4 +1,4 @@
-// Jeu Coude : supervision des joueurs.
+// Jeu Coussin : supervision des joueurs.
 //
 // Lecture seule cote web. Les actions de jeu (combats, vols, primes, paris)
 // restent sur Discord : ce sont des interactions entre joueurs, les rejouer
@@ -6,7 +6,7 @@
 
 import { nexusGet } from "@/api/nexusHttp";
 
-export interface CoudeProfile {
+export interface CoussinProfile {
   guild_id: string;
   user_id: string;
   username: string;
@@ -28,11 +28,11 @@ export interface CoudeProfile {
   chaos_events: number;
 }
 
-export const nexusCoudeService = {
-  /** GET /api/coude/{guild}/classement */
-  ranking(guildId: string, limit = 50): Promise<CoudeProfile[]> {
-    return nexusGet<CoudeProfile[]>(
-      `/api/coude/${encodeURIComponent(guildId)}/classement?limit=${limit}`,
+export const nexusCoussinService = {
+  /** GET /api/coussin/{guild}/classement */
+  ranking(guildId: string, limit = 50): Promise<CoussinProfile[]> {
+    return nexusGet<CoussinProfile[]>(
+      `/api/coussin/${encodeURIComponent(guildId)}/classement?limit=${limit}`,
       guildId,
     );
   },

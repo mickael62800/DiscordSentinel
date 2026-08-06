@@ -68,17 +68,17 @@ export const gamesService = {
     return httpPost<SpinResult>("/api/me/games/wheel/spin", {});
   },
 
-  /// Dossier complet du joueur à Coup de Coude : profil, objets, derniers
+  /// Dossier complet du joueur à Coussin Piégé : profil, objets, derniers
   /// combats, classement. Une seule requête — la page a besoin des quatre en
   /// même temps, et le classement seul n'a aucun sens sans le profil.
-  coude(): Promise<CoudeFile> {
-    return httpGet<CoudeFile>("/api/me/games/coude");
+  coussin(): Promise<CoussinFile> {
+    return httpGet<CoussinFile>("/api/me/games/coussin");
   },
 };
 
-// ── Coup de Coude ──
+// ── Coussin Piégé ──
 
-export interface CoudeProfile {
+export interface CoussinProfile {
   username: string;
   /// `bourrin` | `agile` | `fourbe` | `tank`, ou vide si non choisie.
   class: string;
@@ -101,12 +101,12 @@ export interface CoudeProfile {
   chaos_events: number;
 }
 
-export interface CoudeItem {
+export interface CoussinItem {
   item_key: string;
   quantity: number;
 }
 
-export interface CoudeCombat {
+export interface CoussinCombat {
   id: string;
   attacker_id: string;
   attacker_name: string;
@@ -124,9 +124,9 @@ export interface CoudeCombat {
   resolved_at: string | null;
 }
 
-export interface CoudeFile {
-  profile: CoudeProfile;
-  items: CoudeItem[];
-  combats: CoudeCombat[];
-  ranking: CoudeProfile[];
+export interface CoussinFile {
+  profile: CoussinProfile;
+  items: CoussinItem[];
+  combats: CoussinCombat[];
+  ranking: CoussinProfile[];
 }

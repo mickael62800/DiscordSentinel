@@ -25,8 +25,8 @@ import {
   type Rank,
   type SpinResult,
   type Transaction,
-  type CoudeCombat,
-  type CoudeFile,
+  type CoussinCombat,
+  type CoussinFile,
   type Wallet,
 } from "@/services/gamesService";
 import { badgeCanaux, GAMES, jeuMemorise, memoriserJeu } from "@/games/catalog";
@@ -148,20 +148,20 @@ async function tirer() {
   }
 }
 
-// ── Coup de Coude ──
+// ── Coussin Piégé ──
 
-const coude = ref<CoudeFile | null>(null);
-const coudeErreur = ref<string | null>(null);
+const coussin = ref<CoussinFile | null>(null);
+const coussinErreur = ref<string | null>(null);
 
 /// Chargé à la demande, pas au montage : quelqu'un qui vient pour la Roue
 /// n'a pas à payer quatre requêtes pour un jeu qu'il ne regardera pas.
-async function chargerCoude() {
-  if (coude.value || !user.value) return;
-  coudeErreur.value = null;
+async function chargerCoussin() {
+  if (coussin.value || !user.value) return;
+  coussinErreur.value = null;
   try {
-    coude.value = await gamesService.coude();
+    coussin.value = await gamesService.coussin();
   } catch (e) {
-    coudeErreur.value =
+    coussinErreur.value =
       e instanceof Error ? e.message : "Impossible de charger ton profil.";
   }
 }
@@ -169,43 +169,49 @@ async function chargerCoude() {
 watch(
   () => jeuActif.value,
   (k) => {
-    if (k === "coude") void chargerCoude();
+    if (k === "coussin") void chargerCoussin();
   },
   { immediate: true },
 );
 
 /// Libellés des classes : le serveur renvoie une clé technique.
 const CLASSES: Record<string, { nom: string; emoji: string; trait: string }> = {
-  bourrin: { nom: "Bourrin", emoji: "🪓", trait: "Frappe fort, encaisse mal" },
-  agile: { nom: "Agile", emoji: "🏃", trait: "Esquive souvent, frappe vite" },
-  fourbe: { nom: "Fourbe", emoji: "🗡️", trait: "Vole mieux, joue sale" },
-  tank: { nom: "Tank", emoji: "🛡️", trait: "Encaisse tout, frappe lentement" },
+  ecraseur: { nom: "Écraseur", emoji: "🪑", trait: "S'assoit sans regarder. Ça fait mal aux deux." },
+  ressort: { nom: "Ressort", emoji: "🤸", trait: "Rebondit d'un accoudoir à l'autre." },
+  piegeur: { nom: "Piégeur", emoji: "🪡", trait: "Place les coussins et fouille sous ceux des autres." },
+  couette: { nom: "Couette", emoji: "🛌", trait: "Roulé dans la couette. Ne bougera plus." },
 };
 
 const classe = computed(() => {
-  const k = coude.value?.profile.class ?? "";
-  return CLASSES[k] ?? { nom: "Sans classe", emoji: "❔", trait: "Classe pas encore choisie" };
+  const k = coussin.value?.profile.class ?? "";
+  return (
+    CLASSES[k] ?? {
+      nom: "Debout",
+      emoji: "🧍",
+      trait: "Tu n'as pas encore choisi ta place sur le canapé",
+    }
+  );
 });
 
 /// Part de victoires. `null` quand rien n'a été joué : afficher « 0 % » à
 /// quelqu'un qui n'a jamais combattu serait un jugement, pas une statistique.
 const tauxVictoire = computed(() => {
-  const p = coude.value?.profile;
+  const p = coussin.value?.profile;
   if (!p) return null;
   const total = p.total_wins + p.total_losses + p.total_draws;
   return total === 0 ? null : Math.round((p.total_wins / total) * 100);
 });
 
 /// Le combat a-t-il été gagné par le lecteur ?
-function gagne(c: CoudeCombat): boolean | null {
+function gagne(c: CoussinCombat): boolean | null {
   if (!c.winner_id) return null; // égalité
   return c.winner_id === adversaireContexte(c).moi;
 }
 
 /// Identifie le lecteur et son adversaire dans un combat, quel que soit le
 /// côté où il se trouvait.
-function adversaireContexte(c: CoudeCombat): { moi: string; nom: string } {
-  const p = coude.value?.profile;
+function adversaireContexte(c: CoussinCombat): { moi: string; nom: string } {
+  const p = coussin.value?.profile;
   // Le profil ne porte pas l'identifiant : on se reconnaît au pseudo, qui
   // est celui enregistré au moment du combat.
   const jeSuisAttaquant = c.attacker_name === p?.username;
@@ -215,11 +221,17 @@ function adversaireContexte(c: CoudeCombat): { moi: string; nom: string } {
 }
 
 /// Objets : le serveur renvoie une clé technique, on l'habille.
+/// Les clés du coffre à coussins, telles que le serveur les stocke. Elles
+/// datent d'avant le changement de nom : les renommer viderait les
+/// inventaires déjà constitués, donc seul l'affichage change.
 const OBJETS: Record<string, string> = {
-  potion: "🧪 Potion",
-  bouclier: "🛡️ Bouclier",
-  poison: "☠️ Poison",
-  assurance: "📜 Assurance",
+  rage: "🧱 Coussin Plombé",
+  mindgame: "👁️ Œil sous le Plaid",
+  explosion: "🍟 Renversement de Chips",
+  double_coup: "🛋️ Double Coussin",
+  surprise: "🪶 Bataille d'Oreillers",
+  coup_traitre: "📌 Punaise dans le Coussin",
+  inversion: "🔄 Retourne le Canapé",
 };
 
 function objet(cle: string): string {
@@ -276,7 +288,7 @@ function fmtDate(iso: string): string {
 function icone(source: string): string {
   if (source.startsWith("wheel")) return "🎡";
   if (source.includes("transfer")) return "🤝";
-  if (source.includes("coude")) return "💥";
+  if (source.includes("coussin")) return "💥";
   return "🪙";
 }
 
@@ -429,17 +441,17 @@ const fondRoue = computed(() => {
         </div>
       </section>
 
-      <!-- Coup de Coude : le jeu se JOUE sur Discord, mais tout ce qu'on y a
+      <!-- Coussin Piégé : le jeu se JOUE sur Discord, mais tout ce qu'on y a
            accompli se consulte ici. Le web fait ce que Discord fait mal —
            garder une trace lisible. -->
-      <section v-else-if="jeuActif === 'coude'" class="jx-block">
+      <section v-else-if="jeuActif === 'coussin'" class="jx-block">
         <h2>{{ jeu.emoji }} {{ jeu.nom }}</h2>
 
         <p v-if="!user" class="jx-vide">
-          Connecte-toi pour voir ta fiche, tes combats et ton inventaire.
+          Connecte-toi pour voir ta place, tes bagarres et ce que tu planques.
         </p>
-        <p v-else-if="coudeErreur" class="jx-alerte">{{ coudeErreur }}</p>
-        <p v-else-if="!coude" class="jx-hint">Chargement de ta fiche…</p>
+        <p v-else-if="coussinErreur" class="jx-alerte">{{ coussinErreur }}</p>
+        <p v-else-if="!coussin" class="jx-hint">Chargement de ta fiche…</p>
 
         <template v-else>
           <!-- ── Fiche du personnage ── -->
@@ -453,79 +465,80 @@ const fondRoue = computed(() => {
             </div>
 
             <div class="cd-identite">
-              <strong>{{ coude.profile.username || "Toi" }}</strong>
-              <span v-if="coude.profile.title" class="cd-titre">
-                « {{ coude.profile.title }} »
+              <strong>{{ coussin.profile.username || "Toi" }}</strong>
+              <span v-if="coussin.profile.title" class="cd-titre">
+                « {{ coussin.profile.title }} »
               </span>
-              <span class="cd-niveau">Niveau {{ coude.profile.level }}</span>
+              <span class="cd-niveau">Niveau {{ coussin.profile.level }}</span>
             </div>
 
-            <!-- Points de vie : une jauge dit d'un coup d'œil ce qu'un
-                 « 34/50 » demande de calculer. -->
+            <!-- Confort : une jauge dit d'un coup d'œil ce qu'un
+                 « 34/50 » demande de calculer. À zéro on ne meurt pas, on se
+                 lève du canapé — d'où le mot, et pas « points de vie ». -->
             <div class="cd-pv">
               <div class="cd-pv-ligne">
-                <span>Points de vie</span>
-                <span>{{ coude.profile.hp_current }} / {{ coude.profile.hp_max }}</span>
+                <span>Confort</span>
+                <span>{{ coussin.profile.hp_current }} / {{ coussin.profile.hp_max }}</span>
               </div>
               <div class="cd-jauge">
                 <i
                   :style="{
-                    width: `${Math.max(0, Math.round((coude.profile.hp_current / Math.max(1, coude.profile.hp_max)) * 100))}%`,
+                    width: `${Math.max(0, Math.round((coussin.profile.hp_current / Math.max(1, coussin.profile.hp_max)) * 100))}%`,
                   }"
                 ></i>
               </div>
             </div>
 
             <ul class="cd-stats">
-              <li><span>⚔️ Attaque</span><b>{{ coude.profile.atk }}</b></li>
-              <li><span>🛡️ Défense</span><b>{{ coude.profile.def }}</b></li>
-              <li><span>✨ Expérience</span><b>{{ coude.profile.xp }}</b></li>
-              <li v-if="coude.profile.stat_points > 0" class="cd-dispo">
-                <span>🎯 Points à répartir</span><b>{{ coude.profile.stat_points }}</b>
+              <li><span>🧱 Impact</span><b>{{ coussin.profile.atk }}</b></li>
+              <li><span>🪶 Moelleux</span><b>{{ coussin.profile.def }}</b></li>
+              <li><span>✨ Expérience</span><b>{{ coussin.profile.xp }}</b></li>
+              <li v-if="coussin.profile.stat_points > 0" class="cd-dispo">
+                <span>🎯 Points à répartir</span><b>{{ coussin.profile.stat_points }}</b>
               </li>
             </ul>
 
-            <p v-if="coude.profile.stat_points > 0" class="jx-vide">
-              Tu as {{ coude.profile.stat_points }} point(s) à placer.
-              Utilise <code>/coude entrainement</code> sur Discord.
+            <p v-if="coussin.profile.stat_points > 0" class="jx-vide">
+              Tu as {{ coussin.profile.stat_points }} point(s) à placer.
+              Utilise <code>/train</code> sur Discord.
             </p>
           </div>
 
           <!-- ── Palmarès ── -->
           <h3 class="cd-sous-titre">Ton palmarès</h3>
           <ul class="cd-palmares">
-            <li class="gagne"><b>{{ coude.profile.total_wins }}</b><span>victoires</span></li>
-            <li class="perdu"><b>{{ coude.profile.total_losses }}</b><span>défaites</span></li>
-            <li><b>{{ coude.profile.total_draws }}</b><span>égalités</span></li>
+            <li class="gagne"><b>{{ coussin.profile.total_wins }}</b><span>fois assis dessus</span></li>
+            <li class="perdu"><b>{{ coussin.profile.total_losses }}</b><span>fois piégé</span></li>
+            <li><b>{{ coussin.profile.total_draws }}</b><span>matchs nuls</span></li>
             <li v-if="tauxVictoire !== null"><b>{{ tauxVictoire }} %</b><span>de réussite</span></li>
-            <li><b>{{ fmtCoins(coude.profile.total_stolen) }}</b><span>coins volés</span></li>
-            <li><b>{{ coude.profile.chaos_events }}</b><span>événements chaotiques</span></li>
-            <li v-if="coude.profile.cowardice_count > 0" class="perdu">
-              <b>{{ coude.profile.cowardice_count }}</b><span>combats refusés</span>
+            <li><b>{{ fmtCoins(coussin.profile.total_stolen) }}</b><span>coins trouvés sous les coussins</span></li>
+            <li><b>{{ coussin.profile.chaos_events }}</b><span>fois où le salon a dégénéré</span></li>
+            <li v-if="coussin.profile.cowardice_count > 0" class="perdu">
+              <b>{{ coussin.profile.cowardice_count }}</b><span>fois resté debout</span>
             </li>
           </ul>
 
           <!-- ── Inventaire ── -->
-          <h3 class="cd-sous-titre">Ton inventaire</h3>
-          <p v-if="!coude.items.length" class="jx-vide">
-            Rien en poche. La boutique s'ouvre avec <code>/coude boutique</code>.
+          <h3 class="cd-sous-titre">Sous ton coussin</h3>
+          <p v-if="!coussin.items.length" class="jx-vide">
+            Rien de planqué. Le coffre à coussins s'ouvre avec <code>/shop</code>.
           </p>
           <ul v-else class="cd-objets">
-            <li v-for="o in coude.items" :key="o.item_key" class="cd-objet">
+            <li v-for="o in coussin.items" :key="o.item_key" class="cd-objet">
               <span>{{ objet(o.item_key) }}</span>
               <b>×{{ o.quantity }}</b>
             </li>
           </ul>
 
           <!-- ── Derniers combats ── -->
-          <h3 class="cd-sous-titre">Tes derniers combats</h3>
-          <p v-if="!coude.combats.length" class="jx-vide">
-            Aucun combat pour l'instant. Le premier coup se donne avec
-            <code>/coude</code> sur Discord.
+          <h3 class="cd-sous-titre">Tes dernières bagarres</h3>
+          <p v-if="!coussin.combats.length" class="jx-vide">
+            Aucune bagarre pour l'instant. Le premier coussin se glisse avec
+            <code>/coussin</code> sur Discord.
           </p>
           <ul v-else class="cd-combats">
             <li
-              v-for="c in coude.combats"
+              v-for="c in coussin.combats"
               :key="c.id"
               class="cd-combat"
               :class="{ gagne: gagne(c) === true, perdu: gagne(c) === false }"
@@ -562,10 +575,10 @@ const fondRoue = computed(() => {
           <h3 class="cd-sous-titre">Le classement</h3>
           <ol class="jx-rangs">
             <li
-              v-for="(r, i) in coude.ranking"
+              v-for="(r, i) in coussin.ranking"
               :key="r.username + i"
               class="jx-rang"
-              :class="{ moi: r.username === coude.profile.username }"
+              :class="{ moi: r.username === coussin.profile.username }"
             >
               <span class="jx-place">{{ i + 1 }}</span>
               <span class="jx-nom">{{ r.username || "Un membre" }}</span>
@@ -1023,7 +1036,7 @@ const fondRoue = computed(() => {
   font-size: 0.92rem;
 }
 
-/* ── Coup de Coude ── */
+/* ── Coussin Piégé ── */
 .cd-sous-titre {
   margin: var(--space-2xl) 0 var(--space-lg);
   font-size: 1.02rem;

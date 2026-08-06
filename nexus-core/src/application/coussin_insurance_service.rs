@@ -6,12 +6,12 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rand::Rng;
 
-use crate::application::economy_config::load_coude;
+use crate::application::economy_config::load_coussin;
 use crate::domain::errors::DomainError;
 use crate::ports::{
-    inbound::coude_insurance::CoudeInsuranceUseCase,
+    inbound::coussin_insurance::CoussinInsuranceUseCase,
     outbound::{
-        coude_insurance_repository::{CoudeInsurance, CoudeInsuranceRepository},
+        coussin_insurance_repository::{CoussinInsurance, CoussinInsuranceRepository},
         system::bot_config_repository::BotConfigRepository,
     },
 };
@@ -22,14 +22,14 @@ use crate::ports::{
 /// sans histoire — ou a 100, ce qui n'est plus une assurance.
 const SCAM_PERCENT: u32 = 5;
 
-pub struct CoudeInsuranceService {
-    repo: Arc<dyn CoudeInsuranceRepository>,
+pub struct CoussinInsuranceService {
+    repo: Arc<dyn CoussinInsuranceRepository>,
     config_repo: Arc<dyn BotConfigRepository>,
 }
 
-impl CoudeInsuranceService {
+impl CoussinInsuranceService {
     pub fn new(
-        repo: Arc<dyn CoudeInsuranceRepository>,
+        repo: Arc<dyn CoussinInsuranceRepository>,
         config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
         Self { repo, config_repo }
@@ -37,9 +37,9 @@ impl CoudeInsuranceService {
 }
 
 #[async_trait]
-impl CoudeInsuranceUseCase for CoudeInsuranceService {
-    async fn buy(&self, guild_id: &str, user_id: &str) -> Result<CoudeInsurance, DomainError> {
-        let cfg = load_coude(&self.config_repo, guild_id).await?;
+impl CoussinInsuranceUseCase for CoussinInsuranceService {
+    async fn buy(&self, guild_id: &str, user_id: &str) -> Result<CoussinInsurance, DomainError> {
+        let cfg = load_coussin(&self.config_repo, guild_id).await?;
         if !cfg.insurance_enabled {
             return Err(DomainError::Validation(
                 "l'assurance n'est pas disponible sur ce serveur".into(),
@@ -57,7 +57,7 @@ impl CoudeInsuranceUseCase for CoudeInsuranceService {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeInsurance>, DomainError> {
+    ) -> Result<Option<CoussinInsurance>, DomainError> {
         self.repo.active(guild_id, user_id).await
     }
 }

@@ -52,14 +52,14 @@ export const GAMES: GameCard[] = [
     canaux: ["discord", "web"],
   },
   {
-    key: "coude",
-    nom: "Coup de Coude",
-    emoji: "💥",
+    key: "coussin",
+    nom: "Coussin Piégé",
+    emoji: "🛋️",
     // Les ACTIONS restent sur Discord — leur sel est la réaction du salon,
     // et les ouvrir ici le viderait. Mais tout ce qu'on y accomplit se
     // consulte sur le site : c'est ce que Discord fait mal, garder une trace
     // lisible d'un message qui a défilé.
-    pitch: "Ta fiche, tes combats, ton inventaire. Les coups se donnent sur Discord.",
+    pitch: "Un coussin planqué, quelqu'un qui s'assoit. Ta place, tes bagarres, ton butin.",
     couleur: "#f39c12",
     // Consultable ici, jouable seulement là-bas : le badge ne dit QUE où l'on
     // joue, sinon il promettrait une partie qui ne se lancera pas.

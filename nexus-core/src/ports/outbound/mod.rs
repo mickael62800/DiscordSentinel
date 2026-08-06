@@ -2,12 +2,12 @@
 
 pub mod casino;
 pub mod events;
-pub mod coude_repository;
-pub mod coude_inventory_repository;
-pub mod coude_insurance_repository;
-pub mod coude_steal_repository;
-pub mod coude_prime_repository;
-pub mod coude_bet_repository;
+pub mod coussin_repository;
+pub mod coussin_inventory_repository;
+pub mod coussin_insurance_repository;
+pub mod coussin_steal_repository;
+pub mod coussin_prime_repository;
+pub mod coussin_bet_repository;
 pub mod game;
 pub mod system;
 pub mod wallet_repository;

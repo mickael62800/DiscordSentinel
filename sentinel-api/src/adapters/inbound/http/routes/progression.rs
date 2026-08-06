@@ -323,8 +323,8 @@ pub fn routes() -> Router<AppState> {
             post(handlers::community::games::spin_wheel),
         )
         .route(
-            "/api/me/games/coude",
-            get(handlers::community::games::my_coude),
+            "/api/me/games/coussin",
+            get(handlers::community::games::my_coussin),
         )
         .route(
             "/api/spotlight/{guild_id}",

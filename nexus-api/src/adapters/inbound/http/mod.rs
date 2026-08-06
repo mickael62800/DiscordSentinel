@@ -55,24 +55,24 @@ pub fn build_router(state: AppState) -> Router {
             "/api/config/{guild_id}/{bot_name}",
             get(handlers::bot_config::get_config).put(handlers::bot_config::set_config),
         )
-        .route("/api/coude/{guild_id}/{user_id}/profile", get(handlers::coude::profile))
-        .route("/api/coude/{guild_id}/{user_id}/class", post(handlers::coude::choose_class))
-        .route("/api/coude/{guild_id}/{user_id}/train", post(handlers::coude::train))
-        .route("/api/coude/{guild_id}/{user_id}/inventory", get(handlers::coude::inventory))
-        .route("/api/coude/{guild_id}/{user_id}/shop", post(handlers::coude::buy_item))
-        .route("/api/coude/{guild_id}/{user_id}/insurance", get(handlers::coude::insurance).post(handlers::coude::buy_insurance))
-        .route("/api/coude/{guild_id}/{user_id}/steal", post(handlers::coude::steal))
-        .route("/api/coude/{guild_id}/{user_id}/prime", post(handlers::coude::place_prime))
-        .route("/api/coude/{guild_id}/{user_id}/bets", post(handlers::coude::place_bet))
-        .route("/api/coude/{guild_id}/classement", get(handlers::coude::ranking))
+        .route("/api/coussin/{guild_id}/{user_id}/profile", get(handlers::coussin::profile))
+        .route("/api/coussin/{guild_id}/{user_id}/class", post(handlers::coussin::choose_class))
+        .route("/api/coussin/{guild_id}/{user_id}/train", post(handlers::coussin::train))
+        .route("/api/coussin/{guild_id}/{user_id}/inventory", get(handlers::coussin::inventory))
+        .route("/api/coussin/{guild_id}/{user_id}/shop", post(handlers::coussin::buy_item))
+        .route("/api/coussin/{guild_id}/{user_id}/insurance", get(handlers::coussin::insurance).post(handlers::coussin::buy_insurance))
+        .route("/api/coussin/{guild_id}/{user_id}/steal", post(handlers::coussin::steal))
+        .route("/api/coussin/{guild_id}/{user_id}/prime", post(handlers::coussin::place_prime))
+        .route("/api/coussin/{guild_id}/{user_id}/bets", post(handlers::coussin::place_bet))
+        .route("/api/coussin/{guild_id}/classement", get(handlers::coussin::ranking))
         .route(
-            "/api/coude/{guild_id}/{user_id}/combats",
-            get(handlers::coude::combat_history),
+            "/api/coussin/{guild_id}/{user_id}/combats",
+            get(handlers::coussin::combat_history),
         )
-        .route("/api/coude/{guild_id}/combats", post(handlers::coude::challenge))
-        .route("/api/coude/combats/{id}/accept", post(handlers::coude::accept))
-        .route("/api/coude/combats/{id}/refuse", post(handlers::coude::refuse))
-        .route("/api/coude/combats/{id}/resolve", post(handlers::coude::resolve))
+        .route("/api/coussin/{guild_id}/combats", post(handlers::coussin::challenge))
+        .route("/api/coussin/combats/{id}/accept", post(handlers::coussin::accept))
+        .route("/api/coussin/combats/{id}/refuse", post(handlers::coussin::refuse))
+        .route("/api/coussin/combats/{id}/resolve", post(handlers::coussin::resolve))
         .route(
             "/api/games/{guild_id}/by-category",
             get(handlers::casino::games::list_games_by_category),

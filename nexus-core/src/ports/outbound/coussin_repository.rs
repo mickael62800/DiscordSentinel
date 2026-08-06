@@ -1,9 +1,9 @@
-use crate::domain::entities::coude::PlayerClass;
+use crate::domain::entities::coussin::PlayerClass;
 use crate::domain::errors::DomainError;
 use async_trait::async_trait;
 
 #[derive(Debug, Clone)]
-pub struct CoudeProfile {
+pub struct CoussinProfile {
     pub guild_id: String,
     pub user_id: String,
     pub username: String,
@@ -25,7 +25,7 @@ pub struct CoudeProfile {
     pub chaos_events: i32,
 }
 #[derive(Debug, Clone)]
-pub struct CoudeCombat {
+pub struct CoussinCombat {
     pub id: uuid::Uuid,
     pub guild_id: String,
     pub attacker_id: String,
@@ -34,19 +34,19 @@ pub struct CoudeCombat {
     pub status: String,
 }
 #[derive(Debug, Clone)]
-pub struct CoudeCombatSnapshot {
-    pub combat: CoudeCombat,
-    pub attacker: CoudeProfile,
-    pub defender: CoudeProfile,
+pub struct CoussinCombatSnapshot {
+    pub combat: CoussinCombat,
+    pub attacker: CoussinProfile,
+    pub defender: CoussinProfile,
 }
 
 /// Un combat resolu, tel qu'on le raconte apres coup.
 ///
-/// Distinct de `CoudeCombat`, qui decrit un combat EN COURS de negociation
+/// Distinct de `CoussinCombat`, qui decrit un combat EN COURS de negociation
 /// (en attente, accepte, refuse). Ici tout est joue : il y a un vainqueur,
 /// des jets de des et un recit.
 #[derive(Debug, Clone)]
-pub struct CoudeCombatResult {
+pub struct CoussinCombatResult {
     pub id: uuid::Uuid,
     pub attacker_id: String,
     pub attacker_name: String,
@@ -65,7 +65,7 @@ pub struct CoudeCombatResult {
 
 /// Un pari place sur un combat.
 #[derive(Debug, Clone)]
-pub struct CoudeBet {
+pub struct CoussinBet {
     pub id: uuid::Uuid,
     pub backed_id: String,
     pub amount: i64,
@@ -77,7 +77,7 @@ pub struct CoudeBet {
 
 /// Une prime posee sur la tete d'un joueur.
 #[derive(Debug, Clone)]
-pub struct CoudePrime {
+pub struct CoussinPrime {
     pub id: uuid::Uuid,
     pub target_id: String,
     pub target_name: String,
@@ -90,14 +90,14 @@ pub struct CoudePrime {
 }
 
 #[async_trait]
-pub trait CoudeRepository: Send + Sync {
+pub trait CoussinRepository: Send + Sync {
     /// Paris places par un joueur, les plus recents d'abord.
     async fn list_bets(
         &self,
         guild_id: &str,
         user_id: &str,
         limit: i64,
-    ) -> Result<Vec<CoudeBet>, DomainError>;
+    ) -> Result<Vec<CoussinBet>, DomainError>;
 
     /// Primes qui concernent un joueur : celles qu'il a posees ET celles
     /// posees sur sa tete. Les separer cote appelant serait deux requetes
@@ -107,7 +107,7 @@ pub trait CoudeRepository: Send + Sync {
         guild_id: &str,
         user_id: &str,
         limit: i64,
-    ) -> Result<Vec<CoudePrime>, DomainError>;
+    ) -> Result<Vec<CoussinPrime>, DomainError>;
 
     /// Derniers combats RESOLUS d'un joueur, attaquant ou defenseur.
     ///
@@ -119,35 +119,35 @@ pub trait CoudeRepository: Send + Sync {
         guild_id: &str,
         user_id: &str,
         limit: i64,
-    ) -> Result<Vec<CoudeCombatResult>, DomainError>;
+    ) -> Result<Vec<CoussinCombatResult>, DomainError>;
 
     async fn find_profile(
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeProfile>, DomainError>;
+    ) -> Result<Option<CoussinProfile>, DomainError>;
     /// Classement des joueurs de la guild (supervision cote web).
     /// Trie par niveau puis XP decroissants, borne par `limit`.
     async fn list_profiles(
         &self,
         guild_id: &str,
         limit: i64,
-    ) -> Result<Vec<CoudeProfile>, DomainError>;
-    async fn create_profile(&self, profile: &CoudeProfile) -> Result<(), DomainError>;
+    ) -> Result<Vec<CoussinProfile>, DomainError>;
+    async fn create_profile(&self, profile: &CoussinProfile) -> Result<(), DomainError>;
     async fn update_class(&self, guild_id: &str, user_id: &str, class: PlayerClass, atk: i32, def: i32, hp_max: i32) -> Result<(), DomainError>;
-    async fn spend_stat_point(&self, guild_id: &str, user_id: &str, stat: &str) -> Result<CoudeProfile, DomainError>;
+    async fn spend_stat_point(&self, guild_id: &str, user_id: &str, stat: &str) -> Result<CoussinProfile, DomainError>;
     async fn set_progress(&self, guild_id: &str, user_id: &str, xp: i64, level: i32, stat_points: i32, title: &str) -> Result<(), DomainError>;
     async fn create_combat(
         &self,
         guild_id: &str,
         channel_id: &str,
-        attacker: &CoudeProfile,
-        defender: &CoudeProfile,
+        attacker: &CoussinProfile,
+        defender: &CoussinProfile,
         mise: i64,
-    ) -> Result<CoudeCombat, DomainError>;
+    ) -> Result<CoussinCombat, DomainError>;
     async fn accept_combat(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError>;
     async fn refuse_combat(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError>;
-    async fn resolution_snapshot(&self, id: uuid::Uuid) -> Result<Option<CoudeCombatSnapshot>, DomainError>;
+    async fn resolution_snapshot(&self, id: uuid::Uuid) -> Result<Option<CoussinCombatSnapshot>, DomainError>;
     async fn resolve_combat(
         &self,
         id: uuid::Uuid,

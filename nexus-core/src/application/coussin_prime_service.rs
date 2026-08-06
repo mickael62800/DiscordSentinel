@@ -4,24 +4,24 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::application::economy_config::load_coude;
+use crate::application::economy_config::load_coussin;
 use crate::domain::errors::DomainError;
 use crate::ports::{
-    inbound::coude_prime::CoudePrimeUseCase,
+    inbound::coussin_prime::CoussinPrimeUseCase,
     outbound::{
-        coude_prime_repository::CoudePrimeRepository,
+        coussin_prime_repository::CoussinPrimeRepository,
         system::bot_config_repository::BotConfigRepository,
     },
 };
 
-pub struct CoudePrimeService {
-    repo: Arc<dyn CoudePrimeRepository>,
+pub struct CoussinPrimeService {
+    repo: Arc<dyn CoussinPrimeRepository>,
     config_repo: Arc<dyn BotConfigRepository>,
 }
 
-impl CoudePrimeService {
+impl CoussinPrimeService {
     pub fn new(
-        repo: Arc<dyn CoudePrimeRepository>,
+        repo: Arc<dyn CoussinPrimeRepository>,
         config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
         Self { repo, config_repo }
@@ -29,7 +29,7 @@ impl CoudePrimeService {
 }
 
 #[async_trait]
-impl CoudePrimeUseCase for CoudePrimeService {
+impl CoussinPrimeUseCase for CoussinPrimeService {
     async fn place(
         &self,
         guild_id: &str,
@@ -47,7 +47,7 @@ impl CoudePrimeUseCase for CoudePrimeService {
             ));
         }
 
-        let cfg = load_coude(&self.config_repo, guild_id).await?;
+        let cfg = load_coussin(&self.config_repo, guild_id).await?;
         if !cfg.prime_enabled {
             return Err(DomainError::Validation(
                 "les primes sont desactivees sur ce serveur".into(),

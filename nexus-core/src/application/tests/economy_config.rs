@@ -79,12 +79,12 @@ fn transferts_desactives_refusent_tout() {
     assert!(c.validate_transfer(50).is_err());
 }
 
-// ── Coup de Coude ──
+// ── Coussin Piégé ──
 
 /// Les defauts reproduisent les constantes historiques du service de vol.
 #[test]
 fn defauts_du_vol_reproduisent_le_comportement_historique() {
-    let c = CoudeConfig::default();
+    let c = CoussinConfig::default();
     assert_eq!(c.steal_chance(false), 30);
     assert_eq!(c.steal_chance(true), 50);
     // victim/5 == 20 %
@@ -96,9 +96,9 @@ fn defauts_du_vol_reproduisent_le_comportement_historique() {
 /// Ni 0 ni 100 : le vol doit garder une part de risque des deux cotes.
 #[test]
 fn chance_de_vol_reste_dans_des_bornes_jouables() {
-    let c = CoudeConfig {
+    let c = CoussinConfig {
         steal_success_pct: 0,
-        steal_success_pct_fourbe: 100,
+        steal_success_pct_piegeur: 100,
         ..Default::default()
     };
     assert_eq!(c.steal_chance(false), 1);
@@ -108,14 +108,14 @@ fn chance_de_vol_reste_dans_des_bornes_jouables() {
 /// Un vol reussi qui ne rapporte rien serait indistinguable d'un echec.
 #[test]
 fn un_vol_reussi_rapporte_toujours_au_moins_un_coin() {
-    let c = CoudeConfig::default();
+    let c = CoussinConfig::default();
     assert_eq!(c.steal_gain(1), 1);
     assert_eq!(c.steal_gain(0), 1);
 }
 
 #[test]
 fn penalite_d_echec_est_toujours_d_au_moins_un_coin() {
-    assert_eq!(CoudeConfig::default().steal_penalty(0), 1);
+    assert_eq!(CoussinConfig::default().steal_penalty(0), 1);
 }
 
 
@@ -129,7 +129,7 @@ fn kv(paires: &[(&str, &str)]) -> Vec<BotGuildConfig> {
         .map(|(k, v)| BotGuildConfig {
             id: uuid::Uuid::nil(),
             guild_id: "g".into(),
-            bot_name: "nexus-coude".into(),
+            bot_name: "nexus-coussin".into(),
             config_key: (*k).into(),
             config_value: (*v).into(),
             updated_at: chrono::Utc::now(),

@@ -67,9 +67,9 @@ pub struct SpinResult {
     pub is_memorable: bool,
 }
 
-/// Profil Coup de Coude : classe, statistiques, palmares.
+/// Profil Coussin Piégé : classe, statistiques, palmares.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoudeProfile {
+pub struct CoussinProfile {
     pub username: String,
     pub class: String,
     pub level: i32,
@@ -90,13 +90,13 @@ pub struct CoudeProfile {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoudeItem {
+pub struct CoussinItem {
     pub item_key: String,
     pub quantity: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CoudeCombat {
+pub struct CoussinCombat {
     pub id: String,
     pub attacker_id: String,
     pub attacker_name: String,
@@ -241,55 +241,55 @@ impl NexusGamesClient {
         self.envoyer(self.client.get(url)).await
     }
 
-    // ── Coup de Coude ──
+    // ── Coussin Piégé ──
     //
-    // Lectures SEULEMENT. Les actions du jeu — coup de coude, vol, prime,
+    // Lectures SEULEMENT. Les actions du jeu — coussin piégé, vol, prime,
     // pari — restent sur Discord : leur interet tient a la reaction dans le
     // salon, et les ouvrir au web viderait la conversation de ce qui la fait
     // vivre.
 
     /// Profil du joueur. `username` sert a creer le profil au premier appel :
     /// le jeu inscrit un joueur des sa premiere consultation.
-    pub async fn coude_profile(
+    pub async fn coussin_profile(
         &self,
         guild_id: &str,
         user_id: &str,
         username: &str,
-    ) -> Result<CoudeProfile, DomainError> {
+    ) -> Result<CoussinProfile, DomainError> {
         let url = self.url(&format!(
-            "/api/coude/{guild_id}/{user_id}/profile?username={}",
+            "/api/coussin/{guild_id}/{user_id}/profile?username={}",
             urlencoding(username)
         ));
         self.envoyer(self.client.get(url)).await
     }
 
-    pub async fn coude_inventory(
+    pub async fn coussin_inventory(
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeItem>, DomainError> {
-        let url = self.url(&format!("/api/coude/{guild_id}/{user_id}/inventory"));
+    ) -> Result<Vec<CoussinItem>, DomainError> {
+        let url = self.url(&format!("/api/coussin/{guild_id}/{user_id}/inventory"));
         self.envoyer(self.client.get(url)).await
     }
 
-    pub async fn coude_combats(
+    pub async fn coussin_combats(
         &self,
         guild_id: &str,
         user_id: &str,
         limit: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError> {
+    ) -> Result<Vec<CoussinCombat>, DomainError> {
         let url = self.url(&format!(
-            "/api/coude/{guild_id}/{user_id}/combats?limit={limit}"
+            "/api/coussin/{guild_id}/{user_id}/combats?limit={limit}"
         ));
         self.envoyer(self.client.get(url)).await
     }
 
-    pub async fn coude_ranking(
+    pub async fn coussin_ranking(
         &self,
         guild_id: &str,
         limit: i64,
-    ) -> Result<Vec<CoudeProfile>, DomainError> {
-        let url = self.url(&format!("/api/coude/{guild_id}/classement?limit={limit}"));
+    ) -> Result<Vec<CoussinProfile>, DomainError> {
+        let url = self.url(&format!("/api/coussin/{guild_id}/classement?limit={limit}"));
         self.envoyer(self.client.get(url)).await
     }
 

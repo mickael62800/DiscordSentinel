@@ -1,6 +1,6 @@
 pub mod bot_config;
 pub mod casino;
-pub mod coude;
+pub mod coussin;
 pub mod game;
 pub mod wallet;
 pub mod wheel;

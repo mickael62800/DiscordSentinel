@@ -1,34 +1,34 @@
 use crate::{
     domain::{
-        entities::coude::{max_hp, PlayerClass},
+        entities::coussin::{max_hp, PlayerClass},
         errors::DomainError,
     },
     ports::{
-        inbound::coude_profile::{CoudeCombatUseCase, CoudeProfileUseCase},
-        outbound::coude_repository::{CoudeProfile, CoudeRepository},
+        inbound::coussin_profile::{CoussinCombatUseCase, CoussinProfileUseCase},
+        outbound::coussin_repository::{CoussinProfile, CoussinRepository},
     },
 };
 use async_trait::async_trait;
 use rand::Rng;
 use std::sync::Arc;
 
-pub struct CoudeService {
-    repo: Arc<dyn CoudeRepository>,
+pub struct CoussinService {
+    repo: Arc<dyn CoussinRepository>,
 }
-impl CoudeService {
-    pub fn new(repo: Arc<dyn CoudeRepository>) -> Self {
+impl CoussinService {
+    pub fn new(repo: Arc<dyn CoussinRepository>) -> Self {
         Self { repo }
     }
 }
 #[async_trait]
-impl CoudeProfileUseCase for CoudeService {
+impl CoussinProfileUseCase for CoussinService {
     async fn combat_history(
         &self,
         guild_id: &str,
         user_id: &str,
         limit: i64,
     ) -> Result<
-        Vec<crate::ports::outbound::coude_repository::CoudeCombatResult>,
+        Vec<crate::ports::outbound::coussin_repository::CoussinCombatResult>,
         DomainError,
     > {
         // Meme borne dure que le classement : une demande absurde ne doit
@@ -38,7 +38,7 @@ impl CoudeProfileUseCase for CoudeService {
             .await
     }
 
-    async fn ranking(&self, guild_id: &str, limit: i64) -> Result<Vec<CoudeProfile>, DomainError> {
+    async fn ranking(&self, guild_id: &str, limit: i64) -> Result<Vec<CoussinProfile>, DomainError> {
         // Borne dure : protege la reponse HTTP et la base d'une demande
         // absurde (?limit=100000) venant du client.
         let limit = limit.clamp(1, 200);
@@ -50,14 +50,14 @@ impl CoudeProfileUseCase for CoudeService {
         guild_id: &str,
         user_id: &str,
         username: &str,
-    ) -> Result<CoudeProfile, DomainError> {
+    ) -> Result<CoussinProfile, DomainError> {
         if let Some(profile) = self.repo.find_profile(guild_id, user_id).await? {
             return Ok(profile);
         }
-        let class = PlayerClass::Bourrin;
+        let class = PlayerClass::Ecraseur;
         let (atk, def) = class.base_stats();
         let hp_max = max_hp(def, class);
-        let profile = CoudeProfile {
+        let profile = CoussinProfile {
             guild_id: guild_id.into(),
             user_id: user_id.into(),
             username: username.into(),
@@ -70,7 +70,9 @@ impl CoudeProfileUseCase for CoudeService {
             hp_max,
             coins: 100,
             stat_points: 0,
-            title: "Debutant".into(),
+            // Le titre du niveau 1, pris a la source plutot que recopie : une
+            // constante en dur ici a deja survecu au changement de nom du jeu.
+            title: crate::domain::entities::coussin::title_for_level(1).into(),
             total_wins: 0,
             total_losses: 0,
             total_draws: 0,
@@ -82,12 +84,12 @@ impl CoudeProfileUseCase for CoudeService {
         self.repo
             .find_profile(guild_id, user_id)
             .await?
-            .ok_or_else(|| DomainError::Internal("profil Coude non cree".into()))
+            .ok_or_else(|| DomainError::Internal("profil Coussin non cree".into()))
     }
 
-    async fn choose_class(&self, guild_id: &str, user_id: &str, username: &str, class: &str) -> Result<CoudeProfile, DomainError> {
+    async fn choose_class(&self, guild_id: &str, user_id: &str, username: &str, class: &str) -> Result<CoussinProfile, DomainError> {
         let mut profile = self.profile(guild_id, user_id, username).await?;
-        let class = PlayerClass::parse(class).ok_or_else(|| DomainError::Validation("classe invalide : bourrin, agile, fourbe ou tank".into()))?;
+        let class = PlayerClass::parse(class).ok_or_else(|| DomainError::Validation("classe invalide : ecraseur, ressort, piegeur ou couette".into()))?;
         let (atk, def) = class.base_stats();
         let hp_max = max_hp(def, class);
         self.repo.update_class(guild_id, user_id, class, atk, def, hp_max).await?;
@@ -99,14 +101,14 @@ impl CoudeProfileUseCase for CoudeService {
         Ok(profile)
     }
 
-    async fn train(&self, guild_id: &str, user_id: &str, username: &str, stat: &str) -> Result<CoudeProfile, DomainError> {
+    async fn train(&self, guild_id: &str, user_id: &str, username: &str, stat: &str) -> Result<CoussinProfile, DomainError> {
         self.profile(guild_id, user_id, username).await?;
         if !matches!(stat, "atk" | "def") { return Err(DomainError::Validation("stat invalide : atk ou def".into())); }
         self.repo.spend_stat_point(guild_id, user_id, stat).await
     }
 }
 #[async_trait]
-impl CoudeCombatUseCase for CoudeService {
+impl CoussinCombatUseCase for CoussinService {
     async fn challenge(
         &self,
         guild_id: &str,
@@ -116,7 +118,7 @@ impl CoudeCombatUseCase for CoudeService {
         defender_id: &str,
         defender_name: &str,
         mise: i64,
-    ) -> Result<crate::ports::outbound::coude_repository::CoudeCombat, DomainError> {
+    ) -> Result<crate::ports::outbound::coussin_repository::CoussinCombat, DomainError> {
         if attacker_id == defender_id {
             return Err(DomainError::Validation(
                 "impossible de se defier soi-meme".into(),
@@ -139,7 +141,7 @@ impl CoudeCombatUseCase for CoudeService {
             let mut rng = rand::thread_rng();
             [(rng.gen_range(1..=6), rng.gen_range(1..=6)), (rng.gen_range(1..=6), rng.gen_range(1..=6)), (rng.gen_range(1..=6), rng.gen_range(1..=6))]
         };
-        let result = crate::domain::entities::coude::resolve_combat(
+        let result = crate::domain::entities::coussin::resolve_combat(
             snapshot.attacker.atk, snapshot.attacker.def, snapshot.attacker.class, snapshot.attacker.level,
             snapshot.defender.atk, snapshot.defender.def, snapshot.defender.class, snapshot.defender.level, &rolls,
         ).map_err(|message| DomainError::Validation(message.into()))?;
@@ -148,9 +150,9 @@ impl CoudeCombatUseCase for CoudeService {
         if resolved {
             for (profile, won) in [(&snapshot.attacker, result.attacker_won == Some(true)), (&snapshot.defender, result.attacker_won == Some(false))] {
                 let xp = profile.xp + if won { 15 } else { 5 };
-                let level = crate::domain::entities::coude::level_for_xp(xp);
+                let level = crate::domain::entities::coussin::level_for_xp(xp);
                 let points = profile.stat_points + (level - profile.level).max(0) * 3;
-                self.repo.set_progress(&snapshot.combat.guild_id, &profile.user_id, xp, level, points, crate::domain::entities::coude::title_for_level(level)).await?;
+                self.repo.set_progress(&snapshot.combat.guild_id, &profile.user_id, xp, level, points, crate::domain::entities::coussin::title_for_level(level)).await?;
             }
         }
         Ok(resolved)

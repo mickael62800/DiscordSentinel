@@ -1,4 +1,4 @@
-//! Reglages de l'economie et de Coup de Coude, par serveur.
+//! Reglages de l'economie et de Coussin Piégé, par serveur.
 //!
 //! Meme patron que `game::config_loader` : on lit les valeurs stockees pour
 //! la guilde et on applique les defauts. Ces defauts reproduisent EXACTEMENT
@@ -16,7 +16,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 pub const ECONOMY_BOT: &str = "nexus-economy";
-pub const COUDE_BOT: &str = "nexus-coude";
+pub const COUSSIN_BOT: &str = "nexus-coussin";
 
 // ── Economie ──
 
@@ -81,14 +81,14 @@ impl EconomyConfig {
     }
 }
 
-// ── Coup de Coude ──
+// ── Coussin Piégé ──
 
 #[derive(Debug, Clone)]
-pub struct CoudeConfig {
+pub struct CoussinConfig {
     pub enabled: bool,
     pub steal_enabled: bool,
     pub steal_success_pct: u32,
-    pub steal_success_pct_fourbe: u32,
+    pub steal_success_pct_piegeur: u32,
     pub steal_gain_pct: i64,
     pub steal_penalty_pct: i64,
     pub steal_cooldown_minutes: i64,
@@ -102,14 +102,14 @@ pub struct CoudeConfig {
     pub insurance_cost: i64,
 }
 
-impl Default for CoudeConfig {
+impl Default for CoussinConfig {
     fn default() -> Self {
         Self {
             enabled: true,
             steal_enabled: true,
             // Les quatre valeurs historiques du service de vol.
             steal_success_pct: 30,
-            steal_success_pct_fourbe: 50,
+            steal_success_pct_piegeur: 50,
             steal_gain_pct: 20,
             steal_penalty_pct: 15,
             steal_cooldown_minutes: 30,
@@ -125,11 +125,11 @@ impl Default for CoudeConfig {
     }
 }
 
-impl CoudeConfig {
+impl CoussinConfig {
     /// Chance de reussite d'un vol, selon la classe du voleur.
-    pub fn steal_chance(&self, is_fourbe: bool) -> u32 {
-        if is_fourbe {
-            self.steal_success_pct_fourbe
+    pub fn steal_chance(&self, is_piegeur: bool) -> u32 {
+        if is_piegeur {
+            self.steal_success_pct_piegeur
         } else {
             self.steal_success_pct
         }
@@ -195,20 +195,20 @@ pub async fn load_economy(
     })
 }
 
-pub async fn load_coude(
+pub async fn load_coussin(
     repo: &Arc<dyn BotConfigRepository>,
     guild_id: &str,
-) -> Result<CoudeConfig, DomainError> {
-    let items = repo.get_config(guild_id, COUDE_BOT).await?;
-    let d = CoudeConfig::default();
-    Ok(CoudeConfig {
+) -> Result<CoussinConfig, DomainError> {
+    let items = repo.get_config(guild_id, COUSSIN_BOT).await?;
+    let d = CoussinConfig::default();
+    Ok(CoussinConfig {
         enabled: b(&items, "enabled", d.enabled),
         steal_enabled: b(&items, "steal_enabled", d.steal_enabled),
         steal_success_pct: n(&items, "steal_success_pct", d.steal_success_pct),
-        steal_success_pct_fourbe: n(
+        steal_success_pct_piegeur: n(
             &items,
-            "steal_success_pct_fourbe",
-            d.steal_success_pct_fourbe,
+            "steal_success_pct_piegeur",
+            d.steal_success_pct_piegeur,
         ),
         steal_gain_pct: n(&items, "steal_gain_pct", d.steal_gain_pct),
         steal_penalty_pct: n(&items, "steal_penalty_pct", d.steal_penalty_pct),

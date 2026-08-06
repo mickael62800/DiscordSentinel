@@ -6,25 +6,25 @@ use nexus_core::application::game::manage_game_servers_service::ManageGameServer
 use nexus_core::application::game::manage_templates_service::ManageGameTemplatesService;
 use nexus_core::application::play_wheel_service::PlayWheelService;
 use nexus_core::application::wallet_service::WalletService;
-use nexus_core::application::coude_service::CoudeService;
-use nexus_core::application::coude_inventory_service::CoudeInventoryService;
-use nexus_core::application::coude_insurance_service::CoudeInsuranceService;
-use nexus_core::application::coude_steal_service::CoudeStealService;
-use nexus_core::application::coude_prime_service::CoudePrimeService;
-use nexus_core::application::coude_bet_service::CoudeBetService;
-use nexus_core::ports::inbound::coude_profile::CoudeProfileUseCase;
-use nexus_core::ports::inbound::coude_profile::CoudeCombatUseCase;
-use nexus_core::ports::inbound::coude_inventory::CoudeInventoryUseCase;
-use nexus_core::ports::inbound::coude_insurance::CoudeInsuranceUseCase;
-use nexus_core::ports::inbound::coude_steal::CoudeStealUseCase;
-use nexus_core::ports::inbound::coude_prime::CoudePrimeUseCase;
-use nexus_core::ports::inbound::coude_bet::CoudeBetUseCase;
-use nexus_core::ports::outbound::coude_inventory_repository::CoudeInventoryRepository;
-use nexus_core::ports::outbound::coude_insurance_repository::CoudeInsuranceRepository;
-use nexus_core::ports::outbound::coude_steal_repository::CoudeStealRepository;
-use nexus_core::ports::outbound::coude_prime_repository::CoudePrimeRepository;
-use nexus_core::ports::outbound::coude_bet_repository::CoudeBetRepository;
-use nexus_core::ports::outbound::coude_repository::CoudeRepository;
+use nexus_core::application::coussin_service::CoussinService;
+use nexus_core::application::coussin_inventory_service::CoussinInventoryService;
+use nexus_core::application::coussin_insurance_service::CoussinInsuranceService;
+use nexus_core::application::coussin_steal_service::CoussinStealService;
+use nexus_core::application::coussin_prime_service::CoussinPrimeService;
+use nexus_core::application::coussin_bet_service::CoussinBetService;
+use nexus_core::ports::inbound::coussin_profile::CoussinProfileUseCase;
+use nexus_core::ports::inbound::coussin_profile::CoussinCombatUseCase;
+use nexus_core::ports::inbound::coussin_inventory::CoussinInventoryUseCase;
+use nexus_core::ports::inbound::coussin_insurance::CoussinInsuranceUseCase;
+use nexus_core::ports::inbound::coussin_steal::CoussinStealUseCase;
+use nexus_core::ports::inbound::coussin_prime::CoussinPrimeUseCase;
+use nexus_core::ports::inbound::coussin_bet::CoussinBetUseCase;
+use nexus_core::ports::outbound::coussin_inventory_repository::CoussinInventoryRepository;
+use nexus_core::ports::outbound::coussin_insurance_repository::CoussinInsuranceRepository;
+use nexus_core::ports::outbound::coussin_steal_repository::CoussinStealRepository;
+use nexus_core::ports::outbound::coussin_prime_repository::CoussinPrimeRepository;
+use nexus_core::ports::outbound::coussin_bet_repository::CoussinBetRepository;
+use nexus_core::ports::outbound::coussin_repository::CoussinRepository;
 use nexus_core::ports::inbound::game::manage_game_servers::ManageGameServersUseCase;
 use nexus_core::ports::inbound::game::manage_game_templates::ManageGameTemplatesUseCase;
 use nexus_core::ports::inbound::get_wallet::GetWalletUseCase;
@@ -56,12 +56,12 @@ use crate::adapters::outbound::events::noop_publisher::NoopEventPublisher;
 use crate::adapters::outbound::events::redis_publisher::RedisEventPublisher;
 use crate::adapters::outbound::game_runtime::redis_port_allocator::RedisPortAllocator;
 use crate::adapters::outbound::postgres::casino::game_repository::PgGameRepository;
-use crate::adapters::outbound::postgres::coude_repository::PgCoudeRepository;
-use crate::adapters::outbound::postgres::coude_inventory_repository::PgCoudeInventoryRepository;
-use crate::adapters::outbound::postgres::coude_insurance_repository::PgCoudeInsuranceRepository;
-use crate::adapters::outbound::postgres::coude_steal_repository::PgCoudeStealRepository;
-use crate::adapters::outbound::postgres::coude_prime_repository::PgCoudePrimeRepository;
-use crate::adapters::outbound::postgres::coude_bet_repository::PgCoudeBetRepository;
+use crate::adapters::outbound::postgres::coussin_repository::PgCoussinRepository;
+use crate::adapters::outbound::postgres::coussin_inventory_repository::PgCoussinInventoryRepository;
+use crate::adapters::outbound::postgres::coussin_insurance_repository::PgCoussinInsuranceRepository;
+use crate::adapters::outbound::postgres::coussin_steal_repository::PgCoussinStealRepository;
+use crate::adapters::outbound::postgres::coussin_prime_repository::PgCoussinPrimeRepository;
+use crate::adapters::outbound::postgres::coussin_bet_repository::PgCoussinBetRepository;
 use crate::adapters::outbound::postgres::game::audit_repository::PgGameAuditRepository;
 use crate::adapters::outbound::postgres::game::config_repository::PgGameServerConfigRepository;
 use crate::adapters::outbound::postgres::game::player_session_repository::PgPlayerSessionRepository;
@@ -81,13 +81,13 @@ pub struct AppState {
     pub transfer_coins: Arc<dyn TransferCoinsUseCase>,
     pub wallet_history: Arc<dyn GetWalletHistoryUseCase>,
     pub wallet_leaderboard: Arc<dyn GetWalletLeaderboardUseCase>,
-    pub coude_profile: Arc<dyn CoudeProfileUseCase>,
-    pub coude_combat: Arc<dyn CoudeCombatUseCase>,
-    pub coude_inventory: Arc<dyn CoudeInventoryUseCase>,
-    pub coude_insurance: Arc<dyn CoudeInsuranceUseCase>,
-    pub coude_steal: Arc<dyn CoudeStealUseCase>,
-    pub coude_prime: Arc<dyn CoudePrimeUseCase>,
-    pub coude_bet: Arc<dyn CoudeBetUseCase>,
+    pub coussin_profile: Arc<dyn CoussinProfileUseCase>,
+    pub coussin_combat: Arc<dyn CoussinCombatUseCase>,
+    pub coussin_inventory: Arc<dyn CoussinInventoryUseCase>,
+    pub coussin_insurance: Arc<dyn CoussinInsuranceUseCase>,
+    pub coussin_steal: Arc<dyn CoussinStealUseCase>,
+    pub coussin_prime: Arc<dyn CoussinPrimeUseCase>,
+    pub coussin_bet: Arc<dyn CoussinBetUseCase>,
     // ── Game Portal ──
     pub game_servers_uc: Arc<dyn ManageGameServersUseCase>,
     pub game_templates_uc: Arc<dyn ManageGameTemplatesUseCase>,
@@ -145,19 +145,19 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
     let wallet_repo = Arc::new(PgWalletRepository::new(pool.clone()));
     let service = Arc::new(PlayWheelService::new(wheel_repo, wallet_repo.clone(), bot_config_repo.clone()));
     let wallet_service = Arc::new(WalletService::new(wallet_repo, bot_config_repo.clone()));
-    let coude_repo: Arc<dyn CoudeRepository> = Arc::new(PgCoudeRepository::new(pool.clone()));
-    let coude_profile: Arc<dyn CoudeProfileUseCase> = Arc::new(CoudeService::new(coude_repo));
-    let coude_combat: Arc<dyn CoudeCombatUseCase> = Arc::new(CoudeService::new(Arc::new(PgCoudeRepository::new(pool.clone()))));
-    let coude_inventory_repo: Arc<dyn CoudeInventoryRepository> = Arc::new(PgCoudeInventoryRepository::new(pool.clone()));
-    let coude_inventory: Arc<dyn CoudeInventoryUseCase> = Arc::new(CoudeInventoryService::new(coude_inventory_repo));
-    let coude_insurance_repo: Arc<dyn CoudeInsuranceRepository> = Arc::new(PgCoudeInsuranceRepository::new(pool.clone()));
-    let coude_insurance: Arc<dyn CoudeInsuranceUseCase> = Arc::new(CoudeInsuranceService::new(coude_insurance_repo, bot_config_repo.clone()));
-    let coude_steal_repo: Arc<dyn CoudeStealRepository> = Arc::new(PgCoudeStealRepository::new(pool.clone()));
-    let coude_steal: Arc<dyn CoudeStealUseCase> = Arc::new(CoudeStealService::new(coude_steal_repo, bot_config_repo.clone()));
-    let coude_prime_repo: Arc<dyn CoudePrimeRepository> = Arc::new(PgCoudePrimeRepository::new(pool.clone()));
-    let coude_prime: Arc<dyn CoudePrimeUseCase> = Arc::new(CoudePrimeService::new(coude_prime_repo, bot_config_repo.clone()));
-    let coude_bet_repo: Arc<dyn CoudeBetRepository> = Arc::new(PgCoudeBetRepository::new(pool.clone()));
-    let coude_bet: Arc<dyn CoudeBetUseCase> = Arc::new(CoudeBetService::new(coude_bet_repo, bot_config_repo.clone()));
+    let coussin_repo: Arc<dyn CoussinRepository> = Arc::new(PgCoussinRepository::new(pool.clone()));
+    let coussin_profile: Arc<dyn CoussinProfileUseCase> = Arc::new(CoussinService::new(coussin_repo));
+    let coussin_combat: Arc<dyn CoussinCombatUseCase> = Arc::new(CoussinService::new(Arc::new(PgCoussinRepository::new(pool.clone()))));
+    let coussin_inventory_repo: Arc<dyn CoussinInventoryRepository> = Arc::new(PgCoussinInventoryRepository::new(pool.clone()));
+    let coussin_inventory: Arc<dyn CoussinInventoryUseCase> = Arc::new(CoussinInventoryService::new(coussin_inventory_repo));
+    let coussin_insurance_repo: Arc<dyn CoussinInsuranceRepository> = Arc::new(PgCoussinInsuranceRepository::new(pool.clone()));
+    let coussin_insurance: Arc<dyn CoussinInsuranceUseCase> = Arc::new(CoussinInsuranceService::new(coussin_insurance_repo, bot_config_repo.clone()));
+    let coussin_steal_repo: Arc<dyn CoussinStealRepository> = Arc::new(PgCoussinStealRepository::new(pool.clone()));
+    let coussin_steal: Arc<dyn CoussinStealUseCase> = Arc::new(CoussinStealService::new(coussin_steal_repo, bot_config_repo.clone()));
+    let coussin_prime_repo: Arc<dyn CoussinPrimeRepository> = Arc::new(PgCoussinPrimeRepository::new(pool.clone()));
+    let coussin_prime: Arc<dyn CoussinPrimeUseCase> = Arc::new(CoussinPrimeService::new(coussin_prime_repo, bot_config_repo.clone()));
+    let coussin_bet_repo: Arc<dyn CoussinBetRepository> = Arc::new(PgCoussinBetRepository::new(pool.clone()));
+    let coussin_bet: Arc<dyn CoussinBetUseCase> = Arc::new(CoussinBetService::new(coussin_bet_repo, bot_config_repo.clone()));
 
     // ── Game Portal : repos Postgres ──
     let game_server_repo: Arc<dyn GameServerRepository> =
@@ -262,13 +262,13 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         transfer_coins: wallet_service.clone(),
         wallet_history: wallet_service.clone(),
         wallet_leaderboard: wallet_service,
-        coude_profile,
-        coude_combat,
-        coude_inventory,
-        coude_insurance,
-        coude_steal,
-        coude_prime,
-        coude_bet,
+        coussin_profile,
+        coussin_combat,
+        coussin_inventory,
+        coussin_insurance,
+        coussin_steal,
+        coussin_prime,
+        coussin_bet,
         game_servers_uc,
         game_templates_uc,
         game_server_repo,

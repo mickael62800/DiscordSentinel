@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Coude : supervision des joueurs (classement + statistiques de jeu).
+// Coussin : supervision des joueurs (classement + statistiques de jeu).
 //
 // Lecture seule assumee. Les actions (combats, vols, primes, paris) sont des
 // interactions entre joueurs et restent sur Discord : les rejouer depuis un
@@ -11,12 +11,12 @@
 
 import { computed, ref, watch } from "vue";
 import { useGuildSelector } from "../../composables/useGuildSelector";
-import { nexusCoudeService, type CoudeProfile } from "@/services/nexusCoudeService";
+import { nexusCoussinService, type CoussinProfile } from "@/services/nexusCoussinService";
 import AdminPageShell from "../layouts/AdminPageShell.vue";
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 
-const players = ref<CoudeProfile[]>([]);
+const players = ref<CoussinProfile[]>([]);
 const loading = ref(false);
 const errorMessage = ref("");
 const search = ref("");
@@ -37,7 +37,7 @@ async function load() {
   loading.value = true;
   errorMessage.value = "";
   try {
-    players.value = await nexusCoudeService.ranking(selectedGuildId.value, 100);
+    players.value = await nexusCoussinService.ranking(selectedGuildId.value, 100);
   } catch (e) {
     errorMessage.value = e instanceof Error ? e.message : "Chargement impossible";
     players.value = [];
@@ -51,14 +51,14 @@ function fmt(n: number): string {
 }
 
 /// Ratio victoires/defaites, en evitant la division par zero.
-function ratio(p: CoudeProfile): string {
+function ratio(p: CoussinProfile): string {
   const total = p.total_wins + p.total_losses;
   if (total === 0) return "—";
   return `${Math.round((p.total_wins / total) * 100)} %`;
 }
 
 /// Part de PV restants : sert a reperer d'un coup d'oeil les joueurs au tapis.
-function hpPercent(p: CoudeProfile): number {
+function hpPercent(p: CoussinProfile): number {
   if (p.hp_max <= 0) return 0;
   return Math.max(0, Math.min(100, Math.round((p.hp_current / p.hp_max) * 100)));
 }
@@ -68,11 +68,11 @@ watch(selectedGuildId, load, { immediate: true });
 
 <template>
   <AdminPageShell
-    title="Coude"
+    title="Coussin Piégé"
     :subtitle="selectedGuild?.name ?? 'Aucun serveur selectionne'"
   >
     <p v-if="!selectedGuildId" class="nc-hint">
-      Selectionne un serveur Discord pour voir ses joueurs.
+      Selectionne un serveur Discord pour voir qui squatte le canape.
     </p>
 
     <p v-else-if="errorMessage" class="nc-error">{{ errorMessage }}</p>
@@ -80,8 +80,8 @@ watch(selectedGuildId, load, { immediate: true });
     <p v-else-if="loading" class="nc-hint">Chargement…</p>
 
     <p v-else-if="!players.length" class="nc-hint">
-      Aucun joueur pour l'instant. Les profils se creent au premier
-      <code>/coude</code> sur Discord.
+      Personne sur le canape pour l'instant. Les profils se creent au premier
+      <code>/coussin</code> sur Discord.
     </p>
 
     <template v-else>
@@ -97,12 +97,12 @@ watch(selectedGuildId, load, { immediate: true });
           <tr>
             <th>#</th>
             <th>Joueur</th>
-            <th>Classe</th>
+            <th>Maniere</th>
             <th>Niveau</th>
-            <th>PV</th>
-            <th>V / D / N</th>
-            <th>Winrate</th>
-            <th>Vole</th>
+            <th>Confort</th>
+            <th>Assis / Piege / Nul</th>
+            <th>Reussite</th>
+            <th>Trouve sous les coussins</th>
             <th>Coins</th>
           </tr>
         </thead>
