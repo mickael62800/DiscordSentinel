@@ -112,10 +112,14 @@ pub async fn on_message_update(
     if !has_embeds {
         return;
     }
-    // On ne refetch que les editions d'un bot PROVIDER connu (evite de refetch
-    // tous les messages edites du serveur, ex: notre propre panneau d'aide).
+    // On ne refetch que les editions d'un bot PROVIDER (evite de refetch tous
+    // les messages edites du serveur, ex: notre propre panneau d'aide). Un
+    // provider = bot_id par defaut (Disboard/DiscordL) OU bot_id configure par
+    // le serveur (French GG, Discadia, top.gg, SpaceBump). Ne gater que sur les
+    // bot_id par defaut ratait justement ces plateformes-la.
     if let Some(author) = &event.author {
-        if !is_provider_bot(author.id.get()) {
+        let gid = event.guild_id.map(|g| g.to_string()).unwrap_or_default();
+        if !author_is_bump_provider(ctx, &gid, author.id.get()).await {
             return;
         }
     }
@@ -123,6 +127,28 @@ pub async fn on_message_update(
     if let Ok(msg) = event.channel_id.message(&ctx.http, event.id).await {
         on_message(ctx, &msg).await;
     }
+}
+
+/// Un bot est-il une plateforme de bump pour CE serveur ? Vrai s'il porte un
+/// bot_id par defaut (Disboard/DiscordL) ou un bot_id configure par le serveur
+/// (`{provider}_bot_id`).
+async fn author_is_bump_provider(ctx: &Context, guild_id: &str, author_id: u64) -> bool {
+    if is_provider_bot(author_id) {
+        return true;
+    }
+    if guild_id.is_empty() {
+        return false;
+    }
+    let cfg =
+        crate::shared::discord_helpers::guild_config_or_default(ctx, guild_id, MODULE_BOT_NAME)
+            .await;
+    PROVIDERS.iter().any(|p| {
+        BaseApiClient::config_or(&cfg, &format!("{}_bot_id", p.key), "")
+            .trim()
+            .parse::<u64>()
+            .map(|id| id != 0 && id == author_id)
+            .unwrap_or(false)
+    })
 }
 
 /// Appele pour chaque message : si c'est une confirmation de bump reussie d'un
@@ -168,7 +194,11 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
             let effectif = if configure != 0 { configure } else { p.bot_id };
             effectif != 0 && effectif == author
         });
-        if est_plateforme_configuree {
+        // Message VIDE (ni embed ni texte) : c'est le placeholder poste avant
+        // l'edition de l'interaction. `on_message_update` le rattrapera quand
+        // l'embed arrivera -> pas d'alerte, ce n'est pas une anomalie.
+        let placeholder_vide = msg.embeds.is_empty() && msg.content.trim().is_empty();
+        if est_plateforme_configuree && !placeholder_vide {
             warn!(
                 bot_id = author,
                 bot_name = %msg.author.name,
