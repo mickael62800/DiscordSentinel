@@ -244,3 +244,100 @@ fn test_strict_link_rule_does_not_lower_insult_action() {
     assert_eq!(result.score, 5.0);
     assert_eq!(result.action, Action::Delete);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DIAGNOSTIC — sensibilite de la moderation (poids/seuils par defaut)
+//
+// Ces tests DOCUMENTENT le comportement actuel pour montrer OU affiner. Ils
+// passent tels quels : ils decrivent l'existant, pas un objectif. Les noms
+// signalent les points sensibles.
+//
+// Rappel des defauts : poids insult=5, spam=3, profanity=1 ; seuils warn=2,
+// delete=4, mute=6, ban=9.
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn flags_profanity_seule() -> DetectionFlags {
+    DetectionFlags {
+        spam: false,
+        insult: false,
+        profanity: true,
+        link: false,
+        phishing: false,
+    }
+}
+
+/// Un message gentil (aucun flag) ne declenche rien. Le comportement voulu.
+#[test]
+fn diag_message_gentil_ne_declenche_rien() {
+    let r = ScoringService::score(&make_flags(false, false, false), &[]);
+    assert_eq!(r.action, Action::None);
+}
+
+/// Un juron isole (« merde ») est TOLERE : poids 1 < seuil warn 2. Bon reglage.
+#[test]
+fn diag_juron_isole_est_tolere() {
+    let r = ScoringService::score(&flags_profanity_seule(), &[]);
+    assert_eq!(r.action, Action::None, "un juron seul ne doit rien declencher");
+}
+
+/// POINT SENSIBLE #1 : une SEULE insulte SUPPRIME deja le message (poids 5 >=
+/// seuil delete 4). Aucune tolerance graduee -> c'est ce que l'utilisateur
+/// ressent (« tu dis un truc, direct une carte »).
+#[test]
+fn diag_une_insulte_isolee_supprime_deja_le_message() {
+    let r = ScoringService::score(&make_flags(false, true, false), &[]);
+    assert_eq!(r.action, Action::Delete, "1 insulte = Delete : trop severe pour un cas isole");
+}
+
+/// POINT SENSIBLE #2 : un simple flag spam (repetition, caps-like...) poste
+/// deja une carte Warn (poids 3 >= seuil warn 2).
+#[test]
+fn diag_spam_seul_declenche_deja_une_carte() {
+    let r = ScoringService::score(&make_flags(true, false, false), &[]);
+    assert_eq!(r.action, Action::Warn);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROPOSITION — reglage plus clement + reaction au « florilege »
+//
+// Objectif : un ecart isole ne fait qu'AVERTIR (voire rien), mais un cumul de
+// signaux dans un meme message agit. La montee en charge inter-messages (un
+// membre qui enchaine les insultes) reste geree par la « tension de salon »
+// (accumulation glissante), a ACTIVER (channel_tension_enabled, off par defaut).
+//
+// Ici on abaisse seulement weight_insult 5 -> 3. Ces tests montrent l'effet.
+// ─────────────────────────────────────────────────────────────────────────────
+
+fn config_proposee() -> ScoringConfig {
+    ScoringConfig {
+        weight_insult: 3.0, // 5 -> 3 : une insulte isolee AVERTIT au lieu de supprimer
+        ..ScoringConfig::default()
+    }
+}
+
+/// Avec la proposition, une insulte isolee ne fait qu'AVERTIR (3 >= warn 2,
+/// < delete 4) au lieu de supprimer. Tolerance graduee retrouvee.
+#[test]
+fn proposition_insulte_isolee_avertit_seulement() {
+    let r = ScoringService::score_with_config(
+        &make_flags(false, true, false),
+        &[],
+        &config_proposee(),
+        600,
+    );
+    assert_eq!(r.action, Action::Warn);
+}
+
+/// Mais un « florilege » dans un meme message (insulte + spam) agit toujours :
+/// 3 + 3 = 6 -> Mute. Le cumul de signaux reste sanctionne.
+#[test]
+fn proposition_florilege_dans_un_message_agit_toujours() {
+    let r = ScoringService::score_with_config(
+        &make_flags(true, true, false),
+        &[],
+        &config_proposee(),
+        600,
+    );
+    assert_eq!(r.action, Action::Mute);
+    assert_eq!(r.score, 6.0);
+}
