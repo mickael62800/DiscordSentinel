@@ -64,7 +64,16 @@ const configFields = computed<ConfigField[]>(() => {
 });
 
 const booleanFields = computed(() => configFields.value.filter((f) => f.type === "boolean"));
-const numberFields = computed(() => configFields.value.filter((f) => f.type === "number"));
+/// Champs de scoring de la moderation (`score_weight_*`, `score_threshold_*`) :
+/// sortis dans LEUR PROPRE section pour ne pas etre noyes parmi les dizaines
+/// d'autres nombres d'automod (l'utilisateur les cherchait sans les trouver).
+const isScoringKey = (key: string) => key.startsWith("score_");
+const scoringFields = computed(() =>
+  configFields.value.filter((f) => f.type === "number" && isScoringKey(f.key)),
+);
+const numberFields = computed(() =>
+  configFields.value.filter((f) => f.type === "number" && !isScoringKey(f.key)),
+);
 const channelFields = computed(() => configFields.value.filter((f) => f.type === "channel"));
 const categoryFields = computed(() => configFields.value.filter((f) => f.type === "category"));
 const roleFields = computed(() => configFields.value.filter((f) => f.type === "role"));
@@ -111,6 +120,7 @@ const unclassifiedFields = computed(() =>
 
 const visibleSections = computed(() => {
   const all = [
+    { title: "Scoring — poids & seuils (modération)", fields: scoringFields.value, wide: true },
     { title: "Valeurs", fields: numberFields.value, wide: false },
     { title: "Choix", fields: enumFields.value, wide: false },
     { title: "Salons", fields: channelFields.value, wide: false },
