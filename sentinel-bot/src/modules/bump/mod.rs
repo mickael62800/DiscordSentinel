@@ -107,9 +107,16 @@ pub async fn on_message_update(
     ctx: &Context,
     event: &serenity::model::event::MessageUpdateEvent,
 ) {
-    // Un embed vient-il d'apparaitre ? (sinon rien a detecter).
+    // Du contenu exploitable vient-il d'apparaitre a l'edition ? Un embed
+    // (Disboard, DiscordL, French GG, SpaceBump...) OU du texte (Discadia
+    // confirme en texte simple). Sans l'un ou l'autre, rien a detecter.
     let has_embeds = event.embeds.as_ref().map(|e| !e.is_empty()).unwrap_or(false);
-    if !has_embeds {
+    let has_content = event
+        .content
+        .as_ref()
+        .map(|c| !c.trim().is_empty())
+        .unwrap_or(false);
+    if !has_embeds && !has_content {
         return;
     }
     // On ne refetch que les editions d'un bot PROVIDER (evite de refetch tous
