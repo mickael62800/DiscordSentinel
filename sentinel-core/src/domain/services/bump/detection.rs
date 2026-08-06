@@ -45,6 +45,10 @@ pub struct BumpMessageFacts {
     /// User id de l'auteur du message (le bot provider).
     pub author_id: u64,
     pub embeds: Vec<EmbedFacts>,
+    /// Texte brut du message (hors embeds). Certaines plateformes (Discadia)
+    /// confirment le bump en TEXTE SIMPLE, sans embed : sans ce champ leur
+    /// message serait invisible a la detection.
+    pub content: String,
     /// Utilisateur de l'interaction `/bump` (interaction_metadata), si présent.
     pub interaction_user: Option<UserFacts>,
     /// Mentions du CONTENU du message (pas celles des embeds).
@@ -117,36 +121,57 @@ pub const DISCORDL_VOTE: BumpProvider = BumpProvider {
 // un succes = un embed present et aucun mot de cooldown/echec. C'est ce qui
 // fiabilise ces plateformes sans parser leur format exact.
 
-/// `matches` generique : le bot a poste un embed (les plateformes repondent au
-/// /bump par un embed). Comme chaque plateforme a un bot_id distinct, pas besoin
-/// de discriminer l'action ici.
-fn generic_matches(facts: &BumpMessageFacts) -> bool {
-    !facts.embeds.is_empty()
+/// Texte pertinent d'un message pour la detection : titres + descriptions des
+/// embeds ET le contenu brut. Les CHAMPS d'embed sont volontairement exclus :
+/// SpaceBump y met « Cooldown applique : 2h » sur un bump REUSSI, ce qui ferait
+/// passer un succes pour un cooldown.
+fn detection_text(facts: &BumpMessageFacts) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    for e in &facts.embeds {
+        if let Some(t) = e.title.as_deref() {
+            parts.push(t);
+        }
+        if let Some(d) = e.description.as_deref() {
+            parts.push(d);
+        }
+    }
+    if !facts.content.is_empty() {
+        parts.push(&facts.content);
+    }
+    parts.join(" ").to_lowercase()
 }
 
-/// `detect` generique : succes = embed present ET aucun mot de cooldown/echec.
+/// `matches` generique : le bot a poste quelque chose d'exploitable — un embed
+/// (Disboard, DiscordL, French GG, SpaceBump...) OU du texte simple (Discadia
+/// confirme le bump sans embed). Chaque plateforme ayant un bot_id distinct, pas
+/// besoin de discriminer l'action ici.
+fn generic_matches(facts: &BumpMessageFacts) -> bool {
+    !facts.embeds.is_empty() || !facts.content.trim().is_empty()
+}
+
+/// Mots/symboles qui signalent un ECHEC ou un cooldown (donc PAS un bump
+/// recompensable) : cooldown en cours, votes epuises, simple invitation a voter.
+const FAILURE_WORDS: &[&str] = &[
+    // Cooldown / attente
+    "wait", "minute", "patient", "cooldown", "seconde", "second", "already",
+    "try again", "deja", "déjà", "prochain", "heure", "hour", "attends",
+    "encore", "trop tot", "trop tôt", "next bump", "come back", "revenir",
+    "reviens",
+    // Votes epuises (DiscordL : « Tu n'as plus de votes ... aujourd'hui »)
+    "plus de vote", "n'as plus", "n as plus", "no more vote",
+    // Invitation a voter, pas une confirmation (top.gg : « Vote is ready »)
+    "is ready", "vote for",
+    // Symboles d'echec/avertissement, fiables cross-plateforme
+    "❌", "⚠️", "🚫",
+];
+
+/// `detect` generique : succes = message exploitable ET aucun signal d'echec.
 fn generic_success(facts: &BumpMessageFacts) -> bool {
-    if facts.embeds.is_empty() {
+    if !generic_matches(facts) {
         return false;
     }
-    let text = facts
-        .embeds
-        .iter()
-        .flat_map(|e| {
-            [
-                e.title.as_deref().unwrap_or(""),
-                e.description.as_deref().unwrap_or(""),
-            ]
-        })
-        .collect::<Vec<_>>()
-        .join(" ")
-        .to_lowercase();
-    const COOLDOWN_WORDS: &[&str] = &[
-        "wait", "minute", "patient", "cooldown", "seconde", "second", "already",
-        "deja", "déjà", "prochain", "heure", "hour", "attends", "encore",
-        "trop tot", "trop tôt", "next bump", "come back", "revenir", "reviens",
-    ];
-    !COOLDOWN_WORDS.iter().any(|w| text.contains(w))
+    let text = detection_text(facts);
+    !FAILURE_WORDS.iter().any(|w| text.contains(w))
 }
 
 /// French GG (bot_id configurable).
@@ -493,6 +518,63 @@ mod tests {
     fn provider_by_key_lookup() {
         assert_eq!(provider_by_key("disboard").unwrap().bot_id, DISBOARD.bot_id);
         assert!(provider_by_key("inconnu").is_none());
+    }
+
+    // ── Plateformes generiques (French GG, Discadia, top.gg, Spacebump) ──
+
+    fn facts_text(content: &str) -> BumpMessageFacts {
+        BumpMessageFacts {
+            content: content.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn discadia_succes_en_texte_simple() {
+        // Discadia confirme le bump SANS embed : la detection doit lire le
+        // contenu brut, sinon son bump est invisible.
+        let f = facts_text("✅ Bumped La Bande du Canapé !");
+        assert!((DISCADIA.detect)(&f));
+    }
+
+    #[test]
+    fn discadia_cooldown_en_texte_simple_rejete() {
+        let f = facts_text("⚠️ Already bumped recently, please try again dans 42 minutes.");
+        assert!(!(DISCADIA.detect)(&f));
+    }
+
+    #[test]
+    fn frenchgg_succes_embed() {
+        let f = facts_with_desc(0, "Le serveur La Bande du Canapé a été bumpé !");
+        assert!((FRENCH_GG.detect)(&f));
+    }
+
+    #[test]
+    fn spacebump_cooldown_seulement_en_champ_reste_un_succes() {
+        // « Cooldown applique : 2h » vit dans un CHAMP sur un bump reussi : il ne
+        // doit pas faire passer le succes pour un cooldown.
+        let f = BumpMessageFacts {
+            embeds: vec![EmbedFacts {
+                title: Some("✅ Bump réussi".into()),
+                description: Some("Le serveur La Bande du Canapé a été bump sur SpaceBump.".into()),
+                fields: vec![("Cooldown appliqué".into(), "2h (base gratuit : 2h)".into())],
+            }],
+            ..Default::default()
+        };
+        assert!((SPACEBUMP.detect)(&f));
+    }
+
+    #[test]
+    fn topgg_vote_is_ready_n_est_pas_un_succes() {
+        // top.gg n'affiche qu'une INVITATION a voter, pas une confirmation.
+        let f = facts_with_desc(0, "La Bande du Canapé — Vote is ready");
+        assert!(!(TOPGG.detect)(&f));
+    }
+
+    #[test]
+    fn votes_epuises_rejete() {
+        let f = facts_with_desc(0, "❌ Tu n'as plus de votes pour La Bande du Canapé aujourd'hui");
+        assert!(!(SPACEBUMP.detect)(&f));
     }
 
     // ── resolve_bumper ──

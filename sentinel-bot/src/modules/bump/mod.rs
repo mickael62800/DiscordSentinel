@@ -44,6 +44,7 @@ pub const MODULE_BOT_NAME: &str = "bump-bot";
 fn message_facts(msg: &Message) -> BumpMessageFacts {
     BumpMessageFacts {
         author_id: msg.author.id.get(),
+        content: msg.content.clone(),
         embeds: msg
             .embeds
             .iter()
