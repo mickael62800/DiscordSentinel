@@ -29,6 +29,11 @@ const MAX_CONTENT: usize = 2000;
 #[derive(Debug, Deserialize)]
 pub struct SendMessageDto {
     pub content: String,
+    /// URL ABSOLUE d'une image a joindre (facultatif). Le bot la telecharge et
+    /// la poste en piece jointe. Un message avec image seule (sans texte) est
+    /// permis.
+    #[serde(default)]
+    pub image_url: Option<String>,
 }
 
 /// POST /api/messages/{guild_id}/{channel_id}
@@ -38,9 +43,17 @@ pub async fn send_message(
     Json(dto): Json<SendMessageDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let content = dto.content.trim();
-    if content.is_empty() {
+    let image_url = dto
+        .image_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+    // Un message est valide s'il porte du texte OU une image. Rejeter le vide
+    // ici (plutot que de laisser le stream avaler un ordre sans effet) rend
+    // l'erreur au moment de l'envoi, dans le navigateur.
+    if content.is_empty() && image_url.is_none() {
         return Err(ApiError(DomainError::ValidationError(
-            "le message est vide".into(),
+            "le message est vide (ni texte ni image)".into(),
         )));
     }
     // En CARACTERES, pas en octets : Discord compte des caracteres, et un
@@ -54,7 +67,12 @@ pub async fn send_message(
 
     let envelope = serde_json::json!({
         "event": "message_send",
-        "data": { "guild_id": guild_id, "channel_id": channel_id, "content": content },
+        "data": {
+            "guild_id": guild_id,
+            "channel_id": channel_id,
+            "content": content,
+            "image_url": image_url,
+        },
     })
     .to_string();
 

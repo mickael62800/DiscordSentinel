@@ -13,6 +13,7 @@ import { computed, ref, watch } from "vue";
 
 import AdminPageShell from "../layouts/AdminPageShell.vue";
 import ActionButton from "../atoms/ActionButton.vue";
+import ImagePicker from "../molecules/ImagePicker.vue";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { guildChannelsService } from "@/services/guildChannelsService";
 import { messagesService, MAX_MESSAGE_LENGTH } from "@/services/messagesService";
@@ -23,6 +24,10 @@ const { selectedGuildId, selectedGuild } = useGuildSelector();
 const channels = ref<DiscordChannelInfo[]>([]);
 const channelId = ref("");
 const content = ref("");
+/// URL absolue d'une image à joindre (facultatif). Le bot la télécharge et la
+/// poste en pièce jointe : un message peut être texte seul, image seule, ou les
+/// deux.
+const imageUrl = ref("");
 const sending = ref(false);
 const errorMessage = ref("");
 const successMessage = ref("");
@@ -34,11 +39,13 @@ const tropLong = computed(() => longueur.value > MAX_MESSAGE_LENGTH);
 /// avant, et on le confirme au moment d'envoyer.
 const pingeTout = computed(() => /@everyone|@here/.test(content.value));
 
+/// Un message part s'il a du texte OU une image. Le texte seul comme l'image
+/// seule sont des envois légitimes.
 const peutEnvoyer = computed(
   () =>
     !!selectedGuildId.value &&
     !!channelId.value &&
-    content.value.trim().length > 0 &&
+    (content.value.trim().length > 0 || imageUrl.value.trim().length > 0) &&
     !tropLong.value &&
     !sending.value,
 );
@@ -69,12 +76,18 @@ async function envoyer() {
   errorMessage.value = "";
   successMessage.value = "";
   try {
-    await messagesService.send(selectedGuildId.value, channelId.value, content.value);
+    await messagesService.send(
+      selectedGuildId.value,
+      channelId.value,
+      content.value,
+      imageUrl.value,
+    );
     // « Transmis » et non « envoyé » : l'API a mis l'ordre en file, le bot
     // poste ensuite. Promettre un envoi réussi mentirait si le bot n'a pas
     // accès au salon.
     successMessage.value = "Message transmis au bot.";
     content.value = "";
+    imageUrl.value = "";
   } catch (e) {
     errorMessage.value = e instanceof Error ? e.message : "Envoi impossible";
   } finally {
@@ -109,6 +122,13 @@ watch(selectedGuildId, chargerSalons, { immediate: true });
         rows="10"
         placeholder="Le markdown Discord fonctionne : **gras**, *italique*, `code`, > citation, [lien](url), <@&role>…"
       ></textarea>
+
+      <label class="sm-label">Image (facultatif)</label>
+      <ImagePicker v-model="imageUrl" />
+      <p class="sm-note sm-note-image">
+        L'image est jointe au message (pièce jointe Discord). Tu peux envoyer une
+        image seule, sans texte.
+      </p>
 
       <div class="sm-barre">
         <span :class="['sm-compteur', tropLong && 'sm-trop']">
@@ -147,6 +167,10 @@ watch(selectedGuildId, chargerSalons, { immediate: true });
 .sm-note {
   margin-top: var(--space-md);
   font-size: 0.86rem;
+}
+
+.sm-note-image {
+  margin-top: var(--space-xs);
 }
 
 .sm-label {

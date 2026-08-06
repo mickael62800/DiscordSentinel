@@ -16,7 +16,7 @@
 //! Discord. Deux emetteurs, ce sont deux compteurs qui s'ignorent.
 
 use serde::{Deserialize, Serialize};
-use serenity::builder::{CreateAllowedMentions, CreateMessage};
+use serenity::builder::{CreateAllowedMentions, CreateAttachment, CreateMessage};
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use tracing::{info, warn};
@@ -31,6 +31,10 @@ struct MessageSend {
     guild_id: String,
     channel_id: String,
     content: String,
+    /// URL ABSOLUE d'une image a joindre (facultatif). Le bot la telecharge et
+    /// la poste en piece jointe -> une vraie image Discord, pas un lien brut.
+    #[serde(default)]
+    image_url: Option<String>,
 }
 
 /// Spawn le consumer durable. Appele une fois au `ready`.
@@ -67,10 +71,21 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         }
     };
 
-    if payload.content.trim().is_empty() || payload.content.chars().count() > MAX_CONTENT {
+    let image = payload
+        .image_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty());
+
+    // Un message sans texte MAIS avec image est legitime (on envoie juste une
+    // image). On ne rejette que le message reellement vide (ni texte ni image)
+    // ou au texte trop long.
+    if (payload.content.trim().is_empty() && image.is_none())
+        || payload.content.chars().count() > MAX_CONTENT
+    {
         warn!(
             channel = %payload.channel_id,
-            "message_send: contenu vide ou trop long, ignore"
+            "message_send: contenu vide (sans image) ou trop long, ignore"
         );
         return;
     }
@@ -83,7 +98,7 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
     // Mentions laissees libres : l'outil est reserve au back-office, et un
     // message d'annonce qui ne peut pas ping @everyone ne sert a rien. Le
     // garde-fou est donc l'acces a la page, pas le contenu.
-    let message = CreateMessage::new()
+    let mut message = CreateMessage::new()
         .content(&payload.content)
         .allowed_mentions(
             CreateAllowedMentions::new()
@@ -91,6 +106,21 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
                 .all_roles(true)
                 .all_users(true),
         );
+
+    // Image jointe : telechargee par le bot puis postee en piece jointe. Si le
+    // telechargement echoue (URL morte, hote injoignable), on poste quand meme
+    // le texte plutot que de perdre tout le message.
+    if let Some(url) = image {
+        match CreateAttachment::url(&ctx.http, url).await {
+            Ok(att) => message = message.add_file(att),
+            Err(e) => warn!(
+                channel = %payload.channel_id,
+                url = %url,
+                error = %e,
+                "message_send: image injoignable, message poste sans elle"
+            ),
+        }
+    }
 
     match ChannelId::new(channel_id).send_message(&ctx.http, message).await {
         Ok(m) => info!(

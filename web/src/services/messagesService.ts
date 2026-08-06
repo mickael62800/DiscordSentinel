@@ -17,7 +17,18 @@ export interface SendResult {
 export const MAX_MESSAGE_LENGTH = 2000;
 
 export const messagesService = {
-  send(guildId: string, channelId: string, content: string): Promise<SendResult> {
-    return httpPost(`/api/messages/${guildId}/${channelId}`, { content });
+  /// `imageUrl` (URL absolue) est facultatif : un message peut être du texte
+  /// seul, une image seule, ou les deux. Le bot télécharge l'image et la poste
+  /// en pièce jointe.
+  send(
+    guildId: string,
+    channelId: string,
+    content: string,
+    imageUrl?: string,
+  ): Promise<SendResult> {
+    return httpPost(`/api/messages/${guildId}/${channelId}`, {
+      content,
+      image_url: imageUrl && imageUrl.trim() ? imageUrl.trim() : null,
+    });
   },
 };
