@@ -19,10 +19,17 @@ use std::sync::Arc;
 pub struct CoussinService {
     repo: Arc<dyn CoussinRepository>,
     config_repo: Arc<dyn BotConfigRepository>,
+    cooldowns: Arc<dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository>,
 }
 impl CoussinService {
-    pub fn new(repo: Arc<dyn CoussinRepository>, config_repo: Arc<dyn BotConfigRepository>) -> Self {
-        Self { repo, config_repo }
+    pub fn new(
+        repo: Arc<dyn CoussinRepository>,
+        config_repo: Arc<dyn BotConfigRepository>,
+        cooldowns: Arc<
+            dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository,
+        >,
+    ) -> Self {
+        Self { repo, config_repo, cooldowns }
     }
 
     /// Le jeu est-il ouvert sur ce serveur ?
@@ -115,12 +122,24 @@ impl CoussinProfileUseCase for CoussinService {
     }
 
     async fn choose_class(&self, guild_id: &str, user_id: &str, username: &str, class: &str) -> Result<CoussinProfile, DomainError> {
-        self.ensure_open(guild_id).await?;
+        let cfg = self.open_config(guild_id).await?;
+        crate::application::economy_config::ensure_cooldown_over(
+            &self.cooldowns,
+            guild_id,
+            user_id,
+            "class",
+            "tu viens de changer de place",
+        )
+        .await?;
         let mut profile = self.profile(guild_id, user_id, username).await?;
         let class = PlayerClass::parse(class).ok_or_else(|| DomainError::Validation("classe invalide : ecraseur, ressort, piegeur ou couette".into()))?;
-        let (atk, def) = class.base_stats();
-        let hp_max = max_hp(def, class);
+        let stats = cfg.classes.stats(class);
+        let (atk, def) = (stats.atk, stats.def);
+        let hp_max = crate::domain::entities::coussin::max_hp_with(def, class, &cfg.classes);
         self.repo.update_class(guild_id, user_id, class, atk, def, hp_max).await?;
+        self.cooldowns
+            .arm(guild_id, user_id, "class", cfg.class_change_cooldown_minutes)
+            .await?;
         profile.class = class;
         profile.atk = atk;
         profile.def = def;
@@ -150,6 +169,14 @@ impl CoussinCombatUseCase for CoussinService {
     ) -> Result<crate::ports::outbound::coussin_repository::CoussinCombat, DomainError> {
         let cfg = self.open_config(guild_id).await?;
         cfg.validate_mise(mise)?;
+        crate::application::economy_config::ensure_cooldown_over(
+            &self.cooldowns,
+            guild_id,
+            attacker_id,
+            "combat",
+            "tu viens de te battre",
+        )
+        .await?;
         if attacker_id == defender_id {
             return Err(DomainError::Validation(
                 "impossible de se defier soi-meme".into(),
@@ -160,9 +187,16 @@ impl CoussinCombatUseCase for CoussinService {
         if attacker.coins < mise {
             return Err(DomainError::Validation("coins insuffisants".into()));
         }
-        self.repo
+        let combat = self
+            .repo
             .create_combat(guild_id, channel_id, &attacker, &defender, mise)
-            .await
+            .await?;
+        // Arme apres creation : un defi refuse par la validation ne doit pas
+        // consommer le delai de l'attaquant.
+        self.cooldowns
+            .arm(guild_id, attacker_id, "combat", cfg.combat_cooldown_minutes)
+            .await?;
+        Ok(combat)
     }
     async fn accept(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError> { self.repo.accept_combat(id, defender_id).await }
     async fn refuse(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError> { self.repo.refuse_combat(id, defender_id).await }
@@ -171,17 +205,22 @@ impl CoussinCombatUseCase for CoussinService {
         // La configuration est lue AVANT de tirer les des : une bagarre qu'on
         // ne saurait pas regler ne doit pas consommer son alea.
         let cfg = load_coussin(&self.config_repo, &snapshot.combat.guild_id).await?;
+        // Les des suivent le reglage du serveur. Bornes 2..=100 : un de a une
+        // face rendrait chaque manche identique, et au-dela de cent le jet
+        // ecraserait toute notion de statistique.
+        let faces = cfg.dice_faces.clamp(2, 100);
         let rolls = {
             let mut rng = rand::thread_rng();
-            [(rng.gen_range(1..=6), rng.gen_range(1..=6)), (rng.gen_range(1..=6), rng.gen_range(1..=6)), (rng.gen_range(1..=6), rng.gen_range(1..=6))]
+            [
+                (rng.gen_range(1..=faces), rng.gen_range(1..=faces)),
+                (rng.gen_range(1..=faces), rng.gen_range(1..=faces)),
+                (rng.gen_range(1..=faces), rng.gen_range(1..=faces)),
+            ]
         };
         let result = crate::domain::entities::coussin::resolve_combat(
             snapshot.attacker.atk, snapshot.attacker.def, snapshot.attacker.class, snapshot.attacker.level,
             snapshot.defender.atk, snapshot.defender.def, snapshot.defender.class, snapshot.defender.level, &rolls,
-            crate::domain::entities::coussin::CombatRules {
-                level_gap_max: cfg.level_gap_max,
-                max_rounds: cfg.combat_max_rounds,
-            },
+            cfg.combat_rules(),
         ).map_err(|message| DomainError::Validation(message.into()))?;
         let winner = match result.attacker_won { Some(true) => Some(snapshot.attacker.user_id.as_str()), Some(false) => Some(snapshot.defender.user_id.as_str()), None => None };
         let resolved = self.repo.resolve_combat(id, winner, rolls[0].0, rolls[0].1, if winner.is_some() { snapshot.combat.mise } else { 0 }, result.attacker_hp, result.defender_hp, cfg.bet_payout_pct).await?;

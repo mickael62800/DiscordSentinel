@@ -51,10 +51,12 @@ impl PlayerClass {
         }
     }
 
-    /// (Impact, Moelleux) de depart. L'equilibre est celui d'avant la
-    /// refonte : seuls les noms changent, pas les chiffres — un joueur ne
-    /// doit pas retrouver son personnage affaibli parce que le jeu a change
-    /// de titre.
+    /// (Impact, Moelleux) de depart, valeurs HISTORIQUES.
+    ///
+    /// Restent le defaut, mais ne sont plus la loi : un serveur peut les
+    /// redefinir via `ClassRules`. Gardees ici parce qu'elles servent de
+    /// point de depart a la configuration — et parce qu'un appelant sans
+    /// configuration sous la main (tests, outillage) doit pouvoir jouer.
     pub fn base_stats(self) -> (i32, i32) {
         match self {
             Self::Ecraseur => (25, 8),
@@ -72,6 +74,14 @@ impl PlayerClass {
             Self::Couette => (1, 4),
         }
     }
+
+    /// Les quatre classes, pour parcourir sans rien oublier.
+    pub const ALL: [PlayerClass; 4] = [
+        Self::Ecraseur,
+        Self::Ressort,
+        Self::Piegeur,
+        Self::Couette,
+    ];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -122,17 +132,37 @@ pub fn level_for_xp(xp: i64) -> i32 {
     level_for_xp_capped(xp, MAX_LEVEL)
 }
 
+/// Les six titres, du bout d'accoudoir a la place du milieu.
+pub const TITLES: [&str; 6] = [
+    "Bout d'Accoudoir",
+    "Squatteur",
+    "Poseur de Coussins",
+    "Gardien de la Telecommande",
+    "Roi du Canape",
+    "Le Canape, c'est Lui",
+];
+
 /// Le titre raconte la place gagnee sur le canape, pas un grade militaire :
 /// on commence sur l'accoudoir et on finit au milieu, telecommande en main.
-pub fn title_for_level(level: i32) -> &'static str {
-    match level {
-        1..=4 => "Bout d'Accoudoir",
-        5..=9 => "Squatteur",
-        10..=14 => "Poseur de Coussins",
-        15..=19 => "Gardien de la Telecommande",
-        20..=24 => "Roi du Canape",
-        _ => "Le Canape, c'est Lui",
+///
+/// Les paliers sont PROPORTIONNELS au plafond : sur une echelle de 100
+/// niveaux, des bandes fixes de cinq niveaux donneraient le dernier titre des
+/// le niveau 25, puis soixante-quinze niveaux sans rien a gagner.
+pub fn title_for_level_capped(level: i32, max_level: i32) -> &'static str {
+    let max_level = max_level.clamp(1, 200);
+    let level = level.clamp(1, max_level);
+    // Le dernier titre est reserve au plafond : c'est ce qui en fait une fin
+    // de course, et non un palier de plus.
+    if level >= max_level {
+        return TITLES[TITLES.len() - 1];
     }
+    let bandes = (TITLES.len() - 1) as i32;
+    let index = ((level - 1) * bandes / max_level.max(1)).clamp(0, bandes - 1);
+    TITLES[index as usize]
+}
+
+pub fn title_for_level(level: i32) -> &'static str {
+    title_for_level_capped(level, MAX_LEVEL)
 }
 
 /// Handicap applique au plus haut niveau, ou `None` si l'ecart interdit la
@@ -165,25 +195,121 @@ pub fn matchmaking_handicap(first_level: i32, second_level: i32) -> Option<f32> 
     matchmaking_handicap_capped(first_level, second_level, 9)
 }
 
-pub fn max_hp(defense: i32, class: PlayerClass) -> i32 {
-    let base = 100 + defense.max(0) * 10;
-    match class {
-        PlayerClass::Couette => base * 13 / 10,
-        _ => base,
+/// Statistiques d'une classe : depart et croissance par niveau.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClassStats {
+    pub atk: i32,
+    pub def: i32,
+    pub atk_growth: i32,
+    pub def_growth: i32,
+}
+
+/// Tout ce qui fait l'equilibre des classes et des coups.
+///
+/// Reunies dans UNE structure passee en donnees : c'est la condition pour que
+/// le domaine reste pur et testable, et pour qu'un serveur puisse rejouer
+/// l'equilibrage sans recompiler. Les defauts sont les chiffres historiques,
+/// a l'identique.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ClassRules {
+    pub ecraseur: ClassStats,
+    pub ressort: ClassStats,
+    pub piegeur: ClassStats,
+    pub couette: ClassStats,
+    /// Degats de l'Ecraseur, en %. 125 = +25 %.
+    pub ecraseur_damage_pct: i32,
+    /// Part de Confort en dessous de laquelle l'Ecraseur enrage, en %.
+    pub ecraseur_rage_threshold_pct: i32,
+    /// Degats de l'Ecraseur enrage, en % de ses degats normaux.
+    pub ecraseur_rage_bonus_pct: i32,
+    /// Confort maximum de la Couette, en %. 130 = +30 %.
+    pub couette_hp_pct: i32,
+    /// Degats SUBIS par la Couette, en %. 80 = -20 %.
+    pub couette_damage_taken_pct: i32,
+    /// Degats retires forfaitairement a chaque coup encaisse par la Couette.
+    pub couette_flat_reduction: i32,
+    /// Confort de base, avant moelleux.
+    pub hp_base: i32,
+    /// Confort gagne par point de moelleux.
+    pub hp_per_def: i32,
+    /// Degats de base, avant impact et moelleux.
+    pub damage_base: i32,
+    pub damage_per_atk: i32,
+    pub damage_per_def: i32,
+}
+
+impl Default for ClassRules {
+    fn default() -> Self {
+        Self {
+            ecraseur: ClassStats { atk: 25, def: 8, atk_growth: 4, def_growth: 1 },
+            ressort: ClassStats { atk: 12, def: 18, atk_growth: 2, def_growth: 3 },
+            piegeur: ClassStats { atk: 18, def: 14, atk_growth: 3, def_growth: 2 },
+            couette: ClassStats { atk: 8, def: 25, atk_growth: 1, def_growth: 4 },
+            ecraseur_damage_pct: 125,
+            ecraseur_rage_threshold_pct: 30,
+            ecraseur_rage_bonus_pct: 125,
+            couette_hp_pct: 130,
+            couette_damage_taken_pct: 80,
+            couette_flat_reduction: 5,
+            hp_base: 100,
+            hp_per_def: 10,
+            damage_base: 10,
+            damage_per_atk: 4,
+            damage_per_def: 2,
+        }
     }
+}
+
+impl ClassRules {
+    pub fn stats(&self, class: PlayerClass) -> ClassStats {
+        match class {
+            PlayerClass::Ecraseur => self.ecraseur,
+            PlayerClass::Ressort => self.ressort,
+            PlayerClass::Piegeur => self.piegeur,
+            PlayerClass::Couette => self.couette,
+        }
+    }
+}
+
+/// Confort maximum. Jamais moins de 1 : a zero, le joueur serait deja leve du
+/// canape avant le premier coup.
+pub fn max_hp_with(defense: i32, class: PlayerClass, rules: &ClassRules) -> i32 {
+    let base = rules.hp_base + defense.max(0) * rules.hp_per_def;
+    let value = match class {
+        PlayerClass::Couette => base * rules.couette_hp_pct / 100,
+        _ => base,
+    };
+    value.max(1)
+}
+
+/// Confort maximum aux regles historiques.
+pub fn max_hp(defense: i32, class: PlayerClass) -> i32 {
+    max_hp_with(defense, class, &ClassRules::default())
 }
 
 /// Degats deterministes hors tirage : les effets aleatoires restent injectes
 /// par le cas d'usage afin de garder le domaine reproductible en tests.
-pub fn damage(attack: i32, defense: i32, attacker: PlayerClass, defender: PlayerClass) -> i32 {
-    let mut value = (10 + attack.max(0) * 4 - defense.max(0) * 2).max(1);
+pub fn damage_with(
+    attack: i32,
+    defense: i32,
+    attacker: PlayerClass,
+    defender: PlayerClass,
+    rules: &ClassRules,
+) -> i32 {
+    let mut value = (rules.damage_base + attack.max(0) * rules.damage_per_atk
+        - defense.max(0) * rules.damage_per_def)
+        .max(1);
     if attacker == PlayerClass::Ecraseur {
-        value = value * 125 / 100;
+        value = value * rules.ecraseur_damage_pct / 100;
     }
     if defender == PlayerClass::Couette {
-        value = value * 80 / 100;
+        value = value * rules.couette_damage_taken_pct / 100;
     }
     value.max(1)
+}
+
+pub fn damage(attack: i32, defense: i32, attacker: PlayerClass, defender: PlayerClass) -> i32 {
+    damage_with(attack, defense, attacker, defender, &ClassRules::default())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -216,12 +342,22 @@ pub struct CombatRules {
     pub level_gap_max: i32,
     /// Nombre de manches impose. 0 = automatique, selon le Confort total.
     pub max_rounds: i32,
+    /// Faces du de. Chaque manche multiplie les degats par le jet.
+    pub dice_faces: i32,
+    /// L'equilibre des classes, embarque ici plutot qu'en argument separe :
+    /// `resolve_combat` comptait deja dix parametres.
+    pub classes: ClassRules,
 }
 
 impl Default for CombatRules {
     /// Le comportement historique, a l'identique.
     fn default() -> Self {
-        Self { level_gap_max: 9, max_rounds: 0 }
+        Self {
+            level_gap_max: 9,
+            max_rounds: 0,
+            dice_faces: 6,
+            classes: ClassRules::default(),
+        }
     }
 }
 
@@ -240,8 +376,9 @@ pub fn resolve_combat(
     let handicap = matchmaking_handicap_capped(attacker_level, defender_level, rules.level_gap_max)
         .ok_or("ecart de niveau trop important")?;
     let attacker_is_higher = attacker_level > defender_level;
-    let mut attacker_hp = max_hp(attacker_def, attacker_class);
-    let mut defender_hp = max_hp(defender_def, defender_class);
+    let dice = rules.dice_faces.clamp(2, 100);
+    let mut attacker_hp = max_hp_with(attacker_def, attacker_class, &rules.classes);
+    let mut defender_hp = max_hp_with(defender_def, defender_class, &rules.classes);
     let mut attacker_damage_total = 0;
     let mut defender_damage_total = 0;
     // 0 = automatique : le nombre de manches suit la resistance des deux
@@ -259,12 +396,15 @@ pub fn resolve_combat(
     for (index, (attacker_roll, defender_roll)) in rolls.iter().take(max_rounds as usize).enumerate() {
         let attacker_atk = if attacker_is_higher { (attacker_atk as f32 * handicap) as i32 } else { attacker_atk };
         let defender_atk = if !attacker_is_higher { (defender_atk as f32 * handicap) as i32 } else { defender_atk };
-        let mut to_defender = damage(attacker_atk, defender_def, attacker_class, defender_class) * (*attacker_roll).clamp(1, 6);
-        let mut to_attacker = damage(defender_atk, attacker_def, defender_class, attacker_class) * (*defender_roll).clamp(1, 6);
-        if attacker_class == PlayerClass::Ecraseur && attacker_hp * 100 < max_hp(attacker_def, attacker_class) * 30 { to_defender = to_defender * 125 / 100; }
-        if defender_class == PlayerClass::Ecraseur && defender_hp * 100 < max_hp(defender_def, defender_class) * 30 { to_attacker = to_attacker * 125 / 100; }
-        if attacker_class == PlayerClass::Couette { to_attacker = (to_attacker - 5).max(1); }
-        if defender_class == PlayerClass::Couette { to_defender = (to_defender - 5).max(1); }
+        let c = &rules.classes;
+        let mut to_defender = damage_with(attacker_atk, defender_def, attacker_class, defender_class, c) * (*attacker_roll).clamp(1, dice);
+        let mut to_attacker = damage_with(defender_atk, attacker_def, defender_class, attacker_class, c) * (*defender_roll).clamp(1, dice);
+        // Le baroud d'honneur de l'Ecraseur : sous son seuil de Confort, il
+        // frappe plus fort.
+        if attacker_class == PlayerClass::Ecraseur && attacker_hp * 100 < max_hp_with(attacker_def, attacker_class, c) * c.ecraseur_rage_threshold_pct { to_defender = to_defender * c.ecraseur_rage_bonus_pct / 100; }
+        if defender_class == PlayerClass::Ecraseur && defender_hp * 100 < max_hp_with(defender_def, defender_class, c) * c.ecraseur_rage_threshold_pct { to_attacker = to_attacker * c.ecraseur_rage_bonus_pct / 100; }
+        if attacker_class == PlayerClass::Couette { to_attacker = (to_attacker - c.couette_flat_reduction).max(1); }
+        if defender_class == PlayerClass::Couette { to_defender = (to_defender - c.couette_flat_reduction).max(1); }
         attacker_hp = (attacker_hp - to_attacker).max(0);
         defender_hp = (defender_hp - to_defender).max(0);
         attacker_damage_total += to_defender;

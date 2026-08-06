@@ -17,14 +17,18 @@ use crate::ports::{
 pub struct CoussinPrimeService {
     repo: Arc<dyn CoussinPrimeRepository>,
     config_repo: Arc<dyn BotConfigRepository>,
+    cooldowns: Arc<dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository>,
 }
 
 impl CoussinPrimeService {
     pub fn new(
         repo: Arc<dyn CoussinPrimeRepository>,
         config_repo: Arc<dyn BotConfigRepository>,
+        cooldowns: Arc<
+            dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository,
+        >,
     ) -> Self {
-        Self { repo, config_repo }
+        Self { repo, config_repo, cooldowns }
     }
 }
 
@@ -68,8 +72,20 @@ impl CoussinPrimeUseCase for CoussinPrimeService {
             )));
         }
 
+        crate::application::economy_config::ensure_cooldown_over(
+            &self.cooldowns,
+            guild_id,
+            placer_id,
+            "prime",
+            "tu viens de poser un contrat",
+        )
+        .await?;
+
         self.repo
             .place(guild_id, target_id, target_name, placer_id, placer_name, amount)
+            .await?;
+        self.cooldowns
+            .arm(guild_id, placer_id, "prime", cfg.prime_cooldown_minutes)
             .await
     }
 }

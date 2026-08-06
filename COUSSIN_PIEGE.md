@@ -189,12 +189,25 @@ redémarrage.
 | Paris | Autorisés · minimum · gain d'un pari gagnant |
 | Coffre à coussins | Garantie disponible · prix · durée · prix des objets |
 | Progression | Niveau maximum · XP du vainqueur · XP du perdant · points gagnés par niveau |
+| Délais | Entre deux bagarres · deux paris · deux contrats · deux changements de classe (0 = aucune limite) |
+| Prix des objets | Les sept prix, un par un (0 = tarif catalogue) |
+| Formules | Confort de base et par point de moelleux · dégâts de base, par impact et par moelleux · faces du dé |
+| Classe Écraseur / Ressort / Piégeur / Couette | Impact et moelleux de départ, gain par niveau, et les bonus propres à chaque classe |
 
 Les curseurs affichés sont **exactement** ceux qu'un service lit réellement. Un réglage sans
 effet est pire que son absence : il fait croire au problème résolu.
 
-Un seul chiffre reste volontairement en dur : **les 5 % d'arnaque de la garantie**. C'est la
-blague de la mécanique — à 0 l'achat n'a plus d'histoire, à 100 ce n'est plus une garantie.
+**Plus aucun chiffre du jeu n'est en dur**, à une exception assumée : les **5 % d'arnaque de
+la garantie**. C'est la blague de la mécanique — à 0 l'achat n'a plus d'histoire, à 100 ce
+n'est plus une garantie.
+
+Deux réglages en entraînent d'autres, sans qu'on y pense :
+
+- **Le niveau maximum** redistribue les six titres. Sur une échelle de 100 niveaux, les
+  paliers s'étirent proportionnellement — sinon on décrocherait le dernier titre au niveau
+  25 puis on passerait soixante-quinze niveaux sans rien à gagner.
+- **Les faces du dé** multiplient les dégâts de chaque manche. Plus de faces, c'est plus de
+  hasard et des écarts plus violents entre deux joueurs de même niveau.
 
 ---
 

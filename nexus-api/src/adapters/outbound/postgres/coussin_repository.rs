@@ -293,7 +293,10 @@ impl CoussinRepository for PgCoussinRepository {
         defender_hp: i32,
         bet_payout_pct: i64,
     ) -> Result<bool, DomainError> {
-        if !(1..=6).contains(&attacker_roll) || !(1..=6).contains(&defender_roll) || transferred < 0 {
+        // 1..=100 et non 1..=6 : le nombre de faces du de est reglable par
+        // serveur. Cette borne reste un garde-fou contre une valeur aberrante,
+        // pas une regle de jeu — la regle vit dans le domaine.
+        if !(1..=100).contains(&attacker_roll) || !(1..=100).contains(&defender_roll) || transferred < 0 {
             return Err(DomainError::Validation("resultat de duel invalide".into()));
         }
         let mut tx = self.pool.begin().await.map_err(pg_err)?;

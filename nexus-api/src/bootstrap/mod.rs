@@ -148,9 +148,11 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         Arc::new(nexus_core::application::wheel_cases_service::WheelCasesService::new(wheel_repo.clone()));
     let service = Arc::new(PlayWheelService::new(wheel_repo, wallet_repo.clone(), bot_config_repo.clone()));
     let wallet_service = Arc::new(WalletService::new(wallet_repo, bot_config_repo.clone()));
+    let coussin_cooldowns: Arc<dyn nexus_core::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository> =
+        Arc::new(crate::adapters::outbound::postgres::coussin_cooldown_repository::PgCoussinCooldownRepository::new(pool.clone()));
     let coussin_repo: Arc<dyn CoussinRepository> = Arc::new(PgCoussinRepository::new(pool.clone()));
-    let coussin_profile: Arc<dyn CoussinProfileUseCase> = Arc::new(CoussinService::new(coussin_repo, bot_config_repo.clone()));
-    let coussin_combat: Arc<dyn CoussinCombatUseCase> = Arc::new(CoussinService::new(Arc::new(PgCoussinRepository::new(pool.clone())), bot_config_repo.clone()));
+    let coussin_profile: Arc<dyn CoussinProfileUseCase> = Arc::new(CoussinService::new(coussin_repo, bot_config_repo.clone(), coussin_cooldowns.clone()));
+    let coussin_combat: Arc<dyn CoussinCombatUseCase> = Arc::new(CoussinService::new(Arc::new(PgCoussinRepository::new(pool.clone())), bot_config_repo.clone(), coussin_cooldowns.clone()));
     let coussin_inventory_repo: Arc<dyn CoussinInventoryRepository> = Arc::new(PgCoussinInventoryRepository::new(pool.clone()));
     let coussin_inventory: Arc<dyn CoussinInventoryUseCase> = Arc::new(CoussinInventoryService::new(coussin_inventory_repo, bot_config_repo.clone()));
     let coussin_insurance_repo: Arc<dyn CoussinInsuranceRepository> = Arc::new(PgCoussinInsuranceRepository::new(pool.clone()));
@@ -158,9 +160,9 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
     let coussin_steal_repo: Arc<dyn CoussinStealRepository> = Arc::new(PgCoussinStealRepository::new(pool.clone()));
     let coussin_steal: Arc<dyn CoussinStealUseCase> = Arc::new(CoussinStealService::new(coussin_steal_repo, bot_config_repo.clone()));
     let coussin_prime_repo: Arc<dyn CoussinPrimeRepository> = Arc::new(PgCoussinPrimeRepository::new(pool.clone()));
-    let coussin_prime: Arc<dyn CoussinPrimeUseCase> = Arc::new(CoussinPrimeService::new(coussin_prime_repo, bot_config_repo.clone()));
+    let coussin_prime: Arc<dyn CoussinPrimeUseCase> = Arc::new(CoussinPrimeService::new(coussin_prime_repo, bot_config_repo.clone(), coussin_cooldowns.clone()));
     let coussin_bet_repo: Arc<dyn CoussinBetRepository> = Arc::new(PgCoussinBetRepository::new(pool.clone()));
-    let coussin_bet: Arc<dyn CoussinBetUseCase> = Arc::new(CoussinBetService::new(coussin_bet_repo, bot_config_repo.clone()));
+    let coussin_bet: Arc<dyn CoussinBetUseCase> = Arc::new(CoussinBetService::new(coussin_bet_repo, bot_config_repo.clone(), coussin_cooldowns.clone()));
 
     // ── Game Portal : repos Postgres ──
     let game_server_repo: Arc<dyn GameServerRepository> =

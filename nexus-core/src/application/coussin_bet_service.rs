@@ -21,14 +21,18 @@ use crate::ports::{
 pub struct CoussinBetService {
     repo: Arc<dyn CoussinBetRepository>,
     config_repo: Arc<dyn BotConfigRepository>,
+    cooldowns: Arc<dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository>,
 }
 
 impl CoussinBetService {
     pub fn new(
         repo: Arc<dyn CoussinBetRepository>,
         config_repo: Arc<dyn BotConfigRepository>,
+        cooldowns: Arc<
+            dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository,
+        >,
     ) -> Self {
-        Self { repo, config_repo }
+        Self { repo, config_repo, cooldowns }
     }
 }
 
@@ -57,8 +61,20 @@ impl CoussinBetUseCase for CoussinBetService {
             )));
         }
 
+        crate::application::economy_config::ensure_cooldown_over(
+            &self.cooldowns,
+            guild,
+            bettor,
+            "bet",
+            "tu viens de parier",
+        )
+        .await?;
+
         self.repo
             .place(guild, combat, bettor, name, backed, amount)
+            .await?;
+        self.cooldowns
+            .arm(guild, bettor, "bet", cfg.bet_cooldown_minutes)
             .await
     }
 }

@@ -12,6 +12,6 @@ impl CoussinInventoryUseCase for CoussinInventoryService {
         let cfg = load_coussin(&self.config_repo, guild_id).await?;
         cfg.ensure_enabled()?;
         let item = item(item_key).ok_or_else(|| DomainError::Validation("objet inconnu".into()))?;
-        self.repo.buy(guild_id, user_id, item.key, cfg.shop_price(item.price)).await
+        self.repo.buy(guild_id, user_id, item.key, cfg.shop_price(item.key, item.price)).await
     }
 }

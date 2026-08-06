@@ -8,6 +8,7 @@ pub mod coussin_insurance_repository;
 pub mod coussin_steal_repository;
 pub mod coussin_prime_repository;
 pub mod coussin_bet_repository;
+pub mod coussin_cooldown_repository;
 pub mod game;
 pub mod system;
 pub mod wallet_repository;

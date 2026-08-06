@@ -117,7 +117,23 @@ pub struct CoussinConfig {
     pub xp_loser: i64,
     pub stat_points_per_level: i32,
     /// Prix des objets du coffre, en % du tarif catalogue. 100 = inchange.
+    /// S'applique PAR-DESSUS un prix fixe eventuel.
     pub shop_price_pct: i64,
+    /// Prix imposes par objet, `shop_price_<cle>`. 0 = tarif catalogue.
+    ///
+    /// Une liste plutot qu'une struct a sept champs : le catalogue peut
+    /// gagner un objet, et il ne faudrait pas que le jour venu on oublie de
+    /// completer un endroit sur deux.
+    pub shop_prices: Vec<(String, i64)>,
+    // ── Delais entre actions ──
+    pub combat_cooldown_minutes: i64,
+    pub bet_cooldown_minutes: i64,
+    pub prime_cooldown_minutes: i64,
+    pub class_change_cooldown_minutes: i64,
+    // ── Equilibre des classes ──
+    pub classes: crate::domain::entities::coussin::ClassRules,
+    /// Faces du de utilise a chaque manche.
+    pub dice_faces: i32,
 }
 
 impl Default for CoussinConfig {
@@ -152,6 +168,15 @@ impl Default for CoussinConfig {
             xp_loser: 5,
             stat_points_per_level: 3,
             shop_price_pct: 100,
+            shop_prices: Vec::new(),
+            // Aucun delai a l'origine : les ajouter par defaut changerait le
+            // jeu sous les pieds des serveurs existants.
+            combat_cooldown_minutes: 0,
+            bet_cooldown_minutes: 0,
+            prime_cooldown_minutes: 0,
+            class_change_cooldown_minutes: 0,
+            classes: crate::domain::entities::coussin::ClassRules::default(),
+            dice_faces: 6,
         }
     }
 }
@@ -195,13 +220,36 @@ impl CoussinConfig {
         Ok(())
     }
 
-    /// Prix reel d'un objet, tarif catalogue module par le reglage du serveur.
+    /// Prix reel d'un objet.
+    ///
+    /// Deux etages, dans cet ordre : un prix FIXE par objet s'il est reglé
+    /// (0 = on garde le tarif catalogue), puis le multiplicateur global
+    /// par-dessus. Ainsi « tout coute 20 % plus cher » reste un seul geste,
+    /// meme quand deux objets ont un prix impose.
+    ///
     /// Jamais moins de 1 : un objet gratuit se prend en boucle.
-    pub fn shop_price(&self, catalogue: i64) -> i64 {
+    pub fn shop_price(&self, key: &str, catalogue: i64) -> i64 {
+        let base = self
+            .shop_prices
+            .iter()
+            .find(|(k, _)| k == key)
+            .map(|(_, prix)| *prix)
+            .filter(|prix| *prix > 0)
+            .unwrap_or(catalogue);
         if self.shop_price_pct == 100 {
-            return catalogue;
+            return base.max(1);
         }
-        (catalogue.saturating_mul(self.shop_price_pct) / 100).max(1)
+        (base.saturating_mul(self.shop_price_pct) / 100).max(1)
+    }
+
+    /// Les regles de bagarre completes, prêtes pour le domaine.
+    pub fn combat_rules(&self) -> crate::domain::entities::coussin::CombatRules {
+        crate::domain::entities::coussin::CombatRules {
+            level_gap_max: self.level_gap_max,
+            max_rounds: self.combat_max_rounds,
+            dice_faces: self.dice_faces,
+            classes: self.classes,
+        }
     }
 
     /// Chance de reussite d'un vol, selon la classe du voleur.
@@ -230,6 +278,33 @@ impl CoussinConfig {
 
 }
 
+/// Refuse une action si son delai n'est pas ecoule.
+///
+/// Ecrit une fois et partage : bagarre, pari, contrat et changement de classe
+/// posent la meme question, et quatre copies auraient donne quatre messages
+/// differents pour la meme situation.
+pub async fn ensure_cooldown_over(
+    repo: &Arc<dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository>,
+    guild_id: &str,
+    user_id: &str,
+    action: &str,
+    quoi: &str,
+) -> Result<(), DomainError> {
+    let Some(secondes) = repo.remaining_seconds(guild_id, user_id, action).await? else {
+        return Ok(());
+    };
+    // Sous la minute, on compte en secondes : « reessaie dans 1 min » alors
+    // qu'il reste trois secondes donne envie de partir.
+    let attente = if secondes < 60 {
+        format!("{secondes} s")
+    } else {
+        format!("{} min", secondes.div_euclid(60).max(1))
+    };
+    Err(DomainError::RateLimited(format!(
+        "{quoi} : reessaie dans {attente}"
+    )))
+}
+
 // ── Lecture ──
 
 fn find<'a>(items: &'a [BotGuildConfig], key: &str) -> Option<&'a str> {
@@ -253,6 +328,49 @@ fn n<T: std::str::FromStr>(items: &[BotGuildConfig], key: &str, default: T) -> T
     find(items, key)
         .and_then(|v| v.trim().parse().ok())
         .unwrap_or(default)
+}
+
+/// Les regles de classe du serveur, defaut historique pour tout ce qui n'est
+/// pas renseigne.
+///
+/// Chaque classe se regle avec quatre cles : `<classe>_atk`, `<classe>_def`,
+/// `<classe>_atk_growth`, `<classe>_def_growth`. Les nommer d'apres la classe
+/// plutot que d'aligner seize cles a plat evite de se tromper de colonne.
+fn load_classes(items: &[BotGuildConfig]) -> crate::domain::entities::coussin::ClassRules {
+    use crate::domain::entities::coussin::{ClassRules, ClassStats, PlayerClass};
+
+    let d = ClassRules::default();
+    let stats = |class: PlayerClass, defaut: ClassStats| {
+        let nom = class.as_str();
+        ClassStats {
+            atk: n(items, &format!("{nom}_atk"), defaut.atk),
+            def: n(items, &format!("{nom}_def"), defaut.def),
+            atk_growth: n(items, &format!("{nom}_atk_growth"), defaut.atk_growth),
+            def_growth: n(items, &format!("{nom}_def_growth"), defaut.def_growth),
+        }
+    };
+
+    ClassRules {
+        ecraseur: stats(PlayerClass::Ecraseur, d.ecraseur),
+        ressort: stats(PlayerClass::Ressort, d.ressort),
+        piegeur: stats(PlayerClass::Piegeur, d.piegeur),
+        couette: stats(PlayerClass::Couette, d.couette),
+        ecraseur_damage_pct: n(items, "ecraseur_damage_pct", d.ecraseur_damage_pct),
+        ecraseur_rage_threshold_pct: n(
+            items,
+            "ecraseur_rage_threshold_pct",
+            d.ecraseur_rage_threshold_pct,
+        ),
+        ecraseur_rage_bonus_pct: n(items, "ecraseur_rage_bonus_pct", d.ecraseur_rage_bonus_pct),
+        couette_hp_pct: n(items, "couette_hp_pct", d.couette_hp_pct),
+        couette_damage_taken_pct: n(items, "couette_damage_taken_pct", d.couette_damage_taken_pct),
+        couette_flat_reduction: n(items, "couette_flat_reduction", d.couette_flat_reduction),
+        hp_base: n(items, "hp_base", d.hp_base),
+        hp_per_def: n(items, "hp_per_def", d.hp_per_def),
+        damage_base: n(items, "damage_base", d.damage_base),
+        damage_per_atk: n(items, "damage_per_atk", d.damage_per_atk),
+        damage_per_def: n(items, "damage_per_def", d.damage_per_def),
+    }
 }
 
 pub async fn load_economy(
@@ -314,6 +432,25 @@ pub async fn load_coussin(
         xp_loser: n(&items, "xp_loser", d.xp_loser),
         stat_points_per_level: n(&items, "stat_points_per_level", d.stat_points_per_level),
         shop_price_pct: n(&items, "shop_price_pct", d.shop_price_pct),
+        shop_prices: crate::domain::entities::coussin_shop::ITEMS
+            .iter()
+            .map(|item| {
+                (
+                    item.key.to_string(),
+                    n(&items, &format!("shop_price_{}", item.key), 0),
+                )
+            })
+            .collect(),
+        combat_cooldown_minutes: n(&items, "combat_cooldown_minutes", d.combat_cooldown_minutes),
+        bet_cooldown_minutes: n(&items, "bet_cooldown_minutes", d.bet_cooldown_minutes),
+        prime_cooldown_minutes: n(&items, "prime_cooldown_minutes", d.prime_cooldown_minutes),
+        class_change_cooldown_minutes: n(
+            &items,
+            "class_change_cooldown_minutes",
+            d.class_change_cooldown_minutes,
+        ),
+        classes: load_classes(&items),
+        dice_faces: n(&items, "dice_faces", d.dice_faces),
     })
 }
 
