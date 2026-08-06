@@ -19,6 +19,7 @@ export interface Banniere {
 export const BANNIERES: Banniere[] = [
   // ── Arrivées et départs ──
   { fichier: "bienvenue_banner.jpg", libelle: "Bienvenue", categorie: "Arrivées et départs" },
+  { fichier: "bienvenue_general_banner.jpg", libelle: "Bienvenue (général)", categorie: "Arrivées et départs" },
   { fichier: "rebienvenue_banner.jpg", libelle: "Retour d'un ancien membre", categorie: "Arrivées et départs" },
   { fichier: "bye_banner.jpg", libelle: "Départ", categorie: "Arrivées et départs" },
   { fichier: "regle_banner.jpg", libelle: "Règlement", categorie: "Arrivées et départs" },
