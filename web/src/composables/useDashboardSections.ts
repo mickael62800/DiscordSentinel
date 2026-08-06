@@ -69,7 +69,10 @@ const ALL_SECTIONS: DashboardSection[] = [
 
   { key: "moderation.hub", path: "/moderation", label: "Modération", icon: "gavel", requiredBot: "moderation-bot" },
   { key: "moderation.members", path: "/members", label: "Membres", icon: "users" },
-  { key: "moderation.rules", path: "/rules", label: "Règles", icon: "shield", requiredBot: "moderation-bot" },
+  // Règles de scoring : poids + seuils par type de flag. Elles alimentent
+  // l'AUTOMOD (spam, insulte, lien, phishing, nsfw, menace…), donc la tuile
+  // doit s'afficher dès qu'automod-bot est actif — pas seulement moderation-bot.
+  { key: "moderation.rules", path: "/rules", label: "Règles", icon: "shield", requiredAnyBot: ["automod-bot", "moderation-bot"] },
   { key: "moderation.name-history", path: "/name-history", label: "Historique pseudos", icon: "user-x", requiredBot: "audit-bot" },
 
   { key: "community.welcome", path: "/welcome", label: "Bienvenue", icon: "user-plus", requiredBot: "welcome-bot" },
