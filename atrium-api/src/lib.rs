@@ -372,7 +372,7 @@ impl WelcomeAiGateway for DeepSeekGateway {
                     content: prompt.user,
                 },
             ],
-            max_tokens: 500,
+            max_tokens: 250,
             temperature: 0.4,
             // Le chatbot d'accueil n'a pas besoin d'une longue chaine de
             // raisonnement. En mode thinking, celle-ci peut consommer tout le
