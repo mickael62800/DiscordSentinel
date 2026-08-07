@@ -57,56 +57,69 @@ DiscordSentinel/
 
 ## Architecture globale
 
+**Deux stacks symétriques**, chacune avec son bot, son API, son cœur métier et son worker. Elles ne se parlent pas directement : tout ce qu'elles partagent est en bas du schéma (base, cache, dashboard, crates socles).
+
 ```
-Discord Messages / Events / Images
-       │
-       ▼
-┌──────────────────────────────────────────────────────────────┐
-│      Bot Discord unifié (Serenity 0.12)  — sentinel-bot       │
-│  25 modules : ai_dataset · announcements · audit · automod ·  │
-│  bump · cleanup · command_channel · community · confessions · │
-│  embeds · emoji · guild_backup · help_panel · ideas ·         │
-│  logs_setup · messages · moderation · nasa_apod · presence ·  │
-│  progression · rotation · security · tickets · voice · welcome│
-└────────────┬──────────────────────────────────┬──────────────┘
-             │ HTTP (BaseApiClient keep-alive)   │ Redis Streams
-             ▼                                   ▼
-┌─────────────────────────┐         ┌──────────────────────────┐
-│  sentinel-api (Axum 0.8)│◄────────┤  sentinel-gateway        │
-│  adapters HTTP + gRPC   │         │  (relay Redis → clients) │
-│  ONNX inference         │         └─────────┬────────────────┘
-│  guild_auth multi-tenant│                   │
-└──────┬──────────────┬───┘                   │
-       │              │                       │
-       │ délègue à    │                       │
-       ▼              │                       │
-┌──────────────────┐  │                       │
-│  sentinel-core   │  │                       │
-│  domain /        │  │                       │
-│  application /   │  │                       │
-│  ports (pur)     │  │                       │
-└──────────────────┘  │                       │
-       │ PostgreSQL   │ Redis                 │
-       ▼              ▼                       ▼
-┌───────────┐  ┌───────────┐        ┌────────────────────────┐
-│ Postgres  │  │  Redis    │        │ web (Vue 3)            │
-│(PgBouncer)│  │ (cache +  │        │ OAuth2 Discord + WS    │
-└─────┬─────┘  │  streams) │        └────────────────────────┘
-      │        └─────┬─────┘
-      └──────┬───────┘
-             ▼
-┌─────────────────────────────────────────┐    ┌──────────────────────┐
-│ sentinel-worker (Tokio) — 16 domaines   │    │ Stack Nexus          │
-│ ai · analytics · announcements ·        │    │ nexus-api + bot +    │
-│ appeal_sla · audit_cache · automod ·    │    │ worker (serveurs de  │
-│ cache · cleanup · discord_audit_sync ·  │    │ jeux via Docker)     │
-│ export · guild_backup · moderation ·    │    └──────────────────────┘
-│ monitoring · security · temp_roles ·    │
-│ tickets                                 │
-└─────────────────────────────────────────┘
+                          Discord (messages · events · images · slash commands)
+                                    │                              │
+        ── SENTINEL ────────────────┼──────────    ── NEXUS ───────┼────────────
+                                    ▼                              ▼
+        ┌───────────────────────────────────────┐   ┌────────────────────────────┐
+        │ sentinel-bot (Serenity 0.12)          │   │ nexus-bot (Serenity 0.12)  │
+        │ 25 modules, un seul process           │   │ portail de jeux · roue ·   │
+        │ automod · moderation · security ·     │   │ coussin · casino           │
+        │ guild_backup · tickets · voice · …    │   │                            │
+        └──────┬─────────────────────────┬──────┘   └──────┬──────────────┬──────┘
+               │ gRPC (tonic)            │ Redis           │ HTTP         │ Redis
+               │ + HTTP résiduel         │ sentinel:events │ (reqwest)    │ nexus:events
+               ▼                         │                 ▼              │
+        ┌────────────────────────┐       │          ┌────────────────────────────┐
+        │ sentinel-api (Axum 0.8)│       │          │ nexus-api (Axum 0.8)       │
+        │ inbound  http + grpc   │       │          │ inbound  http              │
+        │ outbound pg · redis ·  │       │          │ outbound pg · redis ·      │
+        │          discord · ws  │       │          │          game_runtime      │
+        │ inférence ONNX         │       │          │ (bollard → Docker)         │
+        └───────────┬────────────┘       │          └───────────┬────────────────┘
+                    │ délègue à          │                      │ délègue à
+                    ▼                    │                      ▼
+        ┌────────────────────────┐       │          ┌────────────────────────────┐
+        │ sentinel-core   (pur)  │       │          │ nexus-core      (pur)      │
+        │ domain / application / │       │          │ domain / application /     │
+        │ ports — zéro infra     │       │          │ ports — zéro infra         │
+        └────────────────────────┘       │          └────────────────────────────┘
+                                         │
+        ┌────────────────────────┐       │          ┌────────────────────────────┐
+        │ sentinel-worker        │       │          │ nexus-worker               │
+        │ 16 domaines périodiques│       │          │ jobs serveurs de jeux      │
+        └────────────────────────┘       │          └────────────────────────────┘
+                                         │
+        ┌────────────────────────┐       │          ┌────────────────────────────┐
+        │ sentinel-gateway       │◄──────┘          │ nexus-gateway     (stub)   │
+        │ XREAD $ → WebSocket    │                  │ pas encore implémenté      │
+        └───────────┬────────────┘                  └────────────────────────────┘
+                    │
+        ════════════╪═══════════ PARTAGÉ ══════════════════════════════════
+                    ▼
+   ┌────────────────────────┐  ┌───────────────┐  ┌───────────────┐
+   │ web (Vue 3 + Pinia)    │  │ PostgreSQL 16 │  │ Redis 7       │
+   │ dashboard multi-marque │  │ + PgBouncer   │  │ cache +       │
+   │ OAuth2 Discord + WS    │  │               │  │ Streams       │
+   └────────────────────────┘  └───────────────┘  └───────────────┘
+
+   ┌──────────────────────────────────────────────────────────────────┐
+   │ platform-common      bus d'événements Redis Streams (sans infra) │
+   │ platform-common-api  rate limit · métriques · CORS · en-têtes    │
+   └──────────────────────────────────────────────────────────────────┘
 ```
 
 **Philosophie** : `*-core` = les règles métier · API = adaptateurs + IA + persistance · Bot = interface Discord légère · Gateway = temps réel découplé · Worker = jobs DB-bound périodiques · Web = administration.
+
+**Asymétries réelles, à ne pas lire comme des oublis du schéma** :
+
+- **`sentinel-proto` est complet, `nexus-proto` est un stub vide** (7 lignes, aucun `.proto`). Seule la stack Sentinel parle gRPC ; `nexus-bot` appelle son API en HTTP via `reqwest`.
+- **`nexus-gateway` est un stub de 9 lignes.** Le relay temps réel n'existe que côté Sentinel.
+- **Le transport `sentinel-bot` → `sentinel-api` est majoritairement gRPC**, mais pas exclusivement : les modules sans service proto passent encore par HTTP. Le détail est dans [RESTE-A-FAIRE.md](RESTE-A-FAIRE.md).
+- **Le bot n'a jamais d'accès direct à la base.** Ni Sentinel ni Nexus : c'est l'API qui persiste, dans les deux stacks.
 
 ---
 
@@ -369,7 +382,9 @@ Request
 
 ## Bus d'événements (Redis Streams)
 
-Tous les producers (API, workers) publient sur une **stream unique `sentinel:events`** (`XADD MAXLEN ~ 10000`). Format d'entrée : un champ `payload` = `{"event": ..., "data": ...}`.
+**Une stream par plateforme** — `sentinel:events` et `nexus:events` — jamais partagée : un event Nexus n'a rien à faire dans les consumer groups de Sentinel. Les deux suivent le même contrat, porté par `EventBus` (`platform-common`), paramétré par la clé de stream.
+
+Tous les producers (API, workers) publient en `XADD MAXLEN ~ 10000`. Format d'entrée : un champ `payload` = `{"event": ..., "data": ...}`.
 
 - **Consumers durables** (bot) : `XREADGROUP` + `XACK` (at-least-once), un consumer group par feature, auto-claim `XAUTOCLAIM` des pending > 60 s après un crash.
 - **Consumers live-tail** (gateway) : `XREAD $` sans group → relay WebSocket.
@@ -377,6 +392,8 @@ Tous les producers (API, workers) publient sur une **stream unique `sentinel:eve
 **Events** : `infraction_new`, `ticket_*`, `idea_decided`, `security_event`, `moderation_action`, `voice_channel_updated/closed`, `announcement_publish`, `embed_publish`, `message_send`, `sanction_expiry_reminder`, `temp_role_expire`, `bot_log`, etc.
 
 ### Gateway WebSocket
+
+Côté Sentinel uniquement — `nexus-gateway` n'est pas implémenté.
 
 | Propriété | Valeur |
 |---|---|
