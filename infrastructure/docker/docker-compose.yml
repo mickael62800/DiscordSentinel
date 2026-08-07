@@ -537,6 +537,11 @@ services:
     logging: *default-logging
     mem_limit: 2g
     cpus: 1.5
+    # Le serveur effectue lui-meme le telechargement demande par le client
+    # `ollama pull`; il doit donc resoudre et joindre registry.ollama.ai.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     volumes:
       - atrium_ollama_data:/root/.ollama
     healthcheck:
@@ -550,6 +555,7 @@ services:
       start_period: 30s
     networks:
       - internal
+      - default
     profiles:
       - atrium
 
