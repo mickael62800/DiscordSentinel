@@ -264,7 +264,11 @@ impl EventHandler for Handler {
             )
             .await
         {
-            let mentioned_reply = format!("<@{}> {reply}", member.user.id);
+            let atrium_id = ctx.cache.current_user().id;
+            let mentioned_reply = format!(
+                "<@{}> {reply}\n\n**Pour discuter avec moi dans ce salon, mentionne-moi : <@{}>.**",
+                member.user.id, atrium_id
+            );
             if let Err(error) = self
                 .config
                 .general_channel_id
