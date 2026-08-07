@@ -206,7 +206,13 @@ impl EventHandler for Handler {
             )
             .await
         {
-            if let Err(error) = self.config.general_channel_id.say(&ctx.http, reply).await {
+            let mentioned_reply = format!("<@{}> {reply}", member.user.id);
+            if let Err(error) = self
+                .config
+                .general_channel_id
+                .say(&ctx.http, mentioned_reply)
+                .await
+            {
                 tracing::warn!(%error, "message d'accueil non envoye");
             }
         }
