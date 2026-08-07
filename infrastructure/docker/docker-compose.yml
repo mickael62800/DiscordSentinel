@@ -520,8 +520,8 @@ services:
     depends_on:
       atrium-pgbouncer:
         condition: service_started
-      atrium-ollama:
-        condition: service_healthy
+      atrium-ollama-init:
+        condition: service_completed_successfully
     networks:
       - internal
       - default
@@ -535,12 +535,6 @@ services:
     image: ollama/ollama:latest
     restart: unless-stopped
     logging: *default-logging
-    entrypoint: ["/bin/sh", "-c"]
-    command: >-
-      ollama serve & server_pid=$$!;
-      until ollama list >/dev/null 2>&1; do sleep 1; done;
-      ollama pull nomic-embed-text;
-      wait $$server_pid
     mem_limit: 2g
     cpus: 1.5
     volumes:
@@ -553,6 +547,22 @@ services:
       start_period: 30s
     networks:
       - internal
+    profiles:
+      - atrium
+
+  # Le pull est separe du serveur Ollama : le healthcheck du serveur peut
+  # devenir vert avant le telechargement, mais Atrium ne demarre qu'apres.
+  atrium-ollama-init:
+    image: ollama/ollama:latest
+    command: ["pull", "nomic-embed-text"]
+    volumes:
+      - atrium_ollama_data:/root/.ollama
+    depends_on:
+      atrium-ollama:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: "no"
     profiles:
       - atrium
 
