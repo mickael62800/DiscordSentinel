@@ -569,6 +569,9 @@ services:
         condition: service_healthy
     networks:
       - internal
+      # Necessaire uniquement au telechargement initial du modele depuis le
+      # registre Ollama. Le serveur Ollama reste sur le reseau interne.
+      - default
     restart: "no"
     profiles:
       - atrium
