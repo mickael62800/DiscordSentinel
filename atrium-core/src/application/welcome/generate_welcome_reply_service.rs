@@ -23,7 +23,10 @@ impl WelcomeService {
 impl GenerateWelcomeReplyUseCase for WelcomeService {
     async fn reply(&self, request: WelcomeRequest) -> Result<WelcomeReply, WelcomeError> {
         validate(&request)?;
-        let fallback = fallback_message(&request.member_display_name);
+        let fallback = fallback_message(
+            &request.member_display_name,
+            !request.member_message.trim().is_empty(),
+        );
         let prompt = build_prompt(&request);
         match self.ai.generate(prompt).await {
             Ok(content) if !content.trim().is_empty() => Ok(WelcomeReply {
@@ -78,8 +81,12 @@ fn build_prompt(request: &WelcomeRequest) -> WelcomePrompt {
     WelcomePrompt { system, user }
 }
 
-fn fallback_message(display_name: &str) -> String {
-    format!("Bienvenue {display_name} ! 👋 Je suis Atrium. Consulte les regles du serveur et n'hesite pas a poser tes questions ici ; un membre de l'equipe pourra t'aider.")
+fn fallback_message(display_name: &str, is_question: bool) -> String {
+    if is_question {
+        format!("Désolé {display_name}, mon service de réponse est temporairement indisponible. Réessaie dans un instant ou demande à un membre de l'équipe.")
+    } else {
+        format!("Bienvenue {display_name} ! 👋 Je suis Atrium. Consulte les règles du serveur et n'hésite pas à poser tes questions ici ; un membre de l'équipe pourra t'aider.")
+    }
 }
 
 fn truncate(value: &str, max_chars: usize) -> String {

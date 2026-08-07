@@ -262,6 +262,12 @@ struct DeepSeekRequest {
     messages: Vec<DeepSeekMessage>,
     max_tokens: u16,
     temperature: f32,
+    thinking: DeepSeekThinking,
+}
+#[derive(Serialize)]
+struct DeepSeekThinking {
+    #[serde(rename = "type")]
+    kind: &'static str,
 }
 #[derive(Serialize)]
 struct DeepSeekMessage {
@@ -302,8 +308,12 @@ impl WelcomeAiGateway for DeepSeekGateway {
                     content: prompt.user,
                 },
             ],
-            max_tokens: 350,
+            max_tokens: 500,
             temperature: 0.4,
+            // Le chatbot d'accueil n'a pas besoin d'une longue chaine de
+            // raisonnement. En mode thinking, celle-ci peut consommer tout le
+            // budget et laisser `content` vide.
+            thinking: DeepSeekThinking { kind: "disabled" },
         };
         let response = self
             .client
@@ -312,18 +322,33 @@ impl WelcomeAiGateway for DeepSeekGateway {
             .json(&body)
             .send()
             .await
-            .map_err(|_| AiProviderError)?;
-        if !response.status().is_success() {
+            .map_err(|error| {
+                tracing::warn!(%error, "Appel DeepSeek impossible");
+                AiProviderError
+            })?;
+        let status = response.status();
+        let response_body = response.text().await.map_err(|error| {
+            tracing::warn!(%error, %status, "Lecture reponse DeepSeek impossible");
+            AiProviderError
+        })?;
+        if !status.is_success() {
+            tracing::warn!(%status, body = %response_body, "DeepSeek a refuse la requete");
             return Err(AiProviderError);
         }
-        let payload: DeepSeekResponse = response.json().await.map_err(|_| AiProviderError)?;
-        payload
+        let payload: DeepSeekResponse = serde_json::from_str(&response_body).map_err(|error| {
+            tracing::warn!(%error, body = %response_body, "Reponse DeepSeek invalide");
+            AiProviderError
+        })?;
+        let content = payload
             .choices
             .into_iter()
             .next()
             .and_then(|choice| choice.message.content)
-            .filter(|content| !content.trim().is_empty())
-            .ok_or(AiProviderError)
+            .filter(|content| !content.trim().is_empty());
+        if content.is_none() {
+            tracing::warn!(body = %response_body, "DeepSeek n'a retourne aucun contenu final");
+        }
+        content.ok_or(AiProviderError)
     }
 }
 
