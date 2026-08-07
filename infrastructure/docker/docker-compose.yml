@@ -562,6 +562,11 @@ services:
       # Le client Ollama du job doit joindre le serveur du conteneur voisin,
       # pas son propre localhost.
       OLLAMA_HOST: http://atrium-ollama:11434
+    # Certains hotes Docker ont un resolv.conf non exploitable dans le bridge
+    # (erreur 127.0.0.11). Ce job doit resoudre registry.ollama.ai une fois.
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     volumes:
       - atrium_ollama_data:/root/.ollama
     depends_on:
