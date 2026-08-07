@@ -26,6 +26,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
+pub mod budget;
 pub mod rag;
 
 const DEEPSEEK_URL: &str = "https://api.deepseek.com/chat/completions";
@@ -35,6 +36,7 @@ pub struct AppState {
     pub config: AppConfig,
     pub welcome: Arc<dyn GenerateWelcomeReplyUseCase>,
     pub rag: Option<Arc<rag::RagService>>,
+    pub budget: Option<Arc<budget::BudgetGuard>>,
 }
 
 #[derive(Clone)]
@@ -45,6 +47,9 @@ pub struct AppConfig {
     pub embeddings_base_url: String,
     pub embeddings_api_key: Option<String>,
     pub embeddings_model: String,
+    pub user_cooldown_secs: u64,
+    pub user_daily_limit: u32,
+    pub global_daily_limit: u32,
     api_token: String,
     deepseek_api_key: String,
     model: String,
@@ -59,6 +64,9 @@ impl AppConfig {
             embeddings_base_url: "http://127.0.0.1:11434/v1".into(),
             embeddings_api_key: None,
             embeddings_model: "nomic-embed-text".into(),
+            user_cooldown_secs: 10,
+            user_daily_limit: 30,
+            global_daily_limit: 500,
             api_token: "test-token".into(),
             deepseek_api_key: "test-ds-key".into(),
             model: "deepseek-v4-flash".into(),
@@ -86,6 +94,9 @@ impl AppConfig {
                 .filter(|value| !value.trim().is_empty()),
             embeddings_model: std::env::var("ATRIUM_EMBEDDINGS_MODEL")
                 .unwrap_or_else(|_| "nomic-embed-text".into()),
+            user_cooldown_secs: env_u64("ATRIUM_USER_COOLDOWN_SECS", 10)?,
+            user_daily_limit: env_u32("ATRIUM_USER_DAILY_LIMIT", 30)?,
+            global_daily_limit: env_u32("ATRIUM_GLOBAL_DAILY_LIMIT", 500)?,
             api_token: required("ATRIUM_API_TOKEN")?,
             deepseek_api_key: required("DEEPSEEK_API_KEY")?,
             model: std::env::var("DEEPSEEK_MODEL").unwrap_or_else(|_| "deepseek-v4-flash".into()),
@@ -104,13 +115,32 @@ pub async fn run_migrations(config: &AppConfig) -> Result<(), sqlx::Error> {
     Ok(())
 }
 
-pub fn router(config: AppConfig, rag: Arc<rag::RagService>) -> Router {
+pub fn router(
+    config: AppConfig,
+    rag: Arc<rag::RagService>,
+    budget: Arc<budget::BudgetGuard>,
+) -> Router {
     let state = Arc::new(AppState {
         welcome: welcome_use_case(&config),
         rag: Some(rag),
+        budget: Some(budget),
         config,
     });
     router_with_state(state)
+}
+
+fn env_u64(key: &str, default: u64) -> Result<u64, String> {
+    std::env::var(key)
+        .unwrap_or_else(|_| default.to_string())
+        .parse()
+        .map_err(|_| format!("variable {key} invalide"))
+}
+
+fn env_u32(key: &str, default: u32) -> Result<u32, String> {
+    std::env::var(key)
+        .unwrap_or_else(|_| default.to_string())
+        .parse()
+        .map_err(|_| format!("variable {key} invalide"))
 }
 
 pub fn router_with_state(state: Arc<AppState>) -> Router {
@@ -200,6 +230,23 @@ async fn welcome_reply(
     Json(request): Json<WelcomeReplyRequest>,
 ) -> Result<Json<WelcomeReplyResponse>, ApiError> {
     authorize(&headers, &state.config)?;
+    if let Some(budget) = &state.budget {
+        let interactive = !request.message.trim().is_empty();
+        if let Some(message) = budget
+            .check_and_record(&request.guild_id, &request.member.id, interactive)
+            .await
+            .map_err(|error| {
+                tracing::error!(%error, "Verification du budget DeepSeek impossible");
+                ApiError::bad_request("verification du quota indisponible")
+            })?
+        {
+            return Ok(Json(WelcomeReplyResponse {
+                reply: message,
+                model: state.config.model.clone(),
+                generated_by_ai: false,
+            }));
+        }
+    }
     let retrieved = match &state.rag {
         Some(rag) => rag
             .context_for(&request.guild_id, &request.message)

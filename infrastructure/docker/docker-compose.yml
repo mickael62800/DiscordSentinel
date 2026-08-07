@@ -511,6 +511,9 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
       DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
       ATRIUM_API_RATE_LIMIT_PER_SEC: ${ATRIUM_API_RATE_LIMIT_PER_SEC:-5}
+      ATRIUM_USER_COOLDOWN_SECS: ${ATRIUM_USER_COOLDOWN_SECS:-10}
+      ATRIUM_USER_DAILY_LIMIT: ${ATRIUM_USER_DAILY_LIMIT:-30}
+      ATRIUM_GLOBAL_DAILY_LIMIT: ${ATRIUM_GLOBAL_DAILY_LIMIT:-500}
       # Base logique Atrium, isolee derriere son pool dedie.
       ATRIUM_RAG_DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@atrium-pgbouncer:5432/atrium
       # En Docker, le RAG utilise toujours Ollama local. Ne pas laisser une

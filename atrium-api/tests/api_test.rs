@@ -36,7 +36,10 @@ impl GenerateWelcomeReplyUseCase for MockWelcomeUseCase {
             return Err(WelcomeError::Missing("guild_id"));
         }
         Ok(WelcomeReply {
-            content: format!("Bienvenue {} sur le serveur {} !", req.member_display_name, req.guild_id),
+            content: format!(
+                "Bienvenue {} sur le serveur {} !",
+                req.member_display_name, req.guild_id
+            ),
             generated_by_ai: true,
         })
     }
@@ -49,6 +52,7 @@ fn setup_test_app(should_fail: bool) -> axum::Router {
         config,
         welcome: mock_use_case,
         rag: None,
+        budget: None,
     });
     router_with_state(state)
 }
@@ -61,7 +65,8 @@ fn create_request(method: &str, uri: &str, body: Body) -> Request<Body> {
         .unwrap();
 
     let dummy_addr: SocketAddr = "127.0.0.1:12345".parse().unwrap();
-    req.extensions_mut().insert(axum::extract::ConnectInfo(dummy_addr));
+    req.extensions_mut()
+        .insert(axum::extract::ConnectInfo(dummy_addr));
     req
 }
 #[tokio::test]
@@ -93,7 +98,8 @@ async fn test_welcome_reply_unauthorized() {
     });
 
     let mut req = create_request("POST", "/v1/welcome/reply", Body::from(payload.to_string()));
-    req.headers_mut().insert("Content-Type", "application/json".parse().unwrap());
+    req.headers_mut()
+        .insert("Content-Type", "application/json".parse().unwrap());
 
     let response = app.oneshot(req).await.unwrap();
 
@@ -113,8 +119,10 @@ async fn test_welcome_reply_success() {
     });
 
     let mut req = create_request("POST", "/v1/welcome/reply", Body::from(payload.to_string()));
-    req.headers_mut().insert("Content-Type", "application/json".parse().unwrap());
-    req.headers_mut().insert(AUTHORIZATION, "Bearer test-token".parse().unwrap());
+    req.headers_mut()
+        .insert("Content-Type", "application/json".parse().unwrap());
+    req.headers_mut()
+        .insert(AUTHORIZATION, "Bearer test-token".parse().unwrap());
 
     let response = app.oneshot(req).await.unwrap();
 
@@ -142,8 +150,10 @@ async fn test_welcome_reply_business_error() {
     });
 
     let mut req = create_request("POST", "/v1/welcome/reply", Body::from(payload.to_string()));
-    req.headers_mut().insert("Content-Type", "application/json".parse().unwrap());
-    req.headers_mut().insert(AUTHORIZATION, "Bearer test-token".parse().unwrap());
+    req.headers_mut()
+        .insert("Content-Type", "application/json".parse().unwrap());
+    req.headers_mut()
+        .insert(AUTHORIZATION, "Bearer test-token".parse().unwrap());
 
     let response = app.oneshot(req).await.unwrap();
 

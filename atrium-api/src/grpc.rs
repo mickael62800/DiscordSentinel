@@ -12,23 +12,26 @@ use atrium_proto::welcome::v1::{
 };
 use tonic::{Request, Response, Status};
 
-use crate::{merge_context, rag::RagService, welcome_use_case, AppConfig};
+use crate::{budget::BudgetGuard, merge_context, rag::RagService, welcome_use_case, AppConfig};
 
 use std::pin::Pin;
 use tokio_stream::Stream;
 
-pub async fn serve(config: AppConfig, rag: Arc<RagService>) {
+pub async fn serve(config: AppConfig, rag: Arc<RagService>, budget: Arc<BudgetGuard>) {
     let addr = config.grpc_addr;
     let welcome_service = WelcomeGrpc {
         welcome: welcome_use_case(&config),
         rag: Some(rag.clone()),
+        budget: Some(budget),
     };
     let rag_service = RagGrpc { rag: Some(rag) };
 
     tracing::info!(%addr, "Atrium gRPC démarré (Welcome & RAG)");
     tonic::transport::Server::builder()
         .add_service(WelcomeServiceServer::new(welcome_service))
-        .add_service(proto::rag_service_server::RagServiceServer::new(rag_service))
+        .add_service(proto::rag_service_server::RagServiceServer::new(
+            rag_service,
+        ))
         .serve(addr)
         .await
         .expect("serveur gRPC Atrium");
@@ -37,11 +40,36 @@ pub async fn serve(config: AppConfig, rag: Arc<RagService>) {
 pub struct WelcomeGrpc {
     pub welcome: Arc<dyn GenerateWelcomeReplyUseCase>,
     pub rag: Option<Arc<RagService>>,
+    pub budget: Option<Arc<BudgetGuard>>,
 }
 
 impl WelcomeGrpc {
     pub fn new(welcome: Arc<dyn GenerateWelcomeReplyUseCase>) -> Self {
-        Self { welcome, rag: None }
+        Self {
+            welcome,
+            rag: None,
+            budget: None,
+        }
+    }
+
+    async fn budget_message(
+        &self,
+        input: &proto::GenerateReplyRequest,
+    ) -> Result<Option<String>, Status> {
+        let Some(budget) = &self.budget else {
+            return Ok(None);
+        };
+        budget
+            .check_and_record(
+                &input.guild_id,
+                &input.member_id,
+                !input.member_message.trim().is_empty(),
+            )
+            .await
+            .map_err(|error| {
+                tracing::error!(%error, "Verification du budget DeepSeek gRPC impossible");
+                Status::unavailable("verification du quota indisponible")
+            })
     }
 }
 
@@ -51,13 +79,20 @@ pub struct RagGrpc {
 
 #[tonic::async_trait]
 impl WelcomeService for WelcomeGrpc {
-    type StreamReplyStream = Pin<Box<dyn Stream<Item = Result<proto::ReplyChunk, Status>> + Send + 'static>>;
+    type StreamReplyStream =
+        Pin<Box<dyn Stream<Item = Result<proto::ReplyChunk, Status>> + Send + 'static>>;
 
     async fn generate_reply(
         &self,
         request: Request<proto::GenerateReplyRequest>,
     ) -> Result<Response<proto::GenerateReplyResponse>, Status> {
         let input = request.into_inner();
+        if let Some(message) = self.budget_message(&input).await? {
+            return Ok(Response::new(proto::GenerateReplyResponse {
+                reply: message,
+                generated_by_ai: false,
+            }));
+        }
         let scope = match proto::ConversationScope::try_from(input.scope)
             .unwrap_or(proto::ConversationScope::General)
         {
@@ -98,6 +133,15 @@ impl WelcomeService for WelcomeGrpc {
         request: Request<proto::GenerateReplyRequest>,
     ) -> Result<Response<Self::StreamReplyStream>, Status> {
         let input = request.into_inner();
+        if let Some(message) = self.budget_message(&input).await? {
+            let output_stream = async_stream::try_stream! {
+                yield proto::ReplyChunk {
+                    delta: message,
+                    is_final: true,
+                };
+            };
+            return Ok(Response::new(Box::pin(output_stream)));
+        }
         let scope = match proto::ConversationScope::try_from(input.scope)
             .unwrap_or(proto::ConversationScope::General)
         {
@@ -154,16 +198,24 @@ impl proto::rag_service_server::RagService for RagGrpc {
         request: Request<proto::SearchKnowledgeRequest>,
     ) -> Result<Response<proto::SearchKnowledgeResponse>, Status> {
         let req = request.into_inner();
-        let rag = self.rag.as_ref().ok_or_else(|| Status::unavailable("RAG non configuré"))?;
-        let chunks = rag.search_chunks(&req.query, req.limit).await.map_err(|e| Status::internal(e))?;
+        let rag = self
+            .rag
+            .as_ref()
+            .ok_or_else(|| Status::unavailable("RAG non configuré"))?;
+        let chunks = rag
+            .search_chunks(&req.query, req.limit)
+            .await
+            .map_err(|e| Status::internal(e))?;
 
         let proto_chunks = chunks
             .into_iter()
-            .map(|(source, content, similarity)| proto::SearchKnowledgeChunk {
-                source,
-                content,
-                similarity,
-            })
+            .map(
+                |(source, content, similarity)| proto::SearchKnowledgeChunk {
+                    source,
+                    content,
+                    similarity,
+                },
+            )
             .collect();
 
         Ok(Response::new(proto::SearchKnowledgeResponse {
