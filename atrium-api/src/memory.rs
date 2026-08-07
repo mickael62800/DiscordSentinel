@@ -59,22 +59,28 @@ impl ConversationMemory {
         member_message: &str,
         reply: &str,
     ) -> Result<(), sqlx::Error> {
-        if member_message.trim().is_empty() {
-            return Ok(());
-        }
         let mut tx = self.pool.begin().await?;
-        for (role, content) in [("member", member_message), ("atrium", reply)] {
+        if !member_message.trim().is_empty() {
             sqlx::query(
                 "INSERT INTO atrium_conversation_messages (guild_id, member_id, role, content) \
                  VALUES ($1, $2, $3, $4)",
             )
             .bind(guild_id)
             .bind(member_id)
-            .bind(role)
-            .bind(content)
+            .bind("member")
+            .bind(member_message)
             .execute(&mut *tx)
             .await?;
         }
+        sqlx::query(
+            "INSERT INTO atrium_conversation_messages (guild_id, member_id, role, content) \
+             VALUES ($1, $2, 'atrium', $3)",
+        )
+        .bind(guild_id)
+        .bind(member_id)
+        .bind(reply)
+        .execute(&mut *tx)
+        .await?;
         sqlx::query(
             "DELETE FROM atrium_conversation_messages WHERE guild_id = $1 AND member_id = $2 \
              AND id NOT IN (SELECT id FROM atrium_conversation_messages \
