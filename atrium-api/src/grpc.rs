@@ -14,8 +14,8 @@ use atrium_proto::welcome::v1::{
 use tonic::{Request, Response, Status};
 
 use crate::{
-    budget::BudgetGuard, control::BotControlStore, merge_context, rag::RagService,
-    welcome_use_case, AppConfig,
+    budget::BudgetGuard, control::BotControlStore, memory::ConversationMemory, merge_context,
+    rag::RagService, welcome_use_case, AppConfig,
 };
 
 use std::pin::Pin;
@@ -26,6 +26,7 @@ pub async fn serve(
     rag: Arc<RagService>,
     budget: Arc<BudgetGuard>,
     control: Arc<BotControlStore>,
+    memory: Arc<ConversationMemory>,
 ) {
     let addr = config.grpc_addr;
     let welcome_service = WelcomeGrpc {
@@ -33,6 +34,7 @@ pub async fn serve(
         rag: Some(rag.clone()),
         budget: Some(budget),
         control: Some(control.clone()),
+        memory: Some(memory),
     };
     let rag_service = RagGrpc { rag: Some(rag) };
     let control_service = BotControlGrpc { control };
@@ -54,6 +56,7 @@ pub struct WelcomeGrpc {
     pub rag: Option<Arc<RagService>>,
     pub budget: Option<Arc<BudgetGuard>>,
     pub control: Option<Arc<BotControlStore>>,
+    pub memory: Option<Arc<ConversationMemory>>,
 }
 
 impl WelcomeGrpc {
@@ -63,6 +66,7 @@ impl WelcomeGrpc {
             rag: None,
             budget: None,
             control: None,
+            memory: None,
         }
     }
 
@@ -99,6 +103,27 @@ impl WelcomeGrpc {
                 Status::unavailable("verification du quota indisponible")
             })
     }
+
+    async fn history(&self, guild_id: &str, member_id: &str) -> Result<String, Status> {
+        match &self.memory {
+            Some(memory) => memory.history(guild_id, member_id).await.map_err(|error| {
+                tracing::error!(%error, "Lecture de la memoire Atrium impossible");
+                Status::unavailable("lecture de la memoire indisponible")
+            }),
+            None => Ok(String::new()),
+        }
+    }
+
+    async fn remember(&self, guild_id: &str, member_id: &str, message: &str, reply: &str) {
+        if let Some(memory) = &self.memory {
+            if let Err(error) = memory
+                .remember_exchange(guild_id, member_id, message, reply)
+                .await
+            {
+                tracing::warn!(%error, "Sauvegarde de la memoire Atrium impossible");
+            }
+        }
+    }
 }
 
 pub struct RagGrpc {
@@ -122,6 +147,10 @@ impl WelcomeService for WelcomeGrpc {
                 generated_by_ai: false,
             }));
         }
+        let history = self.history(&input.guild_id, &input.member_id).await?;
+        let guild_id = input.guild_id.clone();
+        let member_id = input.member_id.clone();
+        let member_message = input.member_message.clone();
         let scope = match proto::ConversationScope::try_from(input.scope)
             .unwrap_or(proto::ConversationScope::General)
         {
@@ -147,10 +176,13 @@ impl WelcomeService for WelcomeGrpc {
                 channel_id: input.channel_id,
                 scope,
                 member_message: input.member_message,
+                conversation_history: history,
                 server_context: merge_context(&input.server_context, &retrieved),
             })
             .await
             .map_err(|error| Status::invalid_argument(error.to_string()))?;
+        self.remember(&guild_id, &member_id, &member_message, &reply.content)
+            .await;
         Ok(Response::new(proto::GenerateReplyResponse {
             reply: reply.content,
             generated_by_ai: reply.generated_by_ai,
@@ -172,6 +204,10 @@ impl WelcomeService for WelcomeGrpc {
             };
             return Ok(Response::new(Box::pin(output_stream)));
         }
+        let history = self.history(&input.guild_id, &input.member_id).await?;
+        let guild_id = input.guild_id.clone();
+        let member_id = input.member_id.clone();
+        let member_message = input.member_message.clone();
         let scope = match proto::ConversationScope::try_from(input.scope)
             .unwrap_or(proto::ConversationScope::General)
         {
@@ -197,10 +233,13 @@ impl WelcomeService for WelcomeGrpc {
                 channel_id: input.channel_id,
                 scope,
                 member_message: input.member_message,
+                conversation_history: history,
                 server_context: merge_context(&input.server_context, &retrieved),
             })
             .await
             .map_err(|error| Status::invalid_argument(error.to_string()))?;
+        self.remember(&guild_id, &member_id, &member_message, &reply.content)
+            .await;
 
         // Simuler ou découper la réponse en tokens pour le streaming gRPC
         let content = reply.content;

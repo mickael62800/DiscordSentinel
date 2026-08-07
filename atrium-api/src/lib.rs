@@ -28,6 +28,7 @@ use sqlx::PgPool;
 
 pub mod budget;
 pub mod control;
+pub mod memory;
 pub mod rag;
 
 const DEEPSEEK_URL: &str = "https://api.deepseek.com/chat/completions";
@@ -39,6 +40,7 @@ pub struct AppState {
     pub rag: Option<Arc<rag::RagService>>,
     pub budget: Option<Arc<budget::BudgetGuard>>,
     pub control: Option<Arc<control::BotControlStore>>,
+    pub memory: Option<Arc<memory::ConversationMemory>>,
 }
 
 #[derive(Clone)]
@@ -122,12 +124,14 @@ pub fn router(
     rag: Arc<rag::RagService>,
     budget: Arc<budget::BudgetGuard>,
     control: Arc<control::BotControlStore>,
+    memory: Arc<memory::ConversationMemory>,
 ) -> Router {
     let state = Arc::new(AppState {
         welcome: welcome_use_case(&config),
         rag: Some(rag),
         budget: Some(budget),
         control: Some(control),
+        memory: Some(memory),
         config,
     });
     router_with_state(state)
@@ -274,6 +278,16 @@ async fn welcome_reply(
             })?,
         None => String::new(),
     };
+    let history = match &state.memory {
+        Some(memory) => memory
+            .history(&request.guild_id, &request.member.id)
+            .await
+            .map_err(|_| ApiError::bad_request("lecture de la memoire indisponible"))?,
+        None => String::new(),
+    };
+    let guild_id = request.guild_id.clone();
+    let member_id = request.member.id.clone();
+    let member_message = request.message.clone();
     let reply = state
         .welcome
         .reply(WelcomeRequest {
@@ -283,10 +297,19 @@ async fn welcome_reply(
             channel_id: request.channel.id,
             scope: request.channel.kind.into(),
             member_message: request.message,
+            conversation_history: history,
             server_context: merge_context(&request.server_context, &retrieved),
         })
         .await
         .map_err(ApiError::from)?;
+    if let Some(memory) = &state.memory {
+        if let Err(error) = memory
+            .remember_exchange(&guild_id, &member_id, &member_message, &reply.content)
+            .await
+        {
+            tracing::warn!(%error, "Sauvegarde de la memoire Atrium impossible");
+        }
+    }
     Ok(Json(WelcomeReplyResponse {
         reply: reply.content,
         model: state.config.model.clone(),

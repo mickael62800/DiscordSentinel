@@ -23,6 +23,8 @@ pub struct WelcomeRequest {
     pub channel_id: String,
     pub scope: ConversationScope,
     pub member_message: String,
+    /// Derniers echanges avec ce membre, fournis par la memoire Atrium.
+    pub conversation_history: String,
     /// Texte approuve par les administrateurs : FAQ, regles et orientation.
     pub server_context: String,
 }

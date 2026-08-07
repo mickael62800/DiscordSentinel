@@ -19,6 +19,10 @@ async fn main() {
         atrium_api::control::BotControlStore::new(&config)
             .expect("Configuration du controle Atrium invalide"),
     );
+    let memory = std::sync::Arc::new(
+        atrium_api::memory::ConversationMemory::new(&config)
+            .expect("Configuration de la memoire Atrium invalide"),
+    );
     rag.index_knowledge()
         .await
         .expect("Erreur lors de l'indexation RAG Atrium");
@@ -28,12 +32,13 @@ async fn main() {
         rag.clone(),
         budget.clone(),
         control.clone(),
+        memory.clone(),
     ));
     let listener = tokio::net::TcpListener::bind(addr)
         .await
         .expect("Impossible de binder Atrium API");
     tracing::info!(%addr, "Atrium API demarree");
-    axum::serve(listener, router(config, rag, budget, control))
+    axum::serve(listener, router(config, rag, budget, control, memory))
         .await
         .expect("Erreur serveur Atrium API");
 }

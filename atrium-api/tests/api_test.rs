@@ -54,6 +54,7 @@ fn setup_test_app(should_fail: bool) -> axum::Router {
         rag: None,
         budget: None,
         control: None,
+        memory: None,
     });
     router_with_state(state)
 }
