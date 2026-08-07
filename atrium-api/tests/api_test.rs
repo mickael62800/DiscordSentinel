@@ -53,6 +53,7 @@ fn setup_test_app(should_fail: bool) -> axum::Router {
         welcome: mock_use_case,
         rag: None,
         budget: None,
+        control: None,
     });
     router_with_state(state)
 }

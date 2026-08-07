@@ -12,6 +12,11 @@ service RagService {
   rpc SearchKnowledge(SearchKnowledgeRequest) returns (SearchKnowledgeResponse);
 }
 
+service BotControlService {
+  rpc GetState(BotStateRequest) returns (BotStateResponse);
+  rpc SetState(SetBotStateRequest) returns (BotStateResponse);
+}
+
 enum ConversationScope { GENERAL = 0; DIRECT = 1; }
 
 message GenerateReplyRequest {
@@ -47,4 +52,18 @@ message SearchKnowledgeChunk {
 
 message SearchKnowledgeResponse {
   repeated SearchKnowledgeChunk chunks = 1;
+}
+
+message BotStateRequest {
+  string guild_id = 1;
+}
+
+message SetBotStateRequest {
+  string guild_id = 1;
+  bool enabled = 2;
+  string actor_id = 3;
+}
+
+message BotStateResponse {
+  bool enabled = 1;
 }

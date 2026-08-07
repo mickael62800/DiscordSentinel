@@ -27,6 +27,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 
 pub mod budget;
+pub mod control;
 pub mod rag;
 
 const DEEPSEEK_URL: &str = "https://api.deepseek.com/chat/completions";
@@ -37,6 +38,7 @@ pub struct AppState {
     pub welcome: Arc<dyn GenerateWelcomeReplyUseCase>,
     pub rag: Option<Arc<rag::RagService>>,
     pub budget: Option<Arc<budget::BudgetGuard>>,
+    pub control: Option<Arc<control::BotControlStore>>,
 }
 
 #[derive(Clone)]
@@ -119,11 +121,13 @@ pub fn router(
     config: AppConfig,
     rag: Arc<rag::RagService>,
     budget: Arc<budget::BudgetGuard>,
+    control: Arc<control::BotControlStore>,
 ) -> Router {
     let state = Arc::new(AppState {
         welcome: welcome_use_case(&config),
         rag: Some(rag),
         budget: Some(budget),
+        control: Some(control),
         config,
     });
     router_with_state(state)
@@ -230,6 +234,19 @@ async fn welcome_reply(
     Json(request): Json<WelcomeReplyRequest>,
 ) -> Result<Json<WelcomeReplyResponse>, ApiError> {
     authorize(&headers, &state.config)?;
+    if let Some(control) = &state.control {
+        if !control
+            .is_enabled(&request.guild_id)
+            .await
+            .map_err(|_| ApiError::bad_request("verification de l'etat Atrium indisponible"))?
+        {
+            return Ok(Json(WelcomeReplyResponse {
+                reply: "Atrium est actuellement desactive sur ce serveur.".into(),
+                model: state.config.model.clone(),
+                generated_by_ai: false,
+            }));
+        }
+    }
     if let Some(budget) = &state.budget {
         let interactive = !request.message.trim().is_empty();
         if let Some(message) = budget
