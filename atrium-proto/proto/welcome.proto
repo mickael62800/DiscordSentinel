@@ -1,0 +1,50 @@
+syntax = "proto3";
+package atrium.welcome.v1;
+
+service WelcomeService {
+  rpc GenerateReply(GenerateReplyRequest) returns (GenerateReplyResponse);
+  // Stream la réponse token par token au fur et à mesure de la génération LLM
+  rpc StreamReply(GenerateReplyRequest) returns (stream ReplyChunk);
+}
+
+service RagService {
+  // Recherche sémantique dans la base de connaissances vectorielle PgVector
+  rpc SearchKnowledge(SearchKnowledgeRequest) returns (SearchKnowledgeResponse);
+}
+
+enum ConversationScope { GENERAL = 0; DIRECT = 1; }
+
+message GenerateReplyRequest {
+  string guild_id = 1;
+  string member_id = 2;
+  string member_display_name = 3;
+  string channel_id = 4;
+  ConversationScope scope = 5;
+  string member_message = 6;
+  string server_context = 7;
+}
+
+message GenerateReplyResponse {
+  string reply = 1;
+  bool generated_by_ai = 2;
+}
+
+message ReplyChunk {
+  string delta = 1;
+  bool is_final = 2;
+}
+
+message SearchKnowledgeRequest {
+  string query = 1;
+  uint32 limit = 2;
+}
+
+message SearchKnowledgeChunk {
+  string source = 1;
+  string content = 2;
+  double similarity = 3;
+}
+
+message SearchKnowledgeResponse {
+  repeated SearchKnowledgeChunk chunks = 1;
+}

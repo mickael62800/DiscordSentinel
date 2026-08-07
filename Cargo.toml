@@ -15,6 +15,10 @@ members = [
     "nexus-gateway",
     "nexus-worker",
     "nexus-bot",
+    "atrium-api",
+    "atrium-core",
+    "atrium-proto",
+    "atrium-bot",
 ]
 
 [workspace.package]
@@ -83,6 +87,8 @@ sentinel-core = { path = "sentinel-core" }
 # et n'est donc consomme que par les APIs, jamais par les bots.
 platform-common = { path = "platform-common" }
 platform-common-api = { path = "platform-common-api" }
+atrium-core = { path = "atrium-core" }
+atrium-proto = { path = "atrium-proto" }
 
 # ── Lints partagés (à activer dans chaque crate via `[lints] workspace = true`) ──
 [workspace.lints.clippy]
