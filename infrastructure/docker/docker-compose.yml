@@ -558,6 +558,10 @@ services:
   atrium-ollama-init:
     image: ollama/ollama:latest
     command: ["pull", "nomic-embed-text"]
+    environment:
+      # Le client Ollama du job doit joindre le serveur du conteneur voisin,
+      # pas son propre localhost.
+      OLLAMA_HOST: http://atrium-ollama:11434
     volumes:
       - atrium_ollama_data:/root/.ollama
     depends_on:
