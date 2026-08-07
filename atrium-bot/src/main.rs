@@ -19,6 +19,9 @@ use tonic::transport::Channel;
 
 mod logic;
 
+const DISCORD_DIRECTORY_MAX_CHARS: usize = 6_000;
+const MEMBERS_PER_ROLE: usize = 30;
+
 #[derive(Clone)]
 struct Config {
     token: String,
@@ -59,6 +62,7 @@ impl Handler {
         channel_id: String,
         scope: ConversationScope,
         message: String,
+        server_context: String,
     ) -> Option<String> {
         let mut client = WelcomeServiceClient::new(self.channel.clone());
         client
@@ -69,11 +73,63 @@ impl Handler {
                 channel_id,
                 scope: scope as i32,
                 member_message: message,
-                server_context: self.config.server_context.clone(),
+                server_context,
             })
             .await
             .ok()
             .map(|response| response.into_inner().reply)
+    }
+
+    fn server_context(&self, ctx: &Context, guild_id: GuildId) -> String {
+        let Some(guild) = ctx.cache.guild(guild_id) else {
+            return self.config.server_context.clone();
+        };
+        let mut roles: Vec<_> = guild
+            .roles
+            .values()
+            .filter(|role| role.id.get() != guild_id.get() && !role.managed)
+            .collect();
+        roles.sort_by_key(|role| std::cmp::Reverse(role.position));
+
+        let mut directory = String::from("\n\nAnnuaire Discord actuel (roles et membres):\n");
+        for role in roles {
+            let mut members: Vec<_> = guild
+                .members
+                .values()
+                .filter(|member| member.roles.contains(&role.id))
+                .map(|member| {
+                    format!(
+                        "{} (<@{}>)",
+                        member.display_name().replace(['\n', '\r'], " "),
+                        member.user.id
+                    )
+                })
+                .collect();
+            if members.is_empty() {
+                continue;
+            }
+            members.sort_unstable();
+            let remaining = members.len().saturating_sub(MEMBERS_PER_ROLE);
+            members.truncate(MEMBERS_PER_ROLE);
+            let suffix = if remaining > 0 {
+                format!(", et {remaining} autre(s)")
+            } else {
+                String::new()
+            };
+            let line = format!(
+                "- {} (<@&{}>): {}{}\n",
+                role.name.replace(['\n', '\r'], " "),
+                role.id,
+                members.join(", "),
+                suffix
+            );
+            if directory.chars().count() + line.chars().count() > DISCORD_DIRECTORY_MAX_CHARS {
+                directory.push_str("- Annuaire tronque pour limiter la taille du contexte.\n");
+                break;
+            }
+            directory.push_str(&line);
+        }
+        format!("{}{}", self.config.server_context, directory)
     }
 
     async fn control_reply(&self, command: &CommandInteraction) -> String {
@@ -195,6 +251,7 @@ impl EventHandler for Handler {
     }
 
     async fn guild_member_addition(&self, ctx: Context, member: Member) {
+        let server_context = self.server_context(&ctx, member.guild_id);
         if let Some(reply) = self
             .reply(
                 member.guild_id.to_string(),
@@ -203,6 +260,7 @@ impl EventHandler for Handler {
                 self.config.general_channel_id.to_string(),
                 ConversationScope::General,
                 String::new(),
+                server_context,
             )
             .await
         {
@@ -233,17 +291,19 @@ impl EventHandler for Handler {
             logic::MessageHandling::Reply(scope) => scope,
         };
         let guild_id = match message.guild_id.or(*self.primary_guild.read().await) {
-            Some(id) => id.to_string(),
+            Some(id) => id,
             None => return,
         };
+        let server_context = self.server_context(&ctx, guild_id);
         if let Some(reply) = self
             .reply(
-                guild_id,
+                guild_id.to_string(),
                 message.author.id.to_string(),
                 message.author.display_name().to_string(),
                 message.channel_id.to_string(),
                 scope,
                 message.content.clone(),
+                server_context,
             )
             .await
         {
