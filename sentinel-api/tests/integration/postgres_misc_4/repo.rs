@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::system::guild_repository::PgGuildRepository;
-use sentinel_api::ports::outbound::system::guild_repository::GuildRepository;
+use sentinel_core::ports::outbound::system::guild_repository::GuildRepository;
 use sentinel_core::domain::entities::system::guild::Guild;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {

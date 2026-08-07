@@ -15,6 +15,17 @@ service CommunityService {
   rpc CreateTempRole(CreateTempRoleRequest) returns (Empty);
   rpc ListTempRoles(ListTempRolesRequest) returns (TempRoleList);
   rpc DeleteTempRole(DeleteTempRoleRequest) returns (Empty);
+
+  // ── Eligibilite : la DECISION vit ici, pas dans le bot ──
+  //
+  // Le bot fournit les faits Discord (roles actuels, dates de join) ; le
+  // serveur applique les prerequis et les seuils de parrainage.
+  rpc CheckRoleEligibility(CheckRoleEligibilityRequest) returns (EligibilityDecision);
+  rpc ValidateSponsorshipEligibility(ValidateSponsorshipRequest) returns (EligibilityDecision);
+
+  // Publication forcee du classement mensuel (`/classement forcer`) : bypasse
+  // les gates, ne poste rien sur Discord, renvoie les tops au bot qui rend.
+  rpc ForceMonthlyRanking(ForceMonthlyRankingRequest) returns (MonthlyRanking);
 }
 
 message Empty {}
@@ -75,4 +86,48 @@ message TempRole {
 
 message TempRoleList {
   repeated TempRole roles = 1;
+}
+
+// ── Eligibilite ──
+
+message CheckRoleEligibilityRequest {
+  string guild_id = 1;
+  uint64 role_id = 2;
+  repeated uint64 user_roles = 3;
+  // Timestamp unix (s) du join Discord. Absent => 0 jour d'anciennete.
+  optional int64 joined_at_unix = 4;
+}
+
+message ValidateSponsorshipRequest {
+  string guild_id = 1;
+  uint64 sponsor_id = 2;
+  uint64 sponsored_id = 3;
+  optional int64 sponsor_joined_at_unix = 4;
+  optional int64 sponsored_joined_at_unix = 5;
+}
+
+message EligibilityDecision {
+  bool allowed = 1;
+  optional string reason = 2;
+}
+
+// ── Classement mensuel ──
+
+message ForceMonthlyRankingRequest {
+  string guild_id = 1;
+  // "actuel" (defaut) | "precedent". Vide = actuel.
+  string mois = 2;
+}
+
+message RankingEntry {
+  string user_id = 1;
+  int64 xp = 2;
+}
+
+message MonthlyRanking {
+  string period_label = 1;
+  optional string note = 2;
+  repeated RankingEntry text = 3;
+  repeated RankingEntry voice = 4;
+  repeated RankingEntry global = 5;
 }

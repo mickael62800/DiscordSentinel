@@ -537,43 +537,10 @@ impl BaseApiClient {
         }
     }
 
-    /// PATCH JSON vers l'API, avec la reponse deserialisee. A utiliser quand
-    /// l'appelant doit confirmer le resultat (ex : afficher l'erreur de
-    /// validation renvoyee par l'API a l'utilisateur Discord).
-    pub async fn patch_json<B: serde::Serialize, T: serde::de::DeserializeOwned>(
-        &self,
-        path: &str,
-        body: &B,
-    ) -> Result<T, String> {
-        let req = self
-            .client
-            .patch(format!("{}{}", self.base_url, path))
-            .json(body);
-        let resp = self
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| network_error_message("PATCH", path, &e.to_string()))?;
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
-            return Err(friendly_api_error("PATCH", path, status, &text));
-        }
-        resp.json::<T>()
-            .await
-            .map_err(|e| parse_error_message("PATCH", path, &e.to_string()))
-    }
-
-    /// PATCH JSON vers l'API. Fire-and-forget avec log d'erreur.
-    pub async fn patch_fire_and_forget<B: serde::Serialize>(&self, path: &str, body: &B) {
-        let req = self
-            .client
-            .patch(format!("{}{}", self.base_url, path))
-            .json(body);
-        if let Err(e) = self.auth(req).send().await {
-            tracing::warn!(error = %e, path, "Echec PATCH fire-and-forget");
-        }
-    }
+    // Le bot n'emet plus aucun PATCH : `patch_json` (module `ideas`) et
+    // `patch_fire_and_forget` (resolution de review / d'action en attente) sont
+    // tous passes en gRPC. Les routes HTTP correspondantes restent servies pour
+    // le dashboard web.
 
     /// DELETE JSON vers l'API. Retourne le body deserialise.
     pub async fn delete_json<T: serde::de::DeserializeOwned>(
@@ -596,30 +563,8 @@ impl BaseApiClient {
             .map_err(|e| parse_error_message("DELETE", path, &e.to_string()))
     }
 
-    /// DELETE JSON avec body vers l'API. Retourne le body deserialise.
-    pub async fn delete_with_body<B: serde::Serialize, T: serde::de::DeserializeOwned>(
-        &self,
-        path: &str,
-        body: &B,
-    ) -> Result<T, String> {
-        let req = self
-            .client
-            .delete(format!("{}{}", self.base_url, path))
-            .json(body);
-        let resp = self
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| network_error_message("DELETE", path, &e.to_string()))?;
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
-            return Err(friendly_api_error("DELETE", path, status, &text));
-        }
-        resp.json::<T>()
-            .await
-            .map_err(|e| parse_error_message("DELETE", path, &e.to_string()))
-    }
+    // `delete_with_body` a ete supprime : seul le module `cleanup` l'utilisait,
+    // et ses trois purges sont passees en gRPC (`PurgeService`).
 
     // ── Config Helpers ──
 

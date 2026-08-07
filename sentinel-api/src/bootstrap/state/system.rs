@@ -1,0 +1,110 @@
+//! Etat du domaine system : exploitation de l'installation elle-meme.
+//!
+//! Tickets, OAuth, securite de l'hote, Docker, exports, rotation d'admin,
+//! sondes de sante. Tout ce qui concerne la machine et le service plutot que
+//! le contenu du serveur Discord.
+//!
+//! Ce qui n'est PAS ici : les scalaires de configuration lus par les
+//! middlewares (`api_key`, `guild_id`, `superadmin_user_ids`, `metrics_token`).
+//! Ils restent sur `AppState` parce que les middlewares sont montes avec
+//! `from_fn_with_state(state, ...)` au niveau du routeur, hors de tout domaine.
+
+use std::sync::Arc;
+
+use axum::extract::FromRef;
+use sentinel_core::ports::inbound::system::lookup_geoip::LookupGeoIpUseCase;
+use sentinel_core::ports::inbound::system::manage_alert_rules::ManageAlertRulesUseCase;
+use sentinel_core::ports::inbound::system::manage_bot_persistence::ManageBotPersistenceUseCase;
+use sentinel_core::ports::inbound::system::manage_export_jobs::ManageExportJobsUseCase;
+use sentinel_core::ports::inbound::system::manage_ip_bans::ManageIpBansUseCase;
+use sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCase;
+use sentinel_core::ports::inbound::system::manage_oauth::ManageOAuthUseCase;
+use sentinel_core::ports::inbound::system::manage_quarantine::ManageQuarantineUseCase;
+use sentinel_core::ports::inbound::system::manage_rotation::ManageRotationUseCase;
+use sentinel_core::ports::inbound::system::manage_security_audit::ManageSecurityAuditUseCase;
+use sentinel_core::ports::inbound::system::manage_server_events::ManageServerEventsUseCase;
+use sentinel_core::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCase;
+use sentinel_core::ports::inbound::system::manage_system_logs::ManageSystemLogsUseCase;
+use sentinel_core::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
+use sentinel_core::ports::inbound::system::read_host_probe::ReadHostProbeUseCase;
+use sentinel_core::ports::inbound::system::read_security_logs::ReadSecurityLogsUseCase;
+use sentinel_core::ports::inbound::system::read_tls_cert::ReadTlsCertUseCase;
+use sentinel_core::ports::inbound::system::reset_guild::ResetGuildUseCase;
+use sentinel_core::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use sentinel_core::ports::outbound::system::docker_host::DockerHost;
+use sentinel_core::ports::outbound::system::guild_repository::GuildRepository;
+use sentinel_core::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::ports::outbound::system::system_probe::SystemProbe;
+
+use crate::adapters::outbound::discord_api::DiscordApi;
+use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
+use crate::bootstrap::state::AppState;
+
+/// Ports de l'exploitation du service.
+#[derive(Clone)]
+pub struct SystemState {
+    // ── Support et vie du service ──
+    pub tickets_uc: Arc<dyn ManageTicketsUseCase>,
+    pub system_logs_uc: Arc<dyn ManageSystemLogsUseCase>,
+    pub server_events_uc: Arc<dyn ManageServerEventsUseCase>,
+    pub rotation_uc: Arc<dyn ManageRotationUseCase>,
+    pub reset_guild_uc: Arc<dyn ResetGuildUseCase>,
+    pub bot_persistence_uc: Arc<dyn ManageBotPersistenceUseCase>,
+    pub alert_rules_uc: Arc<dyn ManageAlertRulesUseCase>,
+
+    // ── Securite de l'hote et du service ──
+    pub oauth_uc: Arc<dyn ManageOAuthUseCase>,
+    pub ip_bans_uc: Arc<dyn ManageIpBansUseCase>,
+    pub quarantine_uc: Arc<dyn ManageQuarantineUseCase>,
+    pub lockdown_uc: Arc<dyn ManageLockdownUseCase>,
+    pub slowmode_uc: Arc<dyn ManageSlowmodeUseCase>,
+    pub security_logs_uc: Arc<dyn ReadSecurityLogsUseCase>,
+    pub security_audit_uc: Arc<dyn ManageSecurityAuditUseCase>,
+    pub host_probe_uc: Arc<dyn ReadHostProbeUseCase>,
+    pub tls_cert_uc: Arc<dyn ReadTlsCertUseCase>,
+    pub geoip_uc: Arc<dyn LookupGeoIpUseCase>,
+
+    // ── Exports et infrastructure ──
+    pub export_uc: Arc<dyn sentinel_core::application::system::export_service::ExecuteExportUseCase>,
+    pub export_jobs_uc: Arc<dyn ManageExportJobsUseCase>,
+    /// Daemon Docker de l'hote (listing, actions, prune, df).
+    pub docker_host: Arc<dyn DockerHost>,
+    /// Sondes sante (taille/disponibilite BDD). Les handlers health/info
+    /// passent par ici, jamais par `pg_pool`.
+    pub system_probe: Arc<dyn SystemProbe>,
+    pub guild_repo: Arc<dyn GuildRepository>,
+    pub log_repo: Arc<dyn LogRepository>,
+
+    /// Poll Docker chaque minute, detecte les changements d'etat.
+    pub container_monitor: Option<
+        Arc<tokio::sync::RwLock<crate::bootstrap::container_monitor::ContainerMonitorState>>,
+    >,
+    /// Suivi req/IP en memoire pour le ban automatique.
+    pub rate_limiter: Option<Arc<crate::adapters::outbound::system::rate_limiter::RateLimiter>>,
+
+    // ── Dependances transverses du domaine ──
+    pub broadcaster: Arc<EventBroadcaster>,
+    pub discord_api: Arc<dyn DiscordApi>,
+    pub bot_config_repo: Arc<dyn BotConfigRepository>,
+    pub redis_client: redis::Client,
+
+    // ── Configuration OAuth (jamais exposee au front) ──
+    pub discord_oauth_client_id: String,
+    pub discord_oauth_client_secret: String,
+    pub discord_oauth_redirect_uri: String,
+    pub web_front_url: String,
+    /// Discord user_ids superadmin. Duplique depuis `AppState` : le flux OAuth
+    /// en a besoin pour decider quoi renvoyer au front.
+    pub superadmin_user_ids: Arc<Vec<String>>,
+    /// Secret HMAC partage bot <-> API, PAS un jeton d'authentification ici.
+    /// `guild_reset` signe son event Redis avec : sans cette signature, publier
+    /// sur la stream suffirait a declencher un reset destructif (unban-all +
+    /// strip-roles) sur un serveur. Cf. `handlers/system/guild_reset.rs`.
+    pub api_key: String,
+}
+
+impl FromRef<AppState> for SystemState {
+    fn from_ref(state: &AppState) -> Self {
+        state.system.clone()
+    }
+}

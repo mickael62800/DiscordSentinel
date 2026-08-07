@@ -108,8 +108,14 @@ pub struct AppState {
     pub game_repo: Arc<dyn GameRepository>,
     /// Publie les evenements consommes par le bot (salons de session).
     pub events: Arc<dyn EventPublisher>,
+    pub discord_api: Arc<dyn nexus_core::ports::outbound::system::discord_api_repository::DiscordApiRepository>,
     /// Si Some, toutes les routes /api exigent `Authorization: Bearer <key>`.
     pub api_key: Option<String>,
+    /// Si Some et non vide, `/metrics` exige `Authorization: Bearer <token>`.
+    ///
+    /// Vide = ouvert, ce qui convient tant que le port n'est joignable que
+    /// depuis le reseau Docker interne ou vit Prometheus.
+    pub metrics_token: Option<String>,
     /// Serveur Discord unique servi par cette installation.
     ///
     /// `None` = verrou desactive. Voir `single_guild` cote HTTP : Nexus
@@ -194,6 +200,9 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
                 Arc::new(NoopContainerRuntime)
             }
         }
+    } else if runtime_mode == "mock" {
+        tracing::info!("NEXUS_GAME_RUNTIME=mock — runtime container simule en memoire");
+        Arc::new(nexus_core::ports::outbound::game::container_runtime::MockContainerRuntime::new())
     } else {
         tracing::info!("NEXUS_GAME_RUNTIME={runtime_mode} — runtime container noop");
         Arc::new(NoopContainerRuntime)
@@ -209,8 +218,6 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         .map_err(|e| format!("REDIS_URL invalide ({redis_url}): {e}"))?;
     let port_allocator: Arc<dyn PortAllocator> = Arc::new(RedisPortAllocator::new(redis_client));
 
-    // Bus d'evenements vers le bot. REDIS_URL explicitement definie => stream
-    // Redis ; sinon publieur inerte (le bot ne creera pas les salons).
     let events: Arc<dyn EventPublisher> = match std::env::var("REDIS_URL") {
         Ok(url) if !url.is_empty() => match RedisEventPublisher::new(&url) {
             Ok(p) => Arc::new(p),
@@ -228,6 +235,10 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         }
     };
 
+    let discord_token = std::env::var("NEXUS_DISCORD_TOKEN").unwrap_or_default();
+    let discord_api: Arc<dyn nexus_core::ports::outbound::system::discord_api_repository::DiscordApiRepository> =
+        Arc::new(crate::adapters::outbound::system::discord_api::ReqwestDiscordApiClient::new(discord_token));
+
     // ── Game Portal : use cases ──
     let game_servers_uc: Arc<dyn ManageGameServersUseCase> = Arc::new(ManageGameServersService {
         server_repo: game_server_repo.clone(),
@@ -244,6 +255,9 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
     );
 
     let api_key = std::env::var("NEXUS_API_KEY").ok().filter(|k| !k.is_empty());
+    let metrics_token = std::env::var("NEXUS_METRICS_TOKEN")
+        .ok()
+        .filter(|t| !t.is_empty());
     // Meme variable que sentinel-api et que le conteneur web : une seule
     // source de verite pour « de quel serveur parle cette installation ».
     let guild_id = std::env::var("PUBLIC_GUILD_ID")
@@ -289,7 +303,9 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         bot_config_repo,
         game_repo,
         events,
+        discord_api,
         api_key,
+        metrics_token,
         guild_id,
     })
 }

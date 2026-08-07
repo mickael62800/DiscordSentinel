@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::AuditState;
 use sentinel_core::domain::entities::audit::user_activity::UserActivity;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
@@ -38,7 +38,7 @@ pub struct ActivityQuery {
 /// POST /api/user-activity — enregistrer un evenement d'activite.
 /// Passe par le repository (plus de SQL direct dans le handler).
 pub async fn create_activity(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     Json(dto): Json<CreateActivityDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let activity = UserActivity {
@@ -61,7 +61,7 @@ pub async fn create_activity(
 /// Retourne le `message_sent` correspondant a un message_id Discord.
 /// Utilise par le bot lors d'un edit pour retrouver l'ancien contenu.
 pub async fn get_by_message_id(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     Path((guild_id, message_id)): Path<(String, String)>,
 ) -> Result<Json<Option<UserActivity>>, ApiError> {
     // Expose l'ancien contenu d'un message. Le bot (Internal) l'utilise -> bypass ;
@@ -76,7 +76,7 @@ pub async fn get_by_message_id(
 
 /// GET /api/user-activity/{guild_id}/{user_id} — timeline d'un utilisateur
 pub async fn get_activity(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Query(params): Query<ActivityQuery>,
 ) -> Result<Json<Vec<UserActivity>>, ApiError> {

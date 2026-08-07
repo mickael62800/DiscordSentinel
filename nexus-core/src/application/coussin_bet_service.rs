@@ -78,3 +78,7 @@ impl CoussinBetUseCase for CoussinBetService {
             .await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/coussin_bet_service.rs"]
+mod tests;

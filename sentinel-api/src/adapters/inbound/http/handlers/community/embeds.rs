@@ -14,14 +14,14 @@ use crate::adapters::inbound::http::dto::community::embeds::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use sentinel_core::domain::entities::community::embed::RenderedEmbedPost;
 
 const EMBED_STREAM_KEY: &str = "sentinel:events";
 const EMBED_STREAM_MAXLEN: usize = 10_000;
 
 /// Publie un `embed_publish` sur le stream Redis pour que le bot poste/edite.
-async fn publish_embed(state: &AppState, payload: &RenderedEmbedPost) -> Result<(), ApiError> {
+async fn publish_embed(state: &CommunityState, payload: &RenderedEmbedPost) -> Result<(), ApiError> {
     let envelope = serde_json::json!({ "event": "embed_publish", "data": payload }).to_string();
     let mut conn = state
         .redis_client
@@ -49,7 +49,7 @@ async fn publish_embed(state: &AppState, payload: &RenderedEmbedPost) -> Result<
 }
 
 pub async fn list_embeds(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<EmbedDto>>, ApiError> {
     let list = state.embeds_uc.list_by_guild(&guild_id).await?;
@@ -57,7 +57,7 @@ pub async fn list_embeds(
 }
 
 pub async fn get_embed(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<EmbedDto>, ApiError> {
     let e = state.embeds_uc.get(id).await?;
@@ -65,7 +65,7 @@ pub async fn get_embed(
 }
 
 pub async fn create_embed(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(guild_id): Path<String>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<EmbedInputDto>,
@@ -82,7 +82,7 @@ pub async fn create_embed(
 }
 
 pub async fn update_embed(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
     Json(dto): Json<EmbedInputDto>,
 ) -> Result<Json<EmbedDto>, ApiError> {
@@ -91,7 +91,7 @@ pub async fn update_embed(
 }
 
 pub async fn delete_embed(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.embeds_uc.delete(id).await?;
@@ -100,7 +100,7 @@ pub async fn delete_embed(
 
 /// POST /api/embeds/{id}/post — poste l'embed dans un salon (nouveau message).
 pub async fn post_embed(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
     Json(dto): Json<PostEmbedDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -111,7 +111,7 @@ pub async fn post_embed(
 
 /// POST /api/embeds/{id}/edit — re-edite le dernier message poste de cet embed.
 pub async fn edit_embed(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let payload = state.embeds_uc.prepare_edit(id).await?;
@@ -121,7 +121,7 @@ pub async fn edit_embed(
 
 /// POST /api/embeds/{id}/posted — rapport du bot apres un post reussi.
 pub async fn record_embed_posted(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
     Json(dto): Json<EmbedPostedDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {

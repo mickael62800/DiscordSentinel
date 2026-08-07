@@ -110,34 +110,17 @@ async fn handle_user(ctx: &Context, command: &CommandInteraction) -> Result<(), 
         None => (0, 0),
     };
 
-    // Infractions depuis l'API
+    // Infractions : compteurs agreges cote API (le bot ne rapatrie plus le
+    // journal complet du serveur pour le filtrer en memoire).
     let infractions = api
-        .get_infractions(&guild_id.to_string())
+        .count_user_infractions(&guild_id.to_string(), &target_id.to_string())
         .await
         .unwrap_or_default();
 
-    let user_id_str = target_id.to_string();
-    let user_infractions: Vec<_> = infractions
-        .iter()
-        .filter(|i| i.user_id == user_id_str)
-        .collect();
-
-    let warn_count = user_infractions
-        .iter()
-        .filter(|i| i.action == "warn")
-        .count();
-    let delete_count = user_infractions
-        .iter()
-        .filter(|i| i.action == "delete")
-        .count();
-    let mute_count = user_infractions
-        .iter()
-        .filter(|i| i.action == "mute")
-        .count();
-    let ban_count = user_infractions
-        .iter()
-        .filter(|i| i.action == "ban")
-        .count();
+    let warn_count = infractions.warns;
+    let delete_count = infractions.deletes;
+    let mute_count = infractions.mutes;
+    let ban_count = infractions.bans;
 
     let hours = voice_seconds / 3600;
     let minutes = (voice_seconds % 3600) / 60;
@@ -157,11 +140,7 @@ async fn handle_user(ctx: &Context, command: &CommandInteraction) -> Result<(), 
         .field("Messages supprimés", format!("{delete_count}"), true)
         .field("Mutes", format!("{mute_count}"), true)
         .field("Bans", format!("{ban_count}"), true)
-        .field(
-            "Total infractions",
-            format!("{}", user_infractions.len()),
-            true,
-        )
+        .field("Total infractions", format!("{}", infractions.total), true)
         .footer(serenity::builder::CreateEmbedFooter::new(
             "Données persistées via l'API Sentinel",
         ));

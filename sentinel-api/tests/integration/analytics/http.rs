@@ -15,7 +15,7 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::outbound::audit::analytics_repository::AnalyticsRepository;
+use sentinel_core::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 use sentinel_core::domain::entities::system::analytics::ActionDistribution;
 use sentinel_core::domain::entities::system::analytics::HourlyActivity;
 use sentinel_core::domain::entities::system::analytics::ModerationTrend;

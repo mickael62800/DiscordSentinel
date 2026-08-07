@@ -1,11 +1,3 @@
-//! Container Runtime — port abstrait pilotant un Docker daemon (ou autre).
-//!
-//! Volontairement minimaliste : on n'expose que ce qui est strictement
-//! necessaire au game portal. Pas de `exec arbitraire`, pas de `mount` host
-//! configurable depuis le caller, pas de `--privileged`. Toutes les
-//! contraintes de securite sont **dans la signature** : si une option
-//! dangereuse n'est pas exposee ici, l'application ne peut pas la passer.
-
 use async_trait::async_trait;
 use std::collections::HashMap;
 
@@ -197,4 +189,174 @@ pub struct ManagedContainer {
     pub name: String,
     pub state: ContainerState,
     pub labels: HashMap<String, String>,
+}
+
+/// Implementer un Mock Container Runtime en memoire pour les tests et le dev local sans Docker.
+use std::sync::Mutex;
+
+#[derive(Default)]
+pub struct MockContainerRuntime {
+    containers: Mutex<HashMap<String, ContainerStatus>>,
+}
+
+impl MockContainerRuntime {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+#[async_trait]
+impl ContainerRuntime for MockContainerRuntime {
+    fn is_operational(&self) -> bool {
+        true
+    }
+
+    async fn ensure_network(&self, _name: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn ensure_volume(&self, _name: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn pull_image_if_missing(&self, _image: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn create_container(&self, spec: &ContainerSpec) -> Result<String, DomainError> {
+        let id = format!("mock-{}", spec.name);
+        let status = ContainerStatus {
+            container_id: id.clone(),
+            state: ContainerState::Created,
+            exit_code: None,
+            error: None,
+        };
+        self.containers.lock().unwrap().insert(id.clone(), status);
+        Ok(id)
+    }
+
+    async fn start_container(&self, container_id: &str) -> Result<(), DomainError> {
+        let mut guard = self.containers.lock().unwrap();
+        if let Some(status) = guard.get_mut(container_id) {
+            status.state = ContainerState::Running;
+        }
+        Ok(())
+    }
+
+    async fn upload_file_to_container(
+        &self,
+        _container_id: &str,
+        _path: &str,
+        _content: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn stop_container(
+        &self,
+        container_id: &str,
+        _timeout_secs: u32,
+    ) -> Result<(), DomainError> {
+        let mut guard = self.containers.lock().unwrap();
+        if let Some(status) = guard.get_mut(container_id) {
+            status.state = ContainerState::Exited;
+            status.exit_code = Some(0);
+        }
+        Ok(())
+    }
+
+    async fn restart_container(
+        &self,
+        container_id: &str,
+        _timeout_secs: u32,
+    ) -> Result<(), DomainError> {
+        self.stop_container(container_id, 5).await?;
+        self.start_container(container_id).await
+    }
+
+    async fn remove_container(&self, container_id: &str) -> Result<(), DomainError> {
+        self.containers.lock().unwrap().remove(container_id);
+        Ok(())
+    }
+
+    async fn remove_volume(&self, _name: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    async fn remove_image(&self, _image: &str, _force: bool) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+
+    async fn inspect(&self, container_id: &str) -> Result<Option<ContainerStatus>, DomainError> {
+        let guard = self.containers.lock().unwrap();
+        Ok(guard.get(container_id).cloned())
+    }
+
+    async fn stats(&self, _container_id: &str) -> Result<ContainerStats, DomainError> {
+        Ok(ContainerStats {
+            cpu_percent: 2.5,
+            memory_used_bytes: 512 * 1024 * 1024,
+            memory_limit_bytes: 2048 * 1024 * 1024,
+            network_rx_bytes: 102400,
+            network_tx_bytes: 204800,
+        })
+    }
+
+    async fn logs(&self, _container_id: &str, _lines: u32) -> Result<Vec<String>, DomainError> {
+        Ok(vec!["[Mock Runtime] Server initialized successfully.".into()])
+    }
+
+    async fn list_managed_containers(&self) -> Result<Vec<ManagedContainer>, DomainError> {
+        let guard = self.containers.lock().unwrap();
+        Ok(guard
+            .iter()
+            .map(|(id, status)| ManagedContainer {
+                container_id: id.clone(),
+                name: id.clone(),
+                state: status.state,
+                labels: HashMap::new(),
+            })
+            .collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_mock_container_runtime_lifecycle() {
+        let runtime = MockContainerRuntime::new();
+        assert!(runtime.is_operational());
+
+        let spec = ContainerSpec {
+            image: "minecraft:latest".into(),
+            name: "test-mc".into(),
+            env: HashMap::new(),
+            port_mappings: vec![],
+            volumes: vec![],
+            memory_bytes: 1024 * 1024 * 1024,
+            cpu_limit: None,
+            network: "nexus-net".into(),
+            user: None,
+            restart_policy: RestartPolicy::None,
+            labels: HashMap::new(),
+            command: None,
+        };
+
+        let id = runtime.create_container(&spec).await.unwrap();
+        let inspect_created = runtime.inspect(&id).await.unwrap().unwrap();
+        assert_eq!(inspect_created.state, ContainerState::Created);
+
+        runtime.start_container(&id).await.unwrap();
+        let inspect_running = runtime.inspect(&id).await.unwrap().unwrap();
+        assert_eq!(inspect_running.state, ContainerState::Running);
+
+        runtime.stop_container(&id, 5).await.unwrap();
+        let inspect_stopped = runtime.inspect(&id).await.unwrap().unwrap();
+        assert_eq!(inspect_stopped.state, ContainerState::Exited);
+
+        runtime.remove_container(&id).await.unwrap();
+        assert!(runtime.inspect(&id).await.unwrap().is_none());
+    }
 }

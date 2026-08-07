@@ -1,5 +1,5 @@
 use super::*;
-use crate::ports::outbound::moderation::review_repository::ReviewEntry;
+use sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry;
 use chrono::TimeZone;
 use chrono::Utc;
 use uuid::Uuid;

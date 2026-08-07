@@ -7,7 +7,7 @@ use axum::extract::State;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 use sentinel_core::domain::entities::system::admin_rotation::RotationState;
 
 
@@ -65,7 +65,7 @@ impl RotationStateDto {
 
 /// GET /api/rotation/{guild_id}
 pub async fn get_state(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<RotationStateDto>, ApiError> {
     let s = state.rotation_uc.get_state(&guild_id).await?;
@@ -74,7 +74,7 @@ pub async fn get_state(
 
 /// PUT /api/rotation/{guild_id}
 pub async fn save_state(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(mut body): Json<RotationStateDto>,
 ) -> Result<Json<RotationStateDto>, ApiError> {
@@ -91,7 +91,7 @@ pub struct ServedBody {
 
 /// POST /api/rotation/{guild_id}/served
 pub async fn record_served(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<ServedBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -110,7 +110,7 @@ pub struct ServedEntryDto {
 
 /// GET /api/rotation/{guild_id}/history
 pub async fn history(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ServedEntryDto>>, ApiError> {
     let entries = state.rotation_uc.served_entries(&guild_id).await?;

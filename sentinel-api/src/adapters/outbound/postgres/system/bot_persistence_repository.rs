@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::ports::outbound::system::bot_persistence_repository::BotPersistenceRepository;
+use sentinel_core::ports::outbound::system::bot_persistence_repository::BotPersistenceRepository;
 use sentinel_core::domain::errors::DomainError;
 
 pub struct PgBotPersistenceRepository {

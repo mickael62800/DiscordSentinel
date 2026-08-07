@@ -400,7 +400,6 @@ pub enum SanctionKind {
     Ban,
     // Aucune commande /kick n'existe encore ; variante prevue pour le jour ou
     // elle sera ajoutee (la card la supporte deja).
-    #[allow(dead_code)]
     Kick,
 }
 

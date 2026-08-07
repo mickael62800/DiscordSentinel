@@ -4,7 +4,7 @@ use nexus_core::{
     domain::{entities::coussin::PlayerClass, errors::DomainError},
     ports::outbound::coussin_repository::{
         CoussinBet, CoussinCombat, CoussinCombatResult, CoussinCombatSnapshot, CoussinPrime,
-        CoussinProfile, CoussinRepository,
+        CoussinProfile, CoussinProgress, CoussinRepository,
     },
 };
 use sqlx::PgPool;
@@ -209,10 +209,16 @@ impl CoussinRepository for PgCoussinRepository {
         tx.commit().await.map_err(pg_err)?;
         Ok(())
     }
-    async fn update_class(&self, guild_id: &str, user_id: &str, class: PlayerClass, atk: i32, def: i32, hp_max: i32) -> Result<(), DomainError> {
+    async fn update_class(&self, guild_id: &str, user_id: &str, class: PlayerClass, atk: i32, def: i32, hp_max: i32, cooldown_minutes: i64) -> Result<(), DomainError> {
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
         let result = sqlx::query("UPDATE nexus_coussin_players SET class=$3, atk=$4, def=$5, hp_current=$6, hp_max=$6, class_changed_at=NOW(), updated_at=NOW() WHERE guild_id=$1 AND user_id=$2")
-            .bind(guild_id).bind(user_id).bind(class.as_str()).bind(atk).bind(def).bind(hp_max).execute(&self.pool).await.map_err(pg_err)?;
+            .bind(guild_id).bind(user_id).bind(class.as_str()).bind(atk).bind(def).bind(hp_max).execute(&mut *tx).await.map_err(pg_err)?;
         if result.rows_affected() != 1 { return Err(DomainError::NotFound(format!("profil Coussin {user_id}"))); }
+        
+        sqlx::query("INSERT INTO nexus_coussin_cooldowns (guild_id,user_id,action,available_at) VALUES ($1,$2,'class',NOW()+make_interval(mins => $3::int)) ON CONFLICT (guild_id,user_id,action) DO UPDATE SET available_at=EXCLUDED.available_at")
+            .bind(guild_id).bind(user_id).bind(cooldown_minutes.clamp(0, 10080) as i32).execute(&mut *tx).await.map_err(pg_err)?;
+            
+        tx.commit().await.map_err(pg_err)?;
         Ok(())
     }
     async fn spend_stat_point(&self, guild_id: &str, user_id: &str, stat: &str) -> Result<CoussinProfile, DomainError> {
@@ -222,7 +228,6 @@ impl CoussinRepository for PgCoussinRepository {
         if result.rows_affected() != 1 { return Err(DomainError::Validation("aucun point de statistique disponible".into())); }
         self.find_profile(guild_id, user_id).await?.ok_or_else(|| DomainError::NotFound(format!("profil Coussin {user_id}")))
     }
-    async fn set_progress(&self, guild_id: &str, user_id: &str, xp: i64, level: i32, stat_points: i32, title: &str) -> Result<(), DomainError> { sqlx::query("UPDATE nexus_coussin_players SET xp=$3,level=$4,stat_points=$5,title=$6,updated_at=NOW() WHERE guild_id=$1 AND user_id=$2").bind(guild_id).bind(user_id).bind(xp).bind(level).bind(stat_points).bind(title).execute(&self.pool).await.map_err(pg_err)?; Ok(()) }
     async fn create_combat(
         &self,
         guild_id: &str,
@@ -230,12 +235,21 @@ impl CoussinRepository for PgCoussinRepository {
         attacker: &CoussinProfile,
         defender: &CoussinProfile,
         mise: i64,
+        cooldown_minutes: i64,
     ) -> Result<CoussinCombat, DomainError> {
         if mise <= 0 {
             return Err(DomainError::Validation("mise invalide".into()));
         }
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        
         let row: (uuid::Uuid, String, String, String, i64, String) = sqlx::query_as("INSERT INTO nexus_coussin_combats (guild_id,channel_id,attacker_id,attacker_name,defender_id,defender_name,mise,expires_at) VALUES ($1,$2,$3,$4,$5,$6,$7,NOW()+INTERVAL '24 hours') RETURNING id,guild_id,attacker_id,defender_id,mise,status")
-            .bind(guild_id).bind(channel_id).bind(&attacker.user_id).bind(&attacker.username).bind(&defender.user_id).bind(&defender.username).bind(mise).fetch_one(&self.pool).await.map_err(pg_err)?;
+            .bind(guild_id).bind(channel_id).bind(&attacker.user_id).bind(&attacker.username).bind(&defender.user_id).bind(&defender.username).bind(mise).fetch_one(&mut *tx).await.map_err(pg_err)?;
+            
+        sqlx::query("INSERT INTO nexus_coussin_cooldowns (guild_id,user_id,action,available_at) VALUES ($1,$2,'combat',NOW()+make_interval(mins => $3::int)) ON CONFLICT (guild_id,user_id,action) DO UPDATE SET available_at=EXCLUDED.available_at")
+            .bind(guild_id).bind(&attacker.user_id).bind(cooldown_minutes.clamp(0, 10080) as i32).execute(&mut *tx).await.map_err(pg_err)?;
+            
+        tx.commit().await.map_err(pg_err)?;
+        
         Ok(CoussinCombat {
             id: row.0,
             guild_id: row.1,
@@ -292,6 +306,8 @@ impl CoussinRepository for PgCoussinRepository {
         attacker_hp: i32,
         defender_hp: i32,
         bet_payout_pct: i64,
+        attacker_progress: Option<CoussinProgress>,
+        defender_progress: Option<CoussinProgress>,
     ) -> Result<bool, DomainError> {
         // 1..=100 et non 1..=6 : le nombre de faces du de est reglable par
         // serveur. Cette borne reste un garde-fou contre une valeur aberrante,
@@ -345,6 +361,14 @@ impl CoussinRepository for PgCoussinRepository {
             .bind(&guild_id).bind(&attacker_id).bind(attacker_hp.max(0)).execute(&mut *tx).await.map_err(pg_err)?;
         sqlx::query("UPDATE nexus_coussin_players SET hp_current=$3,updated_at=NOW() WHERE guild_id=$1 AND user_id=$2")
             .bind(&guild_id).bind(&defender_id).bind(defender_hp.max(0)).execute(&mut *tx).await.map_err(pg_err)?;
+            
+        if let Some(p) = attacker_progress {
+            sqlx::query("UPDATE nexus_coussin_players SET xp=$3,level=$4,stat_points=$5,title=$6,updated_at=NOW() WHERE guild_id=$1 AND user_id=$2").bind(&guild_id).bind(&attacker_id).bind(p.xp).bind(p.level).bind(p.stat_points).bind(&p.title).execute(&mut *tx).await.map_err(pg_err)?;
+        }
+        if let Some(p) = defender_progress {
+            sqlx::query("UPDATE nexus_coussin_players SET xp=$3,level=$4,stat_points=$5,title=$6,updated_at=NOW() WHERE guild_id=$1 AND user_id=$2").bind(&guild_id).bind(&defender_id).bind(p.xp).bind(p.level).bind(p.stat_points).bind(&p.title).execute(&mut *tx).await.map_err(pg_err)?;
+        }
+            
         let result = sqlx::query("UPDATE nexus_coussin_combats SET status='resolved', winner_id=$2, attacker_roll=$3, defender_roll=$4, coins_transferred=$5, resolved_at=NOW() WHERE id=$1 AND status='accepted'")
             .bind(id).bind(winner_id).bind(attacker_roll).bind(defender_roll).bind(transferred).execute(&mut *tx).await.map_err(pg_err)?;
         tx.commit().await.map_err(pg_err)?;

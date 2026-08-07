@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool, QueryBuilder};
 use uuid::Uuid;
 
-use crate::ports::outbound::community::idea_repository::{IdeaFilters, IdeaRepository};
+use sentinel_core::ports::outbound::community::idea_repository::{IdeaFilters, IdeaRepository};
 use sentinel_core::domain::entities::community::idea::{Idea, IdeaMessage};
 use sentinel_core::domain::errors::DomainError;
 

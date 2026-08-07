@@ -240,6 +240,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
+name = "base64"
+version = "0.23.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
+
+[[package]]
 name = "base64ct"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2005,17 +2011,22 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
+ "base64 0.23.1",
  "bollard",
  "chrono",
  "dotenvy",
  "futures-util",
  "nexus-core",
+ "platform-common-api",
  "redis",
+ "reqwest",
  "serde",
  "serde_json",
  "sqlx",
  "tar",
  "tokio",
+ "tower",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -2029,6 +2040,7 @@ dependencies = [
  "dotenvy",
  "futures-util",
  "nexus-core",
+ "platform-common",
  "rand 0.8.6",
  "redis",
  "reqwest",
@@ -2047,6 +2059,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "rand 0.8.6",
+ "regex",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -2402,6 +2415,32 @@ name = "plain"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
+
+[[package]]
+name = "platform-common"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "redis",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "platform-common-api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "metrics",
+ "metrics-exporter-prometheus",
+ "subtle",
+ "tokio",
+ "tokio-metrics",
+ "tower",
+ "tower-http",
+ "tracing",
+]
 
 [[package]]
 name = "png"
@@ -2893,9 +2932,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.12.3"
+version = "1.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
+checksum = "f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -2905,9 +2944,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.14"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f"
+checksum = "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -2916,9 +2955,9 @@ dependencies = [
 
 [[package]]
 name = "regex-syntax"
-version = "0.8.10"
+version = "0.8.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
+checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "reqwest"
@@ -3257,6 +3296,7 @@ dependencies = [
  "metrics-exporter-prometheus",
  "ndarray",
  "ort",
+ "platform-common-api",
  "prost",
  "rand 0.8.6",
  "redis",
@@ -3297,6 +3337,7 @@ dependencies = [
  "hmac",
  "image",
  "once_cell",
+ "platform-common",
  "prost",
  "rand 0.8.6",
  "redis",

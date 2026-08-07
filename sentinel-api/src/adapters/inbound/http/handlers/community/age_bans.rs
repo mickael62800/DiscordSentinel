@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use sentinel_core::domain::entities::community::age_ban::{AgeBan, AgeBanStatus};
 
 #[derive(Deserialize)]
@@ -47,7 +47,7 @@ impl From<AgeBan> for AgeBanDto {
 
 /// POST /api/age-bans
 pub async fn create_age_ban(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Json(dto): Json<CreateAgeBanDto>,
 ) -> Result<Json<AgeBanDto>, ApiError> {
     // Moderation : reserve moderator+ (le bot passe en Internal -> bypass). Avant :
@@ -73,7 +73,7 @@ pub struct DueQuery {
 
 /// GET /api/age-bans/due — bans echus a lever (worker).
 pub async fn list_due_age_bans(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Query(q): Query<DueQuery>,
 ) -> Result<Json<Vec<AgeBanDto>>, ApiError> {
     // Meme gate que `lift_age_ban` : pas de guild dans le path et la reponse
@@ -88,7 +88,7 @@ pub async fn list_due_age_bans(
 
 /// POST /api/age-bans/{id}/lift — marque un ban comme leve (worker).
 pub async fn lift_age_ban(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Pas de guild dans le path (le worker Internal appelle ceci) : un appelant

@@ -1,8 +1,8 @@
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
-use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use crate::bootstrap::state::CommunityState;
+use sentinel_core::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
+use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use sentinel_core::domain::entities::community::age_check::AgeCheckDecision;
 use axum::extract::State;
 use axum::Json;
@@ -173,7 +173,7 @@ pub struct SaveWelcomeConfigDto {
 
 /// GET /api/welcome/{guild_id}
 pub async fn get_config(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
     // La config expose salons de logs, roles auto, templates -> lecture reservee
@@ -184,7 +184,7 @@ pub async fn get_config(
 
 /// PUT /api/welcome/{guild_id}
 pub async fn save_config(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SaveWelcomeConfigDto>,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
@@ -199,7 +199,7 @@ pub async fn save_config(
 /// Demande au bot de (re)poster le panneau de reglement (texte + bouton
 /// d'acceptation) dans le salon configure, via la stream d'events Redis.
 pub async fn publish_rules(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Garde-fou : refuse si la validation du reglement n'est pas activee /
@@ -271,7 +271,7 @@ impl From<AgeCheckDecision> for AgeCheckDecisionDto {
 /// Decide l'issue de la verification d'age (seuil pass/ban + duree de ban)
 /// server-side. Le bot applique ensuite l'action Discord.
 pub async fn age_check(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<AgeCheckRequestDto>,
 ) -> Result<Json<AgeCheckDecisionDto>, ApiError> {

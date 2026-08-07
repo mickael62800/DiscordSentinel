@@ -224,15 +224,15 @@ pub fn spawn_background_tasks(ctx: &Context) {
         // BUG3 : recharge l'ensemble des salons persistes comme actifs (survit au
         // redemarrage du bot). Ils entrent dans `active` -> la boucle les levera
         // des que l'activite est confirmee retombee (au lieu de rester colles).
-        let api = ctx_clone
+        let grpc = ctx_clone
             .data
             .read()
             .await
-            .get::<crate::shared::heartbeat::ApiClientKey>()
+            .get::<crate::shared::grpc_client::GrpcClientKey>()
             .cloned();
-        if let Some(api) = api {
-            for e in api_client::list_slowmode(&api).await {
-                if let Ok(cid) = e.channel_id.parse::<u64>() {
+        if let Some(grpc) = grpc {
+            for channel_id in api_client::list_slowmode(&grpc).await {
+                if let Ok(cid) = channel_id.parse::<u64>() {
                     if let Some(tracker) = ctx_clone.data.read().await.get::<SlowmodeTrackerKey>() {
                         tracker.mark_active(ChannelId::new(cid));
                     }
@@ -252,14 +252,14 @@ pub fn spawn_background_tasks(ctx: &Context) {
                     } else {
                         info!(channel_id = %channel_id, "Slowmode adaptatif desactive (activite retombee)");
                         // BUG3 : retire de la persistance (best-effort).
-                        let api = ctx_clone
+                        let grpc = ctx_clone
                             .data
                             .read()
                             .await
-                            .get::<crate::shared::heartbeat::ApiClientKey>()
+                            .get::<crate::shared::grpc_client::GrpcClientKey>()
                             .cloned();
-                        if let Some(api) = api {
-                            api_client::forget_slowmode(&api, &channel_id.to_string()).await;
+                        if let Some(grpc) = grpc {
+                            api_client::forget_slowmode(&grpc, &channel_id.to_string()).await;
                         }
                     }
                 }

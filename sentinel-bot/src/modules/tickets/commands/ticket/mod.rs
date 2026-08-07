@@ -168,7 +168,7 @@ async fn handle_close(ctx: &Context, command: &CommandInteraction) -> Result<(),
     if let Some(base) = data.get::<ApiClientKey>() {
         if let Some(ref id) = ticket_id {
             if let Some(grpc) = data.get::<crate::shared::grpc_client::GrpcClientKey>() {
-                let api = ApiClient::new(base.clone(), grpc.clone());
+                let api = ApiClient::new(grpc.clone());
                 if let Err(e) = api.close_ticket(id).await {
                     error!(error = %e, ticket_id = %id, "Erreur fermeture ticket API");
                 }

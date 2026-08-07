@@ -3,8 +3,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::super::pg_err;
-use crate::ports::outbound::moderation::pending_action_repository::PendingAction;
-use crate::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
+use sentinel_core::ports::outbound::moderation::pending_action_repository::PendingAction;
+use sentinel_core::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
 
 pub struct PgPendingActionRepository {
     pool: PgPool,

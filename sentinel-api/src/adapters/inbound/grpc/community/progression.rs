@@ -13,12 +13,12 @@ use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
-use crate::ports::inbound::community::manage_levels::AddXpCommand;
-use crate::ports::inbound::community::manage_levels::AddXpResult;
-use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
-use crate::ports::inbound::community::manage_levels::RecordActivityResult;
-use crate::ports::inbound::community::manage_levels::RecordTextActivityCommand;
-use crate::ports::inbound::community::manage_levels::RecordVoiceActivityCommand;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpCommand;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpResult;
+use sentinel_core::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use sentinel_core::ports::inbound::community::manage_levels::RecordActivityResult;
+use sentinel_core::ports::inbound::community::manage_levels::RecordTextActivityCommand;
+use sentinel_core::ports::inbound::community::manage_levels::RecordVoiceActivityCommand;
 use sentinel_core::domain::entities::community::level::xp_progress;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;

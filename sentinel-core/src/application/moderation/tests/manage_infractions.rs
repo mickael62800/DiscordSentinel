@@ -47,10 +47,19 @@ struct MockRepo {
     find_by_id_returns: Mutex<Option<Infraction>>,
     delete_returns: Mutex<bool>,
     infractions: Mutex<Vec<Infraction>>,
+    /// Reponse brute de l'agregation SQL (`GROUP BY action`).
+    counts_by_action: Mutex<Vec<(String, u64)>>,
 }
 
 #[async_trait]
 impl InfractionRepository for MockRepo {
+    async fn count_by_action_for_user(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<(String, u64)>, crate::domain::errors::DomainError> {
+        Ok(self.counts_by_action.lock().unwrap().clone())
+    }
     async fn save(&self, _: &Infraction) -> Result<(), DomainError> {
         Ok(())
     }
@@ -138,4 +147,43 @@ async fn delete_older_than_days_forwards() {
     let n = svc.delete_older_than_days("g", 90).await.unwrap();
     assert_eq!(n, 100);
     assert_eq!(r.delete_older.lock().unwrap()[0], ("g".into(), 90));
+}
+
+// ── Compteurs d'infractions ──
+
+fn service_avec_counts(rows: Vec<(String, u64)>) -> ManageInfractionsService {
+    let repo = Arc::new(MockRepo::default());
+    *repo.counts_by_action.lock().unwrap() = rows;
+    ManageInfractionsService::new(repo)
+}
+
+#[tokio::test]
+async fn compte_les_quatre_natures_detaillees() {
+    let svc = service_avec_counts(vec![
+        ("warn".into(), 3),
+        ("delete".into(), 2),
+        ("mute".into(), 1),
+        ("ban".into(), 5),
+    ]);
+    let c = svc.count_user_infractions("g", "u").await.unwrap();
+    assert_eq!((c.warns, c.deletes, c.mutes, c.bans), (3, 2, 1, 5));
+    assert_eq!(c.total, 11);
+}
+
+#[tokio::test]
+async fn une_nature_inconnue_alimente_le_total_seulement() {
+    // Le journal peut porter des natures sans compteur dedie (kick, purge...).
+    // Elles ne doivent pas disparaitre du total affiche.
+    let svc = service_avec_counts(vec![("warn".into(), 1), ("kick".into(), 4)]);
+    let c = svc.count_user_infractions("g", "u").await.unwrap();
+    assert_eq!(c.warns, 1);
+    assert_eq!((c.deletes, c.mutes, c.bans), (0, 0, 0));
+    assert_eq!(c.total, 5);
+}
+
+#[tokio::test]
+async fn aucun_resultat_donne_des_compteurs_a_zero() {
+    let svc = service_avec_counts(vec![]);
+    let c = svc.count_user_infractions("g", "u").await.unwrap();
+    assert_eq!(c, Default::default());
 }

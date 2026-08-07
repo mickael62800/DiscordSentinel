@@ -8,7 +8,7 @@ use axum::extract::State;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 
 #[derive(Serialize)]
 pub struct MonthlyRankingReport {
@@ -62,7 +62,7 @@ fn map_entries(
 ///
 /// RBAC : `Admin` sur la guild (pass-through pour les appels bot/internes).
 pub async fn force_publish_monthly_ranking(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Json(req): Json<ForceRankingRequest>,
 ) -> Result<Json<ForceRankingResponse>, ApiError> {
 
@@ -86,20 +86,14 @@ pub async fn force_publish_monthly_ranking(
 /// et renvoie le plan des classements a poster ; le handler poste sur Discord et
 /// notifie le use case (memorisation de la periode publiee).
 pub async fn publish_monthly_ranking_all(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
 ) -> Result<Json<MonthlyRankingReport>, ApiError> {
     let plan = state.monthly_ranking_uc.plan_and_baseline().await?;
 
     let now = chrono::Utc::now();
-    let client = reqwest::Client::new();
     let mut published = 0usize;
 
     for item in &plan.publications {
-        if state.discord_bot_token.is_empty() {
-            tracing::warn!(guild = %item.guild_id, "publish_monthly_ranking: SENTINEL_DISCORD_TOKEN absent");
-            continue;
-        }
-
         let embed = serde_json::json!({
             "title": format!("\u{1f3c6} Classement de {}", item.period_label),
             "description": "Les membres les plus actifs du mois \u{2014} bravo \u{1f44f}",
@@ -112,41 +106,25 @@ pub async fn publish_monthly_ranking_all(
             "timestamp": now.to_rfc3339(),
         });
 
-        // Securite : valider channel_id (config guild) comme snowflake avant
-        // interpolation dans l'URL Discord (cf. snapshots.rs).
-        if crate::adapters::inbound::http::validation::validate_discord_id(
-            "channel_id",
-            &item.channel_id,
-        )
-        .is_err()
-        {
-            continue;
-        }
-        let url = format!(
-            "https://discord.com/api/v10/channels/{}/messages",
-            item.channel_id
-        );
-        match client
-            .post(&url)
-            .header("Authorization", format!("Bot {}", state.discord_bot_token))
-            .json(&serde_json::json!({ "embeds": [embed] }))
-            .send()
+        // La validation du salon, l'absence de token et le statut HTTP sont
+        // traites par l'adaptateur : ici on ne distingue plus que publie /
+        // pas publie. `mark_published` ne doit surtout suivre qu'un succes,
+        // sinon un classement rate serait considere comme deja diffuse et ne
+        // repasserait jamais.
+        match state
+            .discord_api
+            .send_channel_embed(&item.channel_id, embed)
             .await
         {
-            Ok(r) if r.status().is_success() => {
+            Ok(()) => {
                 published += 1;
                 let _ = state
                     .monthly_ranking_uc
                     .mark_published(&item.guild_id, &item.period)
                     .await;
             }
-            Ok(r) => {
-                let status = r.status();
-                let body = r.text().await.unwrap_or_default();
-                tracing::warn!(guild = %item.guild_id, %status, body = %body, "publish_monthly_ranking: Discord refus");
-            }
             Err(e) => {
-                tracing::warn!(error = %e, guild = %item.guild_id, "publish_monthly_ranking: send echec");
+                tracing::warn!(error = %e, guild = %item.guild_id, "publish_monthly_ranking: publication echouee");
             }
         }
     }

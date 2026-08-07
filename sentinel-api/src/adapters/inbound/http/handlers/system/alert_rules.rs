@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 use sentinel_core::domain::entities::system::alert_rule::{AlertRule, AlertRuleUpdate};
 
 #[derive(Serialize)]
@@ -43,7 +43,7 @@ impl From<AlertRule> for AlertRuleDto {
 
 /// GET /api/alert-rules — liste toutes les regles (actives ou non).
 pub async fn list_alert_rules(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<Vec<AlertRuleDto>>, ApiError> {
     let rules = state.alert_rules_uc.list().await?;
@@ -61,7 +61,7 @@ pub struct UpdateAlertRuleDto {
 /// PATCH /api/alert-rules/{id} — met a jour les champs editables d'une regle.
 /// `metric`/`comparator`/`label` sont fixes (ils definissent la semantique).
 pub async fn update_alert_rule(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<UpdateAlertRuleDto>,

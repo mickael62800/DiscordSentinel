@@ -11,8 +11,8 @@ use crate::adapters::inbound::http::dto::community::confessions::{
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::community::manage_confessions::{
+use crate::bootstrap::state::CommunityState;
+use sentinel_core::ports::inbound::community::manage_confessions::{
     CreateConfessionCommand, CreateReplyCommand, CreateReportCommand,
 };
 use axum::Extension;
@@ -94,7 +94,7 @@ fn actor_id(user: &Option<Extension<WebUser>>, body_value: String) -> String {
 // ── Confessions ─────────────────────────────────────────────────────────
 
 pub async fn create_confession(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateConfessionDto>,
 ) -> Result<Json<ConfessionDto>, ApiError> {
@@ -119,7 +119,7 @@ pub async fn create_confession(
 }
 
 pub async fn update_message_refs(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateMessageRefsDto>,
@@ -134,7 +134,7 @@ pub async fn update_message_refs(
 }
 
 pub async fn edit_confession(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<EditConfessionDto>,
@@ -162,7 +162,7 @@ pub async fn edit_confession(
 }
 
 pub async fn delete_confession(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<DeleteConfessionDto>,
@@ -189,7 +189,7 @@ pub async fn delete_confession(
 }
 
 pub async fn get_confession(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<ConfessionDto>, ApiError> {
@@ -200,7 +200,7 @@ pub async fn get_confession(
 }
 
 pub async fn get_by_message_id(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(message_id): Path<String>,
 ) -> Result<Json<Option<ConfessionDto>>, ApiError> {
@@ -213,7 +213,7 @@ pub async fn get_by_message_id(
 }
 
 pub async fn list_confessions(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListConfessionsQuery>,
@@ -234,7 +234,7 @@ pub async fn list_confessions(
 // ── Replies ─────────────────────────────────────────────────────────────
 
 pub async fn create_reply(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(confession_id): Path<Uuid>,
     Json(dto): Json<CreateReplyDto>,
@@ -263,7 +263,7 @@ pub async fn create_reply(
 }
 
 pub async fn update_reply_message_id(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateReplyMessageDto>,
@@ -276,7 +276,7 @@ pub async fn update_reply_message_id(
 }
 
 pub async fn delete_reply(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<DeleteConfessionDto>,
@@ -297,7 +297,7 @@ pub async fn delete_reply(
 }
 
 pub async fn list_replies(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(confession_id): Path<Uuid>,
 ) -> Result<Json<Vec<ReplyDto>>, ApiError> {
@@ -313,7 +313,7 @@ pub async fn list_replies(
 // ── Reports ─────────────────────────────────────────────────────────────
 
 pub async fn create_report(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateReportDto>,
 ) -> Result<Json<ReportDto>, ApiError> {
@@ -338,7 +338,7 @@ pub async fn create_report(
 }
 
 pub async fn list_reports(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListReportsQuery>,
@@ -357,7 +357,7 @@ pub async fn list_reports(
 }
 
 pub async fn resolve_report(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<ResolveReportDto>,
@@ -375,7 +375,7 @@ pub async fn resolve_report(
 // ── Config ──────────────────────────────────────────────────────────────
 
 pub async fn get_config(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<ConfigDto>, ApiError> {
@@ -384,7 +384,7 @@ pub async fn get_config(
 }
 
 pub async fn save_config(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Json(dto): Json<SaveConfigDto>,
 ) -> Result<Json<ConfigDto>, ApiError> {

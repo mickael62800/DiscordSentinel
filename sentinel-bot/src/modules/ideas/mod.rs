@@ -28,7 +28,6 @@ use crate::shared::discord_helpers::{
     is_module_enabled_or_reply_command, is_module_enabled_or_reply_component,
     is_module_enabled_or_reply_modal,
 };
-use crate::shared::heartbeat::ApiClientKey;
 
 use constants::*;
 
@@ -173,14 +172,14 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         return;
     }
 
-    let base = {
+    let grpc = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(b) => b.clone(),
+        match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
             None => return,
         }
     };
-    let api = api_client::ApiClient::new(base);
+    let api = api_client::ApiClient::new(grpc);
     let idea = match api.idea_by_channel(&msg.channel_id.to_string()).await {
         Ok(i) => i,
         Err(_) => return,

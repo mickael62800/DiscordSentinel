@@ -155,9 +155,9 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
             )
         };
 
-        let verdict = match (base_opt.clone(), grpc_opt) {
-            (Some(base), Some(grpc)) => {
-                let api = super::api_client::ApiClient::new(base, grpc);
+        let verdict = match grpc_opt {
+            Some(grpc) => {
+                let api = super::api_client::ApiClient::new(grpc);
                 match api.evaluate_attachments(&guild_id, filenames).await {
                     Ok(v) => Some(v),
                     Err(e) => {
@@ -267,22 +267,18 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
             // (`evaluate_flood`). Le fallback local (0.99/0.9) ne sert qu'en cas
             // d'API indisponible.
             let (severe, flood_card_score) = {
-                let (base, grpc) = {
+                let grpc = {
                     let data = ctx.data.read().await;
-                    (
-                        data.get::<crate::shared::heartbeat::ApiClientKey>()
-                            .cloned(),
-                        data.get::<crate::shared::grpc_client::GrpcClientKey>()
-                            .cloned(),
-                    )
+                    data.get::<crate::shared::grpc_client::GrpcClientKey>()
+                        .cloned()
                 };
                 let local_fallback = || {
                     let sev = auto_protect && flood_count >= severe_flood_max;
                     (sev, if sev { 0.99 } else { 0.9 })
                 };
-                match (base, grpc) {
-                    (Some(base), Some(grpc)) => {
-                        let api = crate::modules::automod::api_client::ApiClient::new(base, grpc);
+                match grpc {
+                    Some(grpc) => {
+                        let api = crate::modules::automod::api_client::ApiClient::new(grpc);
                         let gid = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
                         match api
                             .evaluate_flood(
@@ -431,18 +427,14 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
             // l'invente plus (avant : 0.8 code en dur). Fallback local 0.8
             // uniquement si l'API est injoignable (resilience VOLONTAIRE).
             let caps_card_score = {
-                let (base, grpc) = {
+                let grpc = {
                     let data = ctx.data.read().await;
-                    (
-                        data.get::<crate::shared::heartbeat::ApiClientKey>()
-                            .cloned(),
-                        data.get::<crate::shared::grpc_client::GrpcClientKey>()
-                            .cloned(),
-                    )
+                    data.get::<crate::shared::grpc_client::GrpcClientKey>()
+                        .cloned()
                 };
-                match (base, grpc) {
-                    (Some(base), Some(grpc)) => {
-                        let api = crate::modules::automod::api_client::ApiClient::new(base, grpc);
+                match grpc {
+                    Some(grpc) => {
+                        let api = crate::modules::automod::api_client::ApiClient::new(grpc);
                         let gid = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
                         match api.evaluate_caps(&gid).await {
                             Ok(score) => score,
@@ -519,12 +511,13 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                         tracker.mark_active(msg.channel_id);
                         // BUG3 : persiste cote API pour survivre a un redemarrage
                         // (best-effort, hors chemin critique).
-                        if let Some(api) = data.get::<ApiClientKey>() {
-                            let api = api.clone();
+                        if let Some(grpc) = data.get::<crate::shared::grpc_client::GrpcClientKey>()
+                        {
+                            let grpc = grpc.clone();
                             let gid = guild_id.clone();
                             let cid = msg.channel_id.to_string();
                             tokio::spawn(async move {
-                                super::api_client::persist_slowmode(&api, &gid, &cid).await;
+                                super::api_client::persist_slowmode(&grpc, &gid, &cid).await;
                             });
                         }
                     }

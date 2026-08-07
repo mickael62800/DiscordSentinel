@@ -51,3 +51,24 @@ pub struct GameAuditEntry {
     pub details: serde_json::Value,
     pub created_at: DateTime<Utc>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_game_audit_action_as_str() {
+        assert_eq!(GameAuditAction::Create.as_str(), "create");
+        assert_eq!(GameAuditAction::Start.as_str(), "start");
+        assert_eq!(GameAuditAction::Stop.as_str(), "stop");
+        assert_eq!(GameAuditAction::Restart.as_str(), "restart");
+        assert_eq!(GameAuditAction::Delete.as_str(), "delete");
+        assert_eq!(GameAuditAction::ConfigUpdate.as_str(), "config_update");
+        assert_eq!(GameAuditAction::CommandRcon.as_str(), "command_rcon");
+        assert_eq!(GameAuditAction::IdleShutdown.as_str(), "idle_shutdown");
+        assert_eq!(GameAuditAction::CrashDetected.as_str(), "crash_detected");
+        assert_eq!(GameAuditAction::AutoRestart.as_str(), "auto_restart");
+        assert_eq!(GameAuditAction::BackupCreate.as_str(), "backup_create");
+        assert_eq!(GameAuditAction::BackupRestore.as_str(), "backup_restore");
+    }
+}

@@ -1,7 +1,6 @@
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-#[allow(dead_code)]
 pub enum DomainError {
     /// 404 — ressource introuvable. Le message est libre, ex:
     /// `format!("Regle {uuid}")`, `format!("Ticket {id}")`, etc.

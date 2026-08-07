@@ -7,16 +7,13 @@ use crate::shared::config::load_env_optional;
 use serenity::prelude::TypeMapKey;
 
 #[derive(Clone, Default)]
-#[allow(dead_code)]
 pub struct TicketsConfig {
-    pub ticket_category_id: Option<u64>,
     pub ticket_channel_id: Option<u64>,
 }
 
 impl TicketsConfig {
     pub fn from_env() -> Self {
         Self {
-            ticket_category_id: load_env_optional("TICKET_CATEGORY_ID"),
             ticket_channel_id: load_env_optional("TICKET_CHANNEL_ID"),
         }
     }

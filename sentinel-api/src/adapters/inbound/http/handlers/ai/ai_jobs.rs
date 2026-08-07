@@ -18,7 +18,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::AiState;
 use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::entities::ai::ai_job::NewAiJob;
 
@@ -53,7 +53,7 @@ pub struct AiJobStatusDto {
 
 /// POST /api/ai/jobs — enqueue un job IA. Retourne 202 immediatement.
 pub async fn create_ai_job(
-    State(state): State<AppState>,
+    State(state): State<AiState>,
     Json(dto): Json<CreateAiJobDto>,
 ) -> Result<(StatusCode, Json<AiJobCreatedDto>), ApiError> {
     let id = state
@@ -76,7 +76,7 @@ pub async fn create_ai_job(
 
 /// GET /api/ai/jobs/{id} — recupere le statut courant d'un job IA.
 pub async fn get_ai_job(
-    State(state): State<AppState>,
+    State(state): State<AiState>,
     Path(id): Path<String>,
 ) -> Result<Json<AiJobStatusDto>, ApiError> {
     let uuid = validation::parse_uuid("job_id", &id).map_err(ApiError)?;

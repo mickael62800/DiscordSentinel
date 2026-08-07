@@ -1,5 +1,5 @@
-use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
-use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
 use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;

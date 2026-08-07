@@ -54,13 +54,9 @@ impl TypeMapKey for TrackerKey {
 /// que le tracker de SESSION vocale (secondes brutes) et le client API.
 pub fn init_typemap(
     data: &mut serenity::prelude::TypeMap,
-    api: &Arc<crate::shared::api_client::BaseApiClient>,
     grpc: &Arc<crate::shared::grpc_client::SentinelGrpcClient>,
 ) {
-    data.insert::<StatsApiKey>(api_client::ApiClient::new(
-        Arc::clone(api),
-        Arc::clone(grpc),
-    ));
+    data.insert::<StatsApiKey>(api_client::ApiClient::new(Arc::clone(grpc)));
     data.insert::<TrackerKey>(tracker::StatsTracker::new());
 }
 

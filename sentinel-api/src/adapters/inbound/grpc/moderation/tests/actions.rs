@@ -90,9 +90,9 @@ fn user_history_to_proto_empty_history() {
 
 // ── RPC tests avec mock ──
 
-use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-use crate::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
-use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use sentinel_core::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
+use sentinel_core::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use async_trait::async_trait;
 use chrono::Utc;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeResult;
@@ -313,10 +313,248 @@ impl ModerationCopilotUseCase for MockCopilotUc {
     }
 }
 
+/// Doubles des ports du dossier de moderation (preuves, relecture, notes,
+/// statistiques, apprenti).
+///
+/// Les tests de ce fichier couvrent `log_action`, `get_history` et
+/// `get_member_context` — les seuls chemins ou une conversion proto non
+/// triviale peut se tromper. Les autres RPC ne font que deleguer au port sans
+/// transformation, d'ou ces doubles qui echouent bruyamment si un test venait
+/// a les emprunter sans etre ecrit pour.
+macro_rules! stub_non_exerce {
+    ($nom:ident) => {
+        #[derive(Default)]
+        struct $nom;
+    };
+}
+
+stub_non_exerce!(MockCancelUc);
+stub_non_exerce!(MockAssessRiskUc);
+stub_non_exerce!(MockModstatsUc);
+stub_non_exerce!(MockNotesUc);
+stub_non_exerce!(MockEvidenceRepo);
+stub_non_exerce!(MockReviewRepo);
+stub_non_exerce!(MockPendingActionRepo);
+stub_non_exerce!(MockInfractionsUc);
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::assess_target_risk::AssessTargetRiskUseCase
+    for MockAssessRiskUc
+{
+    async fn assess(
+        &self,
+        _cmd: sentinel_core::ports::inbound::moderation::assess_target_risk::AssessTargetRiskCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::moderation::target_risk::TargetRiskDecision,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("assess_target_risk non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::read_modstats::ReadModstatsUseCase
+    for MockModstatsUc
+{
+    async fn modstats(
+        &self,
+        _guild_id: &str,
+        _days: i32,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::modstats::ModeratorBreakdown>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("modstats non exerce par ces tests")
+    }
+    async fn modstats_trend(
+        &self,
+        _guild_id: &str,
+        _days: i32,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::modstats::ModstatsTrendDay>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("modstats_trend non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::manage_notes::ManageNotesUseCase for MockNotesUc {
+    async fn add_note(
+        &self,
+        _cmd: sentinel_core::ports::inbound::moderation::manage_notes::AddNoteCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::moderation::user_note::UserNote,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("add_note non exerce par ces tests")
+    }
+    async fn get_notes(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::user_note::UserNote>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("get_notes non exerce par ces tests")
+    }
+    async fn delete_note(
+        &self,
+        _note_id: &str,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
+        unimplemented!("delete_note non exerce par ces tests")
+    }
+    async fn note_guild_id(
+        &self,
+        _note_id: &str,
+    ) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("note_guild_id non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::outbound::moderation::evidence_repository::EvidenceRepository
+    for MockEvidenceRepo
+{
+    async fn add(
+        &self,
+        _action_id: uuid::Uuid,
+        _url: &str,
+        _description: Option<&str>,
+        _uploaded_by: &str,
+        _uploaded_by_name: &str,
+    ) -> Result<
+        sentinel_core::ports::outbound::moderation::evidence_repository::EvidenceEntry,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("evidence add non exerce par ces tests")
+    }
+    async fn list(
+        &self,
+        _action_id: uuid::Uuid,
+    ) -> Result<
+        Vec<sentinel_core::ports::outbound::moderation::evidence_repository::EvidenceEntry>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("evidence list non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::outbound::moderation::review_repository::ReviewRepository
+    for MockReviewRepo
+{
+    async fn add(
+        &self,
+        _action_id: uuid::Uuid,
+        _guild_id: &str,
+        _added_by: &str,
+        _added_by_name: &str,
+        _reason: Option<&str>,
+    ) -> Result<
+        sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("review add non exerce par ces tests")
+    }
+    async fn list_pending(
+        &self,
+        _guild_id: &str,
+    ) -> Result<
+        Vec<sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("review list_pending non exerce par ces tests")
+    }
+    async fn resolve(
+        &self,
+        _review_id: uuid::Uuid,
+        _reviewer_id: &str,
+        _reviewer_name: &str,
+        _notes: Option<&str>,
+        _status: &str,
+    ) -> Result<bool, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("review resolve non exerce par ces tests")
+    }
+    async fn get_guild_id(
+        &self,
+        _review_id: uuid::Uuid,
+    ) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("review get_guild_id non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::outbound::moderation::pending_action_repository::PendingActionRepository
+    for MockPendingActionRepo
+{
+    #[allow(clippy::too_many_arguments)]
+    async fn create(
+        &self,
+        _guild_id: &str,
+        _moderator_id: &str,
+        _moderator_name: &str,
+        _target_id: &str,
+        _target_name: &str,
+        _action_type: &str,
+        _reason: &str,
+        _gravity: Option<&str>,
+        _duration: Option<i64>,
+    ) -> Result<uuid::Uuid, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("pending create non exerce par ces tests")
+    }
+    async fn list_pending(
+        &self,
+        _guild_id: &str,
+    ) -> Result<
+        Vec<sentinel_core::ports::outbound::moderation::pending_action_repository::PendingAction>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("pending list non exerce par ces tests")
+    }
+    async fn get_guild_id(
+        &self,
+        _id: uuid::Uuid,
+    ) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("pending get_guild_id non exerce par ces tests")
+    }
+    async fn resolve(
+        &self,
+        _id: uuid::Uuid,
+        _status: &str,
+        _reviewed_by: &str,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
+        unimplemented!("pending resolve non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::cancel_action::CancelModerationActionUseCase
+    for MockCancelUc
+{
+    async fn cancel(
+        &self,
+        _action_id: uuid::Uuid,
+    ) -> Result<
+        sentinel_core::ports::inbound::moderation::cancel_action::CancelOutcome,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        Ok(sentinel_core::ports::inbound::moderation::cancel_action::CancelOutcome::NotFound)
+    }
+}
+
 fn grpc(uc: Arc<MockModerationUc>) -> ModerationGrpc {
     ModerationGrpc {
         moderation_uc: uc,
-        reminders_uc: Arc::new(MockRemindersUc::default()),
+        cancel_action_uc: Arc::new(MockCancelUc),
+        assess_target_risk_uc: Arc::new(MockAssessRiskUc),
+        modstats_uc: Arc::new(MockModstatsUc),
+        notes_uc: Arc::new(MockNotesUc),
+        evidence_repo: Arc::new(MockEvidenceRepo),
+        review_repo: Arc::new(MockReviewRepo),
+        pending_action_repo: Arc::new(MockPendingActionRepo),
+        infractions_uc: Arc::new(MockInfractionsUc),        reminders_uc: Arc::new(MockRemindersUc::default()),
         moderation_copilot_uc: Arc::new(MockCopilotUc::default()),
     }
 }
@@ -324,7 +562,14 @@ fn grpc(uc: Arc<MockModerationUc>) -> ModerationGrpc {
 fn grpc_with_reminders(uc: Arc<MockModerationUc>, rem: Arc<MockRemindersUc>) -> ModerationGrpc {
     ModerationGrpc {
         moderation_uc: uc,
-        reminders_uc: rem,
+        cancel_action_uc: Arc::new(MockCancelUc),
+        assess_target_risk_uc: Arc::new(MockAssessRiskUc),
+        modstats_uc: Arc::new(MockModstatsUc),
+        notes_uc: Arc::new(MockNotesUc),
+        evidence_repo: Arc::new(MockEvidenceRepo),
+        review_repo: Arc::new(MockReviewRepo),
+        pending_action_repo: Arc::new(MockPendingActionRepo),
+        infractions_uc: Arc::new(MockInfractionsUc),        reminders_uc: rem,
         moderation_copilot_uc: Arc::new(MockCopilotUc::default()),
     }
 }
@@ -466,7 +711,14 @@ async fn get_member_context_maps_domain_to_proto() {
     let copilot = Arc::new(MockCopilotUc::default());
     let g = ModerationGrpc {
         moderation_uc: Arc::new(MockModerationUc::default()),
-        reminders_uc: Arc::new(MockRemindersUc::default()),
+        cancel_action_uc: Arc::new(MockCancelUc),
+        assess_target_risk_uc: Arc::new(MockAssessRiskUc),
+        modstats_uc: Arc::new(MockModstatsUc),
+        notes_uc: Arc::new(MockNotesUc),
+        evidence_repo: Arc::new(MockEvidenceRepo),
+        review_repo: Arc::new(MockReviewRepo),
+        pending_action_repo: Arc::new(MockPendingActionRepo),
+        infractions_uc: Arc::new(MockInfractionsUc),        reminders_uc: Arc::new(MockRemindersUc::default()),
         moderation_copilot_uc: copilot.clone(),
     };
     let resp = g
@@ -515,4 +767,65 @@ async fn get_history_clean_user_has_zero_counters() {
     assert_eq!(h.total_mutes, 0);
     assert_eq!(h.total_bans, 0);
     assert!(h.actions.is_empty());
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase
+    for MockInfractionsUc
+{
+    async fn count_user_infractions(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<
+        sentinel_core::ports::inbound::moderation::manage_infractions::UserInfractionCounts,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("count_user_infractions non exerce par ces tests")
+    }
+    async fn list_infractions(
+        &self,
+        _guild_id: &str,
+        _filters: sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::infraction::Infraction>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("list_infractions non exerce par ces tests")
+    }
+    async fn list_all_infractions(
+        &self,
+        _limit: i64,
+        _offset: i64,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::infraction::Infraction>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("list_all_infractions non exerce par ces tests")
+    }
+    async fn count_today(&self) -> Result<u64, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("count_today non exerce par ces tests")
+    }
+    async fn find_by_id(
+        &self,
+        _id: &str,
+    ) -> Result<
+        Option<sentinel_core::domain::entities::moderation::infraction::Infraction>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("find_by_id non exerce par ces tests")
+    }
+    async fn delete_infraction(
+        &self,
+        _id: &str,
+    ) -> Result<bool, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("delete_infraction non exerce par ces tests")
+    }
+    async fn delete_older_than_days(
+        &self,
+        _guild_id: &str,
+        _days: i32,
+    ) -> Result<u64, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("delete_older_than_days non exerce par ces tests")
+    }
 }

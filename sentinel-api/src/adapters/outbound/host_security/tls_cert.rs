@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 
-use crate::ports::outbound::system::tls_cert_reader::TlsCertReader;
+use sentinel_core::ports::outbound::system::tls_cert_reader::TlsCertReader;
 use sentinel_core::domain::entities::system::tls_cert::TlsCertInfo;
 use sentinel_core::domain::errors::DomainError;
 

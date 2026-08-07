@@ -16,11 +16,11 @@ use crate::adapters::inbound::http::dto::community::ideas::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::community::manage_ideas::{
+use crate::bootstrap::state::CommunityState;
+use sentinel_core::ports::inbound::community::manage_ideas::{
     AddIdeaMessageCommand, CreateIdeaCommand, DecideIdeaCommand,
 };
-use crate::ports::outbound::community::idea_repository::IdeaFilters;
+use sentinel_core::ports::outbound::community::idea_repository::IdeaFilters;
 use sentinel_core::domain::errors::DomainError;
 
 const IDEA_STREAM_KEY: &str = "sentinel:events";
@@ -29,7 +29,7 @@ const IDEA_STREAM_MAXLEN: usize = 10_000;
 const DEFAULT_LIMIT: i64 = 50;
 
 /// Previent le bot qu'une idee a change de statut depuis le web.
-async fn publish_decision(state: &AppState, idea: &IdeaDto) -> Result<(), ApiError> {
+async fn publish_decision(state: &CommunityState, idea: &IdeaDto) -> Result<(), ApiError> {
     let envelope = serde_json::json!({
         "event": "idea_decided",
         "data": {
@@ -63,7 +63,7 @@ async fn publish_decision(state: &AppState, idea: &IdeaDto) -> Result<(), ApiErr
 }
 
 pub async fn list_ideas(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Query(q): Query<ListIdeasQuery>,
 ) -> Result<Json<Vec<IdeaDto>>, ApiError> {
     let filters = IdeaFilters {
@@ -85,7 +85,7 @@ pub async fn list_ideas(
 }
 
 pub async fn get_idea(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<IdeaDetailDto>, ApiError> {
     let detail = state.ideas_uc.get_detail(id).await?;
@@ -95,7 +95,7 @@ pub async fn get_idea(
 /// GET /api/ideas/by-channel/{channel_id} — utilise par le bot pour retrouver
 /// l'idee attachee au salon d'ou vient une interaction ou un message.
 pub async fn get_idea_by_channel(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<IdeaDto>, ApiError> {
     let idea = state
@@ -111,7 +111,7 @@ pub async fn get_idea_by_channel(
 }
 
 pub async fn create_idea(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Json(dto): Json<CreateIdeaDto>,
 ) -> Result<Json<IdeaDto>, ApiError> {
     let idea = state
@@ -131,7 +131,7 @@ pub async fn create_idea(
 
 /// PATCH /api/ideas/{id}/status — decision du staff (bot ou web).
 pub async fn decide_idea(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<DecideIdeaDto>,
@@ -175,7 +175,7 @@ pub async fn decide_idea(
 
 /// PATCH /api/ideas/{id}/channel — rattache le salon cree par le bot.
 pub async fn set_idea_channel(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
     Json(dto): Json<SetIdeaChannelDto>,
 ) -> Result<Json<IdeaDto>, ApiError> {
@@ -188,7 +188,7 @@ pub async fn set_idea_channel(
 
 /// POST /api/ideas/{id}/messages — sync d'un message du salon de l'idee.
 pub async fn add_idea_message(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
     Json(dto): Json<AddIdeaMessageDto>,
 ) -> Result<Json<IdeaMessageDto>, ApiError> {
@@ -205,7 +205,7 @@ pub async fn add_idea_message(
 }
 
 pub async fn delete_idea(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.ideas_uc.delete(id).await?;
@@ -215,7 +215,7 @@ pub async fn delete_idea(
 /// GET /api/ideas/quota/{guild_id}/{author_id} — nombre d'idees non tranchees,
 /// consulte par le bot avant d'ouvrir une nouvelle proposition.
 pub async fn get_idea_quota(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path((guild_id, author_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let count = state

@@ -28,6 +28,17 @@ impl WheelRepository for MockRepo {
         *self.cases.lock().unwrap() = cases.to_vec();
         Ok(())
     }
+    async fn execute_spin_transaction(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _cooldown_hours: i64,
+        _spin: &WheelSpin,
+        _wallet: &crate::domain::entities::wallet::Wallet,
+        _mutation: Option<&crate::domain::entities::wallet::WalletMutation>,
+    ) -> Result<bool, DomainError> {
+        Ok(true)
+    }
 }
 
 fn case(key: &str, weight: u32) -> WheelCaseData {

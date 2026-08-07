@@ -1,11 +1,18 @@
+//! Client du module audit, entierement en gRPC (`AuditService`).
+//!
+//! Le dashboard web garde les routes HTTP correspondantes : il filtre par
+//! plage de dates, par natures multiples et pagine — le bot ne fait qu'une
+//! recherche simple, qu'il affiche dans un embed.
+
 use std::sync::Arc;
 
-use crate::shared::api_client::BaseApiClient;
 use serde::Deserialize;
-use serde::Serialize;
 
-/// Rapport hebdomadaire agrege server-side (fenetre 7 jours), renvoye par
-/// l'API. Le bot ne fait que rendre l'embed a partir de ces compteurs.
+use crate::shared::grpc_client::{grpc_err_to_string, GrpcCallError, SentinelGrpcClient};
+use sentinel_proto::audit::v1 as proto;
+
+/// Rapport hebdomadaire agrege server-side (fenetre 7 jours).
+/// Le bot ne fait que rendre l'embed a partir de ces compteurs.
 #[derive(Debug, Default, Deserialize)]
 pub struct WeeklyReport {
     pub member_joins: u64,
@@ -19,7 +26,8 @@ pub struct WeeklyReport {
     pub anomalies: u64,
 }
 
-#[derive(Debug, Serialize)]
+/// Evenement d'audit observe par le bot et transmis a l'API.
+#[derive(Debug)]
 pub struct AuditEvent {
     pub guild_id: String,
     pub event_type: String,
@@ -32,13 +40,24 @@ pub struct AuditEvent {
     pub details: serde_json::Value,
 }
 
+/// Entree du journal, reduite aux champs affiches par `/audit search`.
+///
+/// L'API renvoyait auparavant un JSON libre dont seuls ces trois champs
+/// etaient lus ; le contrat gRPC les nomme explicitement.
+#[derive(Debug, Clone)]
+pub struct AuditLogEntry {
+    pub event_type: String,
+    pub actor_name: Option<String>,
+    pub target_name: Option<String>,
+}
+
 pub struct ApiClient {
-    pub base: Arc<BaseApiClient>,
+    grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>) -> Self {
-        Self { base }
+    pub fn new(grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { grpc }
     }
 
     pub async fn search_audit_logs(
@@ -47,36 +66,40 @@ impl ApiClient {
         target_id: Option<&str>,
         event_type: Option<&str>,
         limit: u32,
-    ) -> Result<Vec<serde_json::Value>, String> {
-        let mut path = format!("/api/audit-logs?guild_id={}&limit={}", guild_id, limit);
-        if let Some(tid) = target_id {
-            path.push_str(&format!("&target_id={}", tid));
-        }
-        if let Some(et) = event_type {
-            path.push_str(&format!("&event_type={}", et));
-        }
-
-        self.base.get_json(&path).await
-    }
-
-    /// Recupere les IDs des utilisateurs surveilles d'un serveur. Le `guild_id`
-    /// est OBLIGATOIRE cote API (durcissement IDOR : sans lui, la liste serait
-    /// globale et echapperait au scope par guilde) -> l'omettre renvoyait 422.
-    pub async fn get_all_watched_user_ids(&self, guild_id: &str) -> Result<Vec<String>, String> {
-        let path = format!("/api/watched-users?guild_id={guild_id}&limit=1000");
-        let users: Vec<serde_json::Value> = self.base.get_json(&path).await?;
-
-        Ok(users
-            .iter()
-            .filter_map(|u| {
-                u.get("user_id")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
+    ) -> Result<Vec<AuditLogEntry>, String> {
+        let req = proto::SearchAuditLogsRequest {
+            guild_id: guild_id.to_string(),
+            target_id: target_id.map(str::to_string),
+            event_type: event_type.map(str::to_string),
+            limit,
+        };
+        let resp = crate::grpc_call!(self.grpc, audit, search_audit_logs, req)?;
+        Ok(resp
+            .entries
+            .into_iter()
+            .map(|e| AuditLogEntry {
+                event_type: e.event_type,
+                actor_name: e.actor_name,
+                target_name: e.target_name,
             })
             .collect())
     }
 
-    /// Enregistre un evenement d'activite pour un utilisateur surveille
+    /// Identifiants des membres surveilles d'un serveur.
+    ///
+    /// `guild_id` est OBLIGATOIRE cote API : sans lui la liste serait globale
+    /// et echapperait au cloisonnement par serveur.
+    pub async fn get_all_watched_user_ids(&self, guild_id: &str) -> Result<Vec<String>, String> {
+        let req = proto::ListWatchedUserIdsRequest {
+            guild_id: guild_id.to_string(),
+            limit: 1000,
+        };
+        let resp = crate::grpc_call!(self.grpc, audit, list_watched_user_ids, req)?;
+        Ok(resp.user_ids)
+    }
+
+    /// Enregistre un evenement d'activite pour un membre surveille.
+    #[allow(clippy::too_many_arguments)]
     pub async fn log_user_activity(
         &self,
         guild_id: &str,
@@ -87,41 +110,65 @@ impl ApiClient {
         content: Option<&str>,
         metadata: serde_json::Value,
     ) -> Result<(), String> {
-        let payload = serde_json::json!({
-            "guild_id": guild_id,
-            "user_id": user_id,
-            "event_type": event_type,
-            "channel_id": channel_id,
-            "channel_name": channel_name,
-            "content": content,
-            "metadata": metadata,
-        });
-
-        self.base
-            .post_fire_and_forget("/api/user-activity", &payload)
-            .await;
+        let req = proto::LogUserActivityRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            event_type: event_type.to_string(),
+            channel_id: channel_id.map(str::to_string),
+            channel_name: channel_name.map(str::to_string),
+            content: content.map(str::to_string),
+            metadata_json: metadata.to_string(),
+        };
+        // Best-effort, comme le `post_fire_and_forget` d'origine : perdre une
+        // trace d'activite ne doit pas interrompre le traitement de l'event
+        // Discord qui l'a produite.
+        let res: Result<(), GrpcCallError> =
+            crate::grpc_call!(@raw_unit self.grpc, audit, log_user_activity, req);
+        if let Err(e) = res {
+            tracing::warn!(error = %e, user_id = %user_id, "trace d'activite perdue (best-effort)");
+        }
         Ok(())
     }
 
-    /// Recupere le rapport d'activite hebdomadaire agrege server-side pour un
-    /// guild (comptage des events d'audit persistes sur 7 jours).
+    /// Rapport d'activite hebdomadaire agrege server-side.
     pub async fn get_weekly_report(&self, guild_id: &str) -> Result<WeeklyReport, String> {
-        let path = format!("/api/audit-weekly-report/{}", guild_id);
-        self.base.get_json(&path).await
+        let req = proto::GetWeeklyReportRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let r = crate::grpc_call!(self.grpc, audit, get_weekly_report, req)?;
+        Ok(WeeklyReport {
+            member_joins: r.member_joins,
+            member_leaves: r.member_leaves,
+            bans: r.bans,
+            messages_deleted: r.messages_deleted,
+            messages_edited: r.messages_edited,
+            role_changes: r.role_changes,
+            channel_changes: r.channel_changes,
+            voice_events: r.voice_events,
+            anomalies: r.anomalies,
+        })
     }
 
     pub async fn send_audit_event(&self, event: &AuditEvent) -> Result<(), String> {
-        let _: serde_json::Value = self.base.post_json("/api/audit-logs", event).await?;
-        Ok(())
+        let req = proto::CreateAuditLogRequest {
+            guild_id: event.guild_id.clone(),
+            event_type: event.event_type.clone(),
+            actor_id: event.actor_id.clone(),
+            actor_name: event.actor_name.clone(),
+            target_id: event.target_id.clone(),
+            target_name: event.target_name.clone(),
+            channel_id: event.channel_id.clone(),
+            channel_name: event.channel_name.clone(),
+            details_json: event.details.to_string(),
+        };
+        crate::grpc_call!(@unit self.grpc, audit, create_audit_log, req)
     }
 
-    /// Envoie un evenement de moderation a l'API, qui agrege sur sa fenetre
-    /// glissante serveur, decide s'il y a anomalie et renvoie l'alerte a
-    /// afficher le cas echeant. La DECISION est server-side : le bot ne fait
-    /// qu'afficher l'embed URGENT si `alert` est present.
+    /// Transmet un evenement de moderation ; l'API agrege sur sa fenetre
+    /// glissante, decide s'il y a anomalie et renvoie l'alerte le cas echeant.
     ///
-    /// `category` : "ban" | "kick" | "delete" | "role_change".
-    /// `increment` : nombre d'evenements (> 1 pour une purge bulk).
+    /// La DECISION est server-side : le bot n'affiche l'embed URGENT que si
+    /// `alert` est present.
     pub async fn detect_moderation_anomaly(
         &self,
         guild_id: &str,
@@ -130,22 +177,20 @@ impl ApiClient {
         window_secs: u64,
         thresholds: &super::anomaly::AnomalyThresholds,
     ) -> Result<Option<super::anomaly::AnomalyAlert>, String> {
-        let payload = serde_json::json!({
-            "guild_id": guild_id,
-            "category": category,
-            "increment": increment,
-            "window_secs": window_secs,
-            "mass_ban": thresholds.mass_ban,
-            "mass_delete": thresholds.mass_delete,
-            "mass_role_change": thresholds.mass_role_change,
-        });
-        let resp: DetectAnomalyResponse =
-            self.base.post_json("/api/moderation-anomaly", &payload).await?;
-        Ok(resp.alert)
+        let req = proto::DetectAnomalyRequest {
+            guild_id: guild_id.to_string(),
+            category: category.to_string(),
+            increment: increment as u64,
+            window_secs,
+            mass_ban: thresholds.mass_ban as u64,
+            mass_delete: thresholds.mass_delete as u64,
+            mass_role_change: thresholds.mass_role_change as u64,
+        };
+        let resp = crate::grpc_call!(self.grpc, audit, detect_moderation_anomaly, req)?;
+        Ok(resp.alert.map(|a| super::anomaly::AnomalyAlert {
+            anomaly_type: a.anomaly_type,
+            count: a.count as usize,
+            window_secs: a.window_secs,
+        }))
     }
-}
-
-#[derive(Debug, serde::Deserialize)]
-struct DetectAnomalyResponse {
-    alert: Option<super::anomaly::AnomalyAlert>,
 }

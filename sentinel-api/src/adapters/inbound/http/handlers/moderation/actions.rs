@@ -17,9 +17,9 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 use crate::adapters::inbound::http::validation;
-use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
+use sentinel_core::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 
@@ -48,7 +48,7 @@ pub struct BansQuery {
 
 /// POST /api/moderation/actions — enregistrer une action de modération
 pub async fn log_action(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     user: Option<Extension<WebUser>>,
     Json(mut dto): Json<LogActionDto>,
 ) -> Result<Json<ModerationActionResponseDto>, ApiError> {
@@ -191,7 +191,7 @@ pub struct ExecuteBanDto {
 
 /// POST /api/moderation/execute-ban — execute un ban Discord + log l'action
 pub async fn execute_ban(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<ExecuteBanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -213,7 +213,7 @@ pub async fn execute_ban(
     // web (WebUser), sinon valeurs desktop par defaut (appel interne).
     let (moderator_id, moderator_name) = resolve_web_moderator(&user, "desktop", "Desktop App");
 
-    let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
+    let command = sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new().into(),
         moderator_id: moderator_id.clone(),
@@ -272,7 +272,7 @@ pub struct ExecuteMuteDto {
 
 /// POST /api/moderation/execute-mute — applique un timeout Discord + log l'action
 pub async fn execute_mute(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<ExecuteMuteDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -298,7 +298,7 @@ pub async fn execute_mute(
     // S1/S4 — identite moderateur derivee du principal authentifie (web).
     let (moderator_id, moderator_name) = resolve_web_moderator(&user, "web-panel", "Web Admin");
 
-    let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
+    let command = sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new().into(),
         moderator_id,
@@ -336,7 +336,7 @@ pub struct ExecuteUnbanDto {
 
 /// POST /api/moderation/execute-unban — debannir un utilisateur Discord
 pub async fn execute_unban(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<ExecuteUnbanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -356,7 +356,7 @@ pub async fn execute_unban(
     // S1/S4 — identite moderateur derivee du principal authentifie (web).
     let (moderator_id, moderator_name) = resolve_web_moderator(&user, "desktop", "Desktop App");
 
-    let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
+    let command = sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id,
         channel_id: String::new().into(),
         moderator_id,
@@ -415,7 +415,7 @@ pub async fn execute_unban(
 
 /// GET /api/moderation/bans
 pub async fn list_bans(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Query(params): Query<BansQuery>,
 ) -> Result<Json<Vec<BanEntryDto>>, ApiError> {
@@ -434,7 +434,7 @@ pub async fn list_bans(
 
 /// GET /api/moderation/history/{guild_id}/{user_id}
 pub async fn get_history(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserHistoryDto>, ApiError> {
@@ -470,7 +470,7 @@ pub struct EvidenceEntryDto {
 }
 
 pub async fn add_evidence(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<AddEvidenceDto>,
 ) -> Result<Json<EvidenceEntryDto>, ApiError> {
@@ -519,7 +519,7 @@ pub async fn add_evidence(
 ///
 /// Liste les preuves attachees a une action.
 pub async fn list_evidence(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Path(action_id): Path<String>,
 ) -> Result<Json<Vec<EvidenceEntryDto>>, ApiError> {
@@ -574,7 +574,7 @@ pub struct ReviewQueueEntryDto {
 }
 
 fn review_entry_to_dto(
-    e: crate::ports::outbound::moderation::review_repository::ReviewEntry,
+    e: sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry,
 ) -> ReviewQueueEntryDto {
     ReviewQueueEntryDto {
         id: e.id.to_string(),
@@ -596,7 +596,7 @@ fn review_entry_to_dto(
 }
 
 pub async fn add_review(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Json(dto): Json<AddReviewDto>,
 ) -> Result<Json<ReviewQueueEntryDto>, ApiError> {
@@ -628,7 +628,7 @@ pub async fn add_review(
 /// Liste les reviews en attente pour une guild, enrichies avec les infos de
 /// l'action de moderation liee (JOIN avec moderation_actions).
 pub async fn list_pending_reviews(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ReviewQueueEntryDto>>, ApiError> {
@@ -648,16 +648,17 @@ pub struct ResolveReviewDto {
 }
 
 pub async fn resolve_review(
-    State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    State(state): State<ModerationState>,
+    // TODO(secu) : aucun gate par role ici. La protection vient uniquement des
+    // middlewares du routeur (auth Bearer + superadmin + guild_auth). Le
+    // controle fin � Moderator+ sur CETTE guilde � reste a implementer � il
+    // existait sous forme d'un `if user.is_some() {}` vide, qui ne verifiait
+    // rien tout en donnant l'impression du contraire.
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<ResolveReviewDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let review_uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
-
-    // user via le repo.
-    if user.is_some() {
-    }
 
     if !sentinel_core::domain::entities::moderation::review::manual::is_valid_review_status(
         &dto.status,
@@ -703,7 +704,7 @@ pub async fn resolve_review(
 ///
 /// Lecture deleguee au use case `modstats_uc` (read-only, aggregation simple).
 pub async fn get_modstats(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
@@ -739,7 +740,7 @@ pub async fn get_modstats(
 /// jours (default 30, max 90). Lecture depuis `audit_logs` comme modstats.
 /// Utilise pour la courbe "Tendance moderation" sur la page web /modstats.
 pub async fn get_modstats_trend(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
@@ -785,97 +786,22 @@ pub struct ModstatsTrendDayDto {
 ///   (`communication_disabled_until = null`) puis supprime la ligne.
 /// - `warn` / autre : supprime juste la ligne (pas d'effet Discord natif).
 pub async fn delete_action(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
 ) -> Result<axum::http::StatusCode, ApiError> {
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
 
-    // Phase 4 : lookup dans `audit_logs` (event_type='mod_*') et plus
-    // dans `moderation_actions` qui n'est plus alimentee. action_id est
-    // stocke dans `details->>'action_id'`. action_type derive de
-    // event_type en strippant le prefixe 'mod_'.
-    let Some(info) = state.moderation_uc.find_action_for_reversal(uuid).await? else {
-        return Err(ApiError(
+    // Toute l'orchestration (effet Discord inverse, annulation du rappel
+    // d'auto-unban, suppression) vit dans `CancelModerationActionUseCase` :
+    // le service gRPC appelle le meme, il ne peut donc pas y avoir deux
+    // comportements selon le transport utilise.
+    use sentinel_core::ports::inbound::moderation::cancel_action::CancelOutcome;
+    match state.cancel_action_uc.cancel(uuid).await? {
+        CancelOutcome::Cancelled => Ok(axum::http::StatusCode::NO_CONTENT),
+        CancelOutcome::NotFound => Err(ApiError(
             sentinel_core::domain::errors::DomainError::NotFound("Action introuvable".into()),
-        ));
-    };
-    let guild_id = info.guild_id;
-    let target_id = info.target_id;
-    let target_name = info.target_name;
-    let action_type = info.action_type;
-
-    // Gate user : moderator+ sur la guild concernee.
-
-    // Reversal Discord : la REGLE (quel effet inverse pour quel type) vit dans
-    // le core (`reversal_effect`) ; le handler n'orchestre que les appels
-    // Discord. Best-effort : une erreur Discord ne bloque pas la suppression
-    // en DB (on log et on continue pour que l'UI reste coherente).
-    use sentinel_core::domain::entities::moderation::action::reversal::{
-        reversal_effect, ReversalEffect,
-    };
-    match reversal_effect(&action_type) {
-        ReversalEffect::Unban {
-            cancel_auto_unban_reminder,
-        } => {
-            match state.discord_api.unban_user(&guild_id, &target_id).await {
-                Ok(()) => tracing::info!(
-                    guild_id = %guild_id,
-                    target_id = %target_id,
-                    target_name = %target_name,
-                    "Unban Discord applique lors de l'annulation d'une action ban"
-                ),
-                Err(e) => tracing::warn!(
-                    error = %e,
-                    guild_id = %guild_id,
-                    target_id = %target_id,
-                    "Echec unban Discord lors de l'annulation — suppression DB quand meme"
-                ),
-            }
-
-            // BUG #2 : l'action ban annulee peut porter un rappel d'auto-unban
-            // encore 'pending'. On l'annule (keye sur l'action_id) pour que le
-            // worker `expire_temp_bans` ne rejoue pas un unban tardif. Best-effort.
-            if cancel_auto_unban_reminder {
-                if let Err(e) = state.reminders_uc.cancel_for_action(uuid).await {
-                    tracing::warn!(
-                        error = %e,
-                        action_id = %uuid,
-                        "Echec annulation du rappel d'auto-unban lors de l'annulation d'un ban"
-                    );
-                }
-            }
-        }
-        ReversalEffect::RemoveTimeout => {
-            match state
-                .discord_api
-                .remove_timeout(&guild_id, &target_id)
-                .await
-            {
-                Ok(()) => tracing::info!(
-                    guild_id = %guild_id,
-                    target_id = %target_id,
-                    target_name = %target_name,
-                    "Timeout Discord retire lors de l'annulation d'une action mute/timeout"
-                ),
-                Err(e) => tracing::warn!(
-                    error = %e,
-                    guild_id = %guild_id,
-                    target_id = %target_id,
-                    "Echec remove_timeout Discord lors de l'annulation — suppression DB quand meme"
-                ),
-            }
-        }
-        ReversalEffect::None => {}
-    }
-
-    let deleted = state.moderation_uc.delete_action(uuid).await?;
-    if deleted {
-        Ok(axum::http::StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError(
-            sentinel_core::domain::errors::DomainError::NotFound("Action introuvable".into()),
-        ))
+        )),
     }
 }
 
@@ -890,7 +816,7 @@ pub struct ModActionCountQuery {
 /// (defaut 3600s). Sert au garde-fou "quota par moderateur" cote bot (anti-modo
 /// compromis / emballement) : le bot bloque une action au-dela du quota configure.
 pub async fn mod_action_count(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Path((guild_id, moderator_id)): Path<(String, String)>,
     Query(q): Query<ModActionCountQuery>,

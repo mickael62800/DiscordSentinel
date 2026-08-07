@@ -6,7 +6,6 @@
 
 use std::sync::Arc;
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +14,9 @@ use sentinel_proto::tickets::v1 as proto;
 // ── DTOs publics ──
 
 #[derive(Debug, Deserialize)]
+/// Miroir de la reponse ticket de l'API. Le bot n'en consomme qu'une partie
+/// (id, statut, salon) ; les autres champs decrivent le contrat de l'API et
+/// sont lus par le dashboard web, pas par le bot.
 #[allow(dead_code)]
 pub struct Ticket {
     pub id: String,
@@ -42,18 +44,13 @@ pub struct Ticket {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct TicketMessage {
-    pub id: String,
-    pub ticket_id: String,
     pub author_name: String,
     pub author_role: String,
     pub content: String,
-    pub created_at: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct TicketDetail {
     pub ticket: Ticket,
     pub messages: Vec<TicketMessage>,
@@ -75,26 +72,20 @@ pub struct CreateTicketRequest {
 // ── Client ──
 
 pub struct ApiClient {
-    #[allow(dead_code)]
-    pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
-        Self { base, grpc }
+    pub fn new(grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { grpc }
     }
 
     /// Helper : construit un `ApiClient` depuis le TypeMap Serenity.
-    #[allow(dead_code)]
     pub fn from_data(data: &serenity::prelude::TypeMap) -> Option<Self> {
-        let base = data
-            .get::<crate::shared::heartbeat::ApiClientKey>()?
-            .clone();
         let grpc = data
             .get::<crate::shared::grpc_client::GrpcClientKey>()?
             .clone();
-        Some(Self::new(base, grpc))
+        Some(Self::new(grpc))
     }
 
     pub async fn list_tickets(&self) -> Result<Vec<Ticket>, String> {
@@ -138,7 +129,6 @@ impl ApiClient {
         Ok(proto_ticket_to_dto(t))
     }
 
-    #[allow(dead_code)]
     pub async fn get_ticket(&self, id: &str) -> Result<TicketDetail, String> {
         let req = proto::GetTicketDetailRequest { id: id.to_string() };
         let detail = crate::grpc_call!(self.grpc, tickets, get_ticket_detail, req)?;
@@ -228,12 +218,9 @@ fn proto_ticket_to_dto(t: proto::Ticket) -> Ticket {
 
 fn proto_ticket_message_to_dto(m: proto::TicketMessage) -> TicketMessage {
     TicketMessage {
-        id: m.id,
-        ticket_id: m.ticket_id,
         author_name: m.author_name,
         author_role: m.author_role,
         content: m.content,
-        created_at: m.created_at,
     }
 }
 

@@ -1,5 +1,21 @@
 //! Test helpers : construit un AppState complet avec des stubs pour tous les traits.
 //! Seul le use case sous test est fonctionnel, les autres panic si appeles.
+//!
+//! # Pourquoi un `allow(dead_code)` global ici, et nulle part ailleurs
+//!
+//! Ce fichier est inclus par `#[path]` dans ~40 binaires de test, chacun
+//! compile comme une crate independante. Un helper consomme par UN seul
+//! binaire est donc « jamais utilise » dans les 39 autres, ce qui produit
+//! ~800 avertissements pour zero ligne de code reellement morte.
+//!
+//! Ce n'est pas un contournement de complaisance : c'est la seule reponse a
+//! une limite du modele de compilation des tests d'integration Rust. Il
+//! remplace les 22 attributs cibles qui parsemaient le fichier — un allow
+//! motive vaut mieux que vingt-deux muets.
+//!
+//! Nulle part ailleurs dans le workspace il ne reste de `allow(dead_code)` :
+//! tout ce qu'ils masquaient a ete supprime ou justifie par `#[cfg(test)]`.
+#![allow(dead_code)]
 
 use std::sync::Arc;
 
@@ -15,40 +31,40 @@ use sentinel_api::adapters::outbound::discord_api::DiscordMember;
 use sentinel_api::adapters::outbound::discord_api::DiscordUser;
 use sentinel_api::adapters::outbound::discord_api::UserGuild;
 use sentinel_api::adapters::outbound::job_client::JobClient;
-use sentinel_api::ports::inbound::ai::analyze_image::*;
-use sentinel_api::ports::inbound::ai::analyze_message::*;
-use sentinel_api::ports::inbound::audit::manage_audit_logs::*;
-use sentinel_api::ports::inbound::audit::manage_security::*;
-use sentinel_api::ports::inbound::audit::manage_stats::*;
-use sentinel_api::ports::inbound::audit::manage_watched_users::*;
-use sentinel_api::ports::inbound::audit::*;
-use sentinel_api::ports::inbound::community::manage_levels::*;
-use sentinel_api::ports::inbound::community::manage_members::*;
-use sentinel_api::ports::inbound::community::manage_role_panels::*;
-use sentinel_api::ports::inbound::community::manage_voice_channels::*;
-use sentinel_api::ports::inbound::community::*;
-use sentinel_api::ports::inbound::moderation::manage_infractions::*;
-use sentinel_api::ports::inbound::moderation::manage_moderation::*;
-use sentinel_api::ports::inbound::moderation::manage_notes::*;
-use sentinel_api::ports::inbound::moderation::manage_reminders::*;
-use sentinel_api::ports::inbound::moderation::manage_rules::*;
-use sentinel_api::ports::inbound::moderation::manage_strikes::*;
-use sentinel_api::ports::inbound::moderation::*;
-use sentinel_api::ports::inbound::system::manage_tickets::*;
-use sentinel_api::ports::outbound::audit::analytics_repository::*;
-use sentinel_api::ports::outbound::audit::modstats_repository::*;
-use sentinel_api::ports::outbound::audit::user_activity_repository::*;
-use sentinel_api::ports::outbound::community::daily_activity_repository::*;
-use sentinel_api::ports::outbound::community::discord_role_repository::*;
-use sentinel_api::ports::outbound::community::sponsorship_repository::*;
-use sentinel_api::ports::outbound::community::temp_role_repository::*;
-use sentinel_api::ports::outbound::community::welcome_config_repository::*;
-use sentinel_api::ports::outbound::moderation::evidence_repository::*;
-use sentinel_api::ports::outbound::moderation::pending_action_repository::*;
-use sentinel_api::ports::outbound::moderation::review_repository::*;
-use sentinel_api::ports::outbound::system::bot_config_repository::*;
-use sentinel_api::ports::outbound::system::guild_repository::*;
-use sentinel_api::ports::outbound::system::log_repository::*;
+use sentinel_core::ports::inbound::ai::analyze_image::*;
+use sentinel_core::ports::inbound::ai::analyze_message::*;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::*;
+use sentinel_core::ports::inbound::audit::manage_security::*;
+use sentinel_core::ports::inbound::audit::manage_stats::*;
+use sentinel_core::ports::inbound::audit::manage_watched_users::*;
+use sentinel_core::ports::inbound::audit::*;
+use sentinel_core::ports::inbound::community::manage_levels::*;
+use sentinel_core::ports::inbound::community::manage_members::*;
+use sentinel_core::ports::inbound::community::manage_role_panels::*;
+use sentinel_core::ports::inbound::community::manage_voice_channels::*;
+use sentinel_core::ports::inbound::community::*;
+use sentinel_core::ports::inbound::moderation::manage_infractions::*;
+use sentinel_core::ports::inbound::moderation::manage_moderation::*;
+use sentinel_core::ports::inbound::moderation::manage_notes::*;
+use sentinel_core::ports::inbound::moderation::manage_reminders::*;
+use sentinel_core::ports::inbound::moderation::manage_rules::*;
+use sentinel_core::ports::inbound::moderation::manage_strikes::*;
+use sentinel_core::ports::inbound::moderation::*;
+use sentinel_core::ports::inbound::system::manage_tickets::*;
+use sentinel_core::ports::outbound::audit::analytics_repository::*;
+use sentinel_core::ports::outbound::audit::modstats_repository::*;
+use sentinel_core::ports::outbound::audit::user_activity_repository::*;
+use sentinel_core::ports::outbound::community::daily_activity_repository::*;
+use sentinel_core::ports::outbound::community::discord_role_repository::*;
+use sentinel_core::ports::outbound::community::sponsorship_repository::*;
+use sentinel_core::ports::outbound::community::temp_role_repository::*;
+use sentinel_core::ports::outbound::community::welcome_config_repository::*;
+use sentinel_core::ports::outbound::moderation::evidence_repository::*;
+use sentinel_core::ports::outbound::moderation::pending_action_repository::*;
+use sentinel_core::ports::outbound::moderation::review_repository::*;
+use sentinel_core::ports::outbound::system::bot_config_repository::*;
+use sentinel_core::ports::outbound::system::guild_repository::*;
+use sentinel_core::ports::outbound::system::log_repository::*;
 use sentinel_core::domain::entities::ai::image_analysis::*;
 use sentinel_core::domain::entities::ai::message_analysis::*;
 use sentinel_core::domain::entities::audit::audit_log::*;
@@ -75,10 +91,6 @@ use sentinel_core::domain::entities::system::log_entry::*;
 use sentinel_core::domain::entities::system::rule::*;
 use sentinel_core::domain::entities::system::ticket::*;
 use sentinel_core::domain::errors::DomainError;
-
-// Chaque fichier de test d'intégration est compilé comme une crate séparée.
-// Du coup Rust voit les helpers comme "unused" dans les tests qui n'en
-// consomment qu'une partie — d'où les `#[allow(dead_code)]` ciblés plus bas.
 
 // ══════════════════════════════════════════════════════════
 // Stub Use Cases (inbound)
@@ -143,6 +155,16 @@ impl ManageRulesUseCase for StubRules {
 pub struct StubInfractions;
 #[async_trait]
 impl ManageInfractionsUseCase for StubInfractions {
+    async fn count_user_infractions(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        sentinel_core::ports::inbound::moderation::manage_infractions::UserInfractionCounts,
+        DomainError,
+    > {
+        unimplemented!("count_user_infractions non exerce par ces tests")
+    }
     async fn list_infractions(
         &self,
         _: &str,
@@ -752,15 +774,14 @@ impl ManageLevelsUseCase for StubLevels {
     }
 }
 
-#[allow(dead_code)]
 pub struct StubAnnouncements;
 #[async_trait]
-impl sentinel_api::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase
+impl sentinel_core::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase
     for StubAnnouncements
 {
     async fn create(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_announcements::CreateAnnouncementCommand,
+        _: sentinel_core::ports::inbound::community::manage_announcements::CreateAnnouncementCommand,
     ) -> Result<
         sentinel_core::domain::entities::community::announcement::ScheduledAnnouncement,
         DomainError,
@@ -769,7 +790,7 @@ impl sentinel_api::ports::inbound::community::manage_announcements::ManageAnnoun
     }
     async fn update(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_announcements::UpdateAnnouncementCommand,
+        _: sentinel_core::ports::inbound::community::manage_announcements::UpdateAnnouncementCommand,
     ) -> Result<
         sentinel_core::domain::entities::community::announcement::ScheduledAnnouncement,
         DomainError,
@@ -805,7 +826,7 @@ impl sentinel_api::ports::inbound::community::manage_announcements::ManageAnnoun
         _: chrono::DateTime<chrono::Utc>,
         _: i64,
     ) -> Result<
-        Vec<sentinel_api::ports::inbound::community::manage_announcements::RenderedAnnouncement>,
+        Vec<sentinel_core::ports::inbound::community::manage_announcements::RenderedAnnouncement>,
         DomainError,
     > {
         unimplemented!()
@@ -821,7 +842,7 @@ impl sentinel_api::ports::inbound::community::manage_announcements::ManageAnnoun
         &self,
         _: uuid::Uuid,
     ) -> Result<
-        sentinel_api::ports::inbound::community::manage_announcements::RenderedAnnouncement,
+        sentinel_core::ports::inbound::community::manage_announcements::RenderedAnnouncement,
         DomainError,
     > {
         unimplemented!()
@@ -873,22 +894,21 @@ impl sentinel_api::ports::inbound::community::manage_announcements::ManageAnnoun
     }
 }
 
-#[allow(dead_code)]
 pub struct StubEmbeds;
 #[async_trait]
-impl sentinel_api::ports::inbound::community::manage_embeds::ManageEmbedsUseCase for StubEmbeds {
+impl sentinel_core::ports::inbound::community::manage_embeds::ManageEmbedsUseCase for StubEmbeds {
     async fn create(
         &self,
         _: &str,
         _: &str,
-        _: sentinel_api::ports::inbound::community::manage_embeds::EmbedInput,
+        _: sentinel_core::ports::inbound::community::manage_embeds::EmbedInput,
     ) -> Result<sentinel_core::domain::entities::community::embed::Embed, DomainError> {
         unimplemented!()
     }
     async fn update(
         &self,
         _: uuid::Uuid,
-        _: sentinel_api::ports::inbound::community::manage_embeds::EmbedInput,
+        _: sentinel_core::ports::inbound::community::manage_embeds::EmbedInput,
     ) -> Result<sentinel_core::domain::entities::community::embed::Embed, DomainError> {
         unimplemented!()
     }
@@ -927,13 +947,12 @@ impl sentinel_api::ports::inbound::community::manage_embeds::ManageEmbedsUseCase
     }
 }
 
-#[allow(dead_code)]
 pub struct StubIdeas;
 #[async_trait]
-impl sentinel_api::ports::inbound::community::manage_ideas::ManageIdeasUseCase for StubIdeas {
+impl sentinel_core::ports::inbound::community::manage_ideas::ManageIdeasUseCase for StubIdeas {
     async fn list(
         &self,
-        _: sentinel_api::ports::outbound::community::idea_repository::IdeaFilters<'_>,
+        _: sentinel_core::ports::outbound::community::idea_repository::IdeaFilters<'_>,
         _: i64,
         _: i64,
     ) -> Result<Vec<sentinel_core::domain::entities::community::idea::Idea>, DomainError> {
@@ -959,13 +978,13 @@ impl sentinel_api::ports::inbound::community::manage_ideas::ManageIdeasUseCase f
     }
     async fn create(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_ideas::CreateIdeaCommand,
+        _: sentinel_core::ports::inbound::community::manage_ideas::CreateIdeaCommand,
     ) -> Result<sentinel_core::domain::entities::community::idea::Idea, DomainError> {
         unimplemented!()
     }
     async fn decide(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_ideas::DecideIdeaCommand,
+        _: sentinel_core::ports::inbound::community::manage_ideas::DecideIdeaCommand,
     ) -> Result<sentinel_core::domain::entities::community::idea::Idea, DomainError> {
         unimplemented!()
     }
@@ -978,7 +997,7 @@ impl sentinel_api::ports::inbound::community::manage_ideas::ManageIdeasUseCase f
     }
     async fn add_message(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_ideas::AddIdeaMessageCommand,
+        _: sentinel_core::ports::inbound::community::manage_ideas::AddIdeaMessageCommand,
     ) -> Result<sentinel_core::domain::entities::community::idea::IdeaMessage, DomainError> {
         unimplemented!()
     }
@@ -990,15 +1009,14 @@ impl sentinel_api::ports::inbound::community::manage_ideas::ManageIdeasUseCase f
     }
 }
 
-#[allow(dead_code)]
 pub struct StubConfessions;
 #[async_trait]
-impl sentinel_api::ports::inbound::community::manage_confessions::ManageConfessionsUseCase
+impl sentinel_core::ports::inbound::community::manage_confessions::ManageConfessionsUseCase
     for StubConfessions
 {
     async fn create(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_confessions::CreateConfessionCommand,
+        _: sentinel_core::ports::inbound::community::manage_confessions::CreateConfessionCommand,
     ) -> Result<sentinel_core::domain::entities::community::confession::Confession, DomainError>
     {
         unimplemented!()
@@ -1065,7 +1083,7 @@ impl sentinel_api::ports::inbound::community::manage_confessions::ManageConfessi
     }
     async fn create_reply(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_confessions::CreateReplyCommand,
+        _: sentinel_core::ports::inbound::community::manage_confessions::CreateReplyCommand,
     ) -> Result<sentinel_core::domain::entities::community::confession::ConfessionReply, DomainError>
     {
         unimplemented!()
@@ -1095,7 +1113,7 @@ impl sentinel_api::ports::inbound::community::manage_confessions::ManageConfessi
     }
     async fn create_report(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_confessions::CreateReportCommand,
+        _: sentinel_core::ports::inbound::community::manage_confessions::CreateReportCommand,
     ) -> Result<sentinel_core::domain::entities::community::confession::ConfessionReport, DomainError>
     {
         unimplemented!()
@@ -1275,7 +1293,7 @@ impl ManageStrikesUseCase for StubStrikes {
 
 pub struct StubModerationCopilot;
 #[async_trait]
-impl sentinel_api::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase
+impl sentinel_core::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase
     for StubModerationCopilot
 {
     async fn get_member_context(
@@ -1627,7 +1645,7 @@ impl WelcomeConfigRepository for StubWelcomeConfigRepo {
 
 pub struct StubGuildResetRepo;
 #[async_trait]
-impl sentinel_api::ports::outbound::system::guild_reset_repository::GuildResetRepository
+impl sentinel_core::ports::outbound::system::guild_reset_repository::GuildResetRepository
     for StubGuildResetRepo
 {
     async fn guild_name(&self, _: &str) -> Result<Option<String>, DomainError> {
@@ -1637,7 +1655,7 @@ impl sentinel_api::ports::outbound::system::guild_reset_repository::GuildResetRe
         &self,
         _: &str,
     ) -> Result<
-        sentinel_api::ports::outbound::system::guild_reset_repository::ResetDiscordContext,
+        sentinel_core::ports::outbound::system::guild_reset_repository::ResetDiscordContext,
         DomainError,
     > {
         Ok(Default::default())
@@ -1649,7 +1667,7 @@ impl sentinel_api::ports::outbound::system::guild_reset_repository::GuildResetRe
 
 pub struct StubAutomodReviewRepo;
 #[async_trait]
-impl sentinel_api::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository
+impl sentinel_core::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository
     for StubAutomodReviewRepo
 {
     async fn create(
@@ -1855,23 +1873,23 @@ impl sentinel_api::ports::outbound::moderation::automod_review_repository::Autom
 
 pub struct StubDiscordActionMessageRepo;
 #[async_trait]
-impl sentinel_api::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository for StubDiscordActionMessageRepo {
+impl sentinel_core::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository for StubDiscordActionMessageRepo {
     async fn register(&self, _: sentinel_core::domain::entities::audit::discord_action_message::NewDiscordActionMessage) -> Result<(), DomainError> { Ok(()) }
     async fn list_for_action(&self, _: Uuid) -> Result<Vec<sentinel_core::domain::entities::audit::discord_action_message::DiscordActionMessage>, DomainError> { Ok(vec![]) }
 }
 
 pub struct StubExportUC;
 #[async_trait]
-impl sentinel_api::application::system::export_service::ExecuteExportUseCase for StubExportUC {
+impl sentinel_core::application::system::export_service::ExecuteExportUseCase for StubExportUC {
     async fn execute(
         &self,
         _: &str,
         _: &str,
         _: &str,
         _: i64,
-    ) -> Result<sentinel_api::application::system::export_service::ExportResult, DomainError> {
+    ) -> Result<sentinel_core::application::system::export_service::ExportResult, DomainError> {
         Ok(
-            sentinel_api::application::system::export_service::ExportResult {
+            sentinel_core::application::system::export_service::ExportResult {
                 data: String::new(),
                 row_count: 0,
             },
@@ -2700,7 +2718,7 @@ impl sentinel_core::ports::outbound::moderation::adaptive_slowmode_repository::A
 
 struct StubSponsorships;
 #[async_trait]
-impl sentinel_api::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase
+impl sentinel_core::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase
     for StubSponsorships
 {
     async fn create_sponsorship(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
@@ -2733,25 +2751,92 @@ fn base_state() -> AppState {
     });
     let pg_pool = sqlx::PgPool::connect_lazy(&db_url).unwrap();
 
-    AppState {
+    // ── Dependances partagees entre l'etat plat et les sous-etats ──
+    //
+    // Le broadcaster DOIT etre une instance unique : les tests qui verifient
+    // qu'un handler a diffuse un evenement s'abonnent a ce canal-la. Deux
+    // instances feraient passer des tests sur un canal que personne n'ecoute.
+    // Les autres stubs ci-dessous sont hoistes pour la meme raison : un
+    // handler migre lit le sous-etat, le test seede l'etat plat.
+    let broadcaster = Arc::new(EventBroadcaster::new());
+    let bot_config_repo: Arc<dyn sentinel_core::ports::outbound::system::bot_config_repository::BotConfigRepository> =
+        Arc::new(StubBotConfigRepo);
+    let guild_snapshots_uc: Arc<dyn sentinel_core::ports::inbound::guild_backup::manage_snapshots::ManageGuildSnapshotsUseCase> =
+        Arc::new(StubGuildSnapshots);
+    let pending_role_grants_uc: Arc<dyn sentinel_core::ports::inbound::guild_backup::manage_pending_role_grants::ManagePendingRoleGrantsUseCase> =
+        Arc::new(StubPendingRoleGrants);
+    let discord_api: Arc<dyn sentinel_core::ports::outbound::discord_api::DiscordApi> =
+        Arc::new(DiscordApiService::new(String::new()));
+    let log_repo: Arc<dyn sentinel_core::ports::outbound::system::log_repository::LogRepository> =
+        Arc::new(StubLogRepo);
+    // Partage entre l'etat plat (lu par les middlewares) et `SystemState` :
+    // deux listes distinctes laisseraient un test regler l'une et verifier
+    // l'autre.
+    let superadmin_user_ids: Arc<Vec<String>> = Arc::new(Vec::new());
+
+    // Sous-etats par domaine (cf. `sentinel_api::bootstrap::state`). Seul
+    // `guild_backup` a des handlers migres a ce stade ; `ai` et `moderation`
+    // sont cables pour que l'etat soit complet, mais encore inutilises.
+    let guild_backup = sentinel_api::bootstrap::state::GuildBackupState {
+        guild_snapshots_uc: guild_snapshots_uc.clone(),
+        pending_role_grants_uc: pending_role_grants_uc.clone(),
+        bot_config_repo: bot_config_repo.clone(),
+        broadcaster: broadcaster.clone(),
+    };
+    let ai = sentinel_api::bootstrap::state::AiState {
         analyze_uc: Arc::new(StubAnalyzeMessage),
         analyze_image_uc: Arc::new(StubAnalyzeImage),
+        dataset_uc: Arc::new(StubDataset),
+        ai_jobs_uc: Arc::new(StubAiJobs),
+        inference: Arc::new(
+            sentinel_api::adapters::outbound::inference_service::InferenceService::new(None, None),
+        ),
+        broadcaster: broadcaster.clone(),
+    };
+    let moderation = sentinel_api::bootstrap::state::ModerationState {
         rules_uc: Arc::new(StubRules),
         infractions_uc: Arc::new(StubInfractions),
-        tickets_uc: Arc::new(StubTickets),
-        security_uc: Arc::new(StubSecurity),
         moderation_uc: Arc::new(StubModeration),
         modstats_uc: Arc::new(sentinel_core::application::moderation::read_modstats_service::ReadModstatsService::new(Arc::new(StubModstatsRepo))),
-        stats_uc: Arc::new(StubStats),
-        voice_channels_uc: Arc::new(StubVoiceChannels),
-        watched_users_uc: Arc::new(StubWatchedUsers),
+        notes_uc: Arc::new(StubNotes),
+        reminders_uc: Arc::new(StubReminders),
+        strikes_uc: Arc::new(StubStrikes),
+        moderation_copilot_uc: Arc::new(StubModerationCopilot),
+        assess_target_risk_uc: Arc::new(
+            sentinel_core::application::moderation::assess_target_risk_service::AssessTargetRiskService::new(
+                Arc::new(StubBotConfigRepo),
+            ),
+        ),
+        automod_reviews_uc: Arc::new(
+            sentinel_core::application::moderation::manage_automod_reviews_service::ManageAutomodReviewsService::new(
+                Arc::new(StubAutomodReviewRepo),
+            ),
+        ),
+        automod_adaptive_slowmode_repo: Arc::new(StubAdaptiveSlowmodeRepo),
+        sursis_uc: Arc::new(StubSursis),
+        // Orchestration reelle : elle ne fait que composer les stubs
+        // ci-dessus, un test qui annule une action obtient donc le vrai
+        // enchainement (effet Discord inverse puis suppression).
+        cancel_action_uc: Arc::new(
+            sentinel_core::application::moderation::cancel_action_service::CancelModerationActionService::new(
+                Arc::new(StubModeration),
+                Arc::new(StubReminders),
+                discord_api.clone(),
+            ),
+        ),
+        evidence_repo: Arc::new(StubEvidenceRepo),
+        review_repo: Arc::new(StubReviewRepo),
+        pending_action_repo: Arc::new(StubPendingActionRepo),
+        modstats_repo: Arc::new(StubModstatsRepo),
+        broadcaster: broadcaster.clone(),
+        discord_api: discord_api.clone(),
+        bot_config_repo: bot_config_repo.clone(),
+    };
+
+    let audit = sentinel_api::bootstrap::state::AuditState {
         audit_logs_uc: Arc::new(StubAuditLogs),
-        events_uc: Arc::new(StubCommunityLife),
-        lfg_uc: Arc::new(StubCommunityLife),
-        polls_uc: Arc::new(StubCommunityLife),
-        spotlight_uc: Arc::new(StubCommunityLife),
-        news_uc: Arc::new(StubCommunityLife),
-        presence_uc: Arc::new(StubCommunityLife),
+        watched_users_uc: Arc::new(StubWatchedUsers),
+        stats_uc: Arc::new(StubStats),
         detect_anomaly_uc: Arc::new(
             sentinel_core::application::audit::detect_moderation_anomaly_service::DetectModerationAnomalyService::new(
                 Arc::new(sentinel_api::adapters::outbound::audit::in_memory_anomaly_counter::InMemoryAnomalyCounter::new(500, 100)),
@@ -2763,97 +2848,119 @@ fn base_state() -> AppState {
             ),
         ),
         snapshots_uc: Arc::new(StubSnapshots),
-        levels_uc: Arc::new(StubLevels),
-        announcements_uc: Arc::new(StubAnnouncements),
-        embeds_uc: Arc::new(StubEmbeds),
-        ideas_uc: Arc::new(StubIdeas),
-        confessions_uc: Arc::new(StubConfessions),
-        role_panels_uc: Arc::new(StubRolePanels),
-        notes_uc: Arc::new(StubNotes),
-        reminders_uc: Arc::new(StubReminders),
-        strikes_uc: Arc::new(StubStrikes),
-        moderation_copilot_uc: Arc::new(StubModerationCopilot),
-        assess_target_risk_uc: Arc::new(
-            sentinel_api::application::moderation::assess_target_risk_service::AssessTargetRiskService::new(
-                Arc::new(StubBotConfigRepo),
+        discord_action_messages_uc: Arc::new(
+            sentinel_core::application::audit::manage_discord_action_messages_service::ManageDiscordActionMessagesService::new(
+                Arc::new(StubDiscordActionMessageRepo),
             ),
         ),
+        security_uc: Arc::new(StubSecurity),
         analytics_repo: Arc::new(StubAnalyticsRepo),
+        user_activity_repo: Arc::new(StubUserActivityRepo),
+        broadcaster: broadcaster.clone(),
+        bot_config_repo: bot_config_repo.clone(),
+        redis_client: redis_client.clone(),
         daily_activity_repo: Arc::new(StubDailyActivityRepo),
+        discord_api: discord_api.clone(),
+    };
+
+    let community = sentinel_api::bootstrap::state::CommunityState {
+        events_uc: Arc::new(StubCommunityLife),
+        lfg_uc: Arc::new(StubCommunityLife),
+        polls_uc: Arc::new(StubCommunityLife),
+        spotlight_uc: Arc::new(StubCommunityLife),
+        news_uc: Arc::new(StubCommunityLife),
+        ideas_uc: Arc::new(StubIdeas),
+        confessions_uc: Arc::new(StubConfessions),
+        announcements_uc: Arc::new(StubAnnouncements),
+        embeds_uc: Arc::new(StubEmbeds),
+        bump_uc: Arc::new(StubBump),
+        presence_uc: Arc::new(StubCommunityLife),
+        members_uc: Arc::new(StubMembers),
+        levels_uc: Arc::new(StubLevels),
+        monthly_ranking_uc: Arc::new(StubMonthlyRanking),
+        role_panels_uc: Arc::new(StubRolePanels),
+        voice_channels_uc: Arc::new(StubVoiceChannels),
+        welcome_config_uc: Arc::new(
+            sentinel_core::application::community::manage_welcome_config_service::ManageWelcomeConfigService::new(
+                Arc::new(StubWelcomeConfigRepo),
+            ),
+        ),
+        eligibility_uc: Arc::new(StubEligibility),
+        age_check_uc: Arc::new(
+            sentinel_core::application::community::evaluate_age_declaration_service::EvaluateAgeDeclarationService::new(
+                Arc::new(StubWelcomeConfigRepo),
+            ),
+        ),
+        manage_sponsorships_uc: Arc::new(StubSponsorships),
+        daily_activity_repo: Arc::new(StubDailyActivityRepo),
+        discord_role_repo: Arc::new(StubDiscordRoleRepo),
         age_ban_repo: Arc::new(
             sentinel_api::adapters::outbound::postgres::community::age_ban_repository::PgAgeBanRepository::new(
                 pg_pool.clone(),
             ),
         ),
-        log_repo: Arc::new(StubLogRepo),
+        sponsorship_repo: Arc::new(StubSponsorshipRepo),
+        temp_role_repo: Arc::new(StubTempRoleRepo),
+        broadcaster: broadcaster.clone(),
+        discord_api: discord_api.clone(),
+        bot_config_repo: bot_config_repo.clone(),
+        redis_client: redis_client.clone(),
+    };
+
+    let system = sentinel_api::bootstrap::state::SystemState {
+        tickets_uc: Arc::new(StubTickets),
         system_logs_uc: Arc::new(StubSystemLogs),
-        guild_repo: Arc::new(StubGuildRepo),
-        bot_config_repo: Arc::new(StubBotConfigRepo),
-        discord_role_repo: Arc::new(StubDiscordRoleRepo),
-        members_uc: Arc::new(StubMembers),
-        user_activity_repo: Arc::new(StubUserActivityRepo),
-        welcome_config_uc: Arc::new(
-            sentinel_api::application::community::manage_welcome_config_service::ManageWelcomeConfigService::new(
-                Arc::new(StubWelcomeConfigRepo),
-            ),
-        ),
-        age_check_uc: Arc::new(
-            sentinel_api::application::community::evaluate_age_declaration_service::EvaluateAgeDeclarationService::new(
-                Arc::new(StubWelcomeConfigRepo),
-            ),
-        ),
-        automod_reviews_uc: Arc::new(
-            sentinel_api::application::moderation::manage_automod_reviews_service::ManageAutomodReviewsService::new(
-                Arc::new(StubAutomodReviewRepo),
-            ),
-        ),
+        server_events_uc: Arc::new(StubServerEvents),
+        rotation_uc: Arc::new(StubRotation),
         reset_guild_uc: Arc::new(
-            sentinel_api::application::system::reset_guild_service::ResetGuildService::new(
+            sentinel_core::application::system::reset_guild_service::ResetGuildService::new(
                 Arc::new(StubGuildResetRepo),
             ),
         ),
-        discord_action_messages_uc: Arc::new(
-            sentinel_api::application::audit::manage_discord_action_messages_service::ManageDiscordActionMessagesService::new(
-                Arc::new(StubDiscordActionMessageRepo),
-            ),
-        ),
-        export_uc: Arc::new(StubExportUC),
-        export_jobs_uc: Arc::new(StubExportJobsUC),
-        evidence_repo: Arc::new(StubEvidenceRepo),
-        review_repo: Arc::new(StubReviewRepo),
-        modstats_repo: Arc::new(StubModstatsRepo),
-        sponsorship_repo: Arc::new(StubSponsorshipRepo),
-        temp_role_repo: Arc::new(StubTempRoleRepo),
-        pending_action_repo: Arc::new(StubPendingActionRepo),
-        guild_snapshots_uc: Arc::new(StubGuildSnapshots),
-        pending_role_grants_uc: Arc::new(StubPendingRoleGrants),
-        rotation_uc: Arc::new(StubRotation),
-        ip_bans_uc: Arc::new(StubIpBans),
-        host_probe_uc: Arc::new(StubHostProbe),
-        security_logs_uc: Arc::new(StubSecurityLogs),
-        security_audit_uc: Arc::new(StubSecurityAudit),
-        tls_cert_uc: Arc::new(StubTlsCert),
-        geoip_uc: Arc::new(StubGeoIp),
-        bump_uc: Arc::new(StubBump),
-        eligibility_uc: Arc::new(StubEligibility),
-        manage_sponsorships_uc: Arc::new(StubSponsorships),
-        dataset_uc: Arc::new(StubDataset),
-        ai_jobs_uc: Arc::new(StubAiJobs),
-        monthly_ranking_uc: Arc::new(StubMonthlyRanking),
+        bot_persistence_uc: Arc::new(StubBotPersistence),
+        alert_rules_uc: Arc::new(StubAlertRules),
         oauth_uc: Arc::new(StubOAuth),
+        ip_bans_uc: Arc::new(StubIpBans),
         quarantine_uc: Arc::new(StubQuarantine),
         lockdown_uc: Arc::new(StubLockdown),
         slowmode_uc: Arc::new(StubSlowmode),
-        alert_rules_uc: Arc::new(StubAlertRules),
+        security_logs_uc: Arc::new(StubSecurityLogs),
+        security_audit_uc: Arc::new(StubSecurityAudit),
+        host_probe_uc: Arc::new(StubHostProbe),
+        tls_cert_uc: Arc::new(StubTlsCert),
+        geoip_uc: Arc::new(StubGeoIp),
+        export_uc: Arc::new(StubExportUC),
+        export_jobs_uc: Arc::new(StubExportJobsUC),
         docker_host: Arc::new(StubDockerHost),
-        bot_persistence_uc: Arc::new(StubBotPersistence),
-        server_events_uc: Arc::new(StubServerEvents),
-        sursis_uc: Arc::new(StubSursis),
-        automod_adaptive_slowmode_repo: Arc::new(StubAdaptiveSlowmodeRepo),
-        broadcaster: Arc::new(EventBroadcaster::new()),
+        system_probe: Arc::new(StubSystemProbe),
+        guild_repo: Arc::new(StubGuildRepo),
+        log_repo: log_repo.clone(),
+        // Aucun poller Docker ni ban automatique en test.
+        container_monitor: None,
+        rate_limiter: None,
+        broadcaster: broadcaster.clone(),
+        discord_api: discord_api.clone(),
+        bot_config_repo: bot_config_repo.clone(),
+        redis_client: redis_client.clone(),
+        discord_oauth_client_id: String::new(),
+        discord_oauth_client_secret: String::new(),
+        discord_oauth_redirect_uri: String::new(),
+        web_front_url: String::new(),
+        superadmin_user_ids: superadmin_user_ids.clone(),
+        api_key: String::new(),
+    };
+
+    AppState {
+        audit,
+        community,
+        system,        ai,
+        moderation,
+        guild_backup,
+        log_repo: log_repo.clone(),
+        bot_config_repo: bot_config_repo.clone(),
+        broadcaster: broadcaster.clone(),
         job_client: JobClient::new(redis_client.clone(), "test:jobs".into()),
-        discord_api: Arc::new(DiscordApiService::new(String::new())),
-        inference: Arc::new(sentinel_api::adapters::outbound::inference_service::InferenceService::new(None, None)),
+        discord_api: discord_api.clone(),
         api_key: String::new(),
         // Vide = verrou mono-serveur desactive : les tests d'integration
         // utilisent des identifiants de guilde arbitraires.
@@ -2867,123 +2974,103 @@ fn base_state() -> AppState {
             ),
         ),
         discord_bot_token: String::new(),
-        system_probe: Arc::new(StubSystemProbe),
         pg_pool,
         redis_client,
         cache: None,
-        superadmin_user_ids: Arc::new(Vec::new()),
-        discord_oauth_client_id: String::new(),
-        discord_oauth_client_secret: String::new(),
-        discord_oauth_redirect_uri: String::new(),
-        web_front_url: String::new(),
-        container_monitor: None,
-        rate_limiter: None,
+        superadmin_user_ids: superadmin_user_ids.clone(),
         metrics_token: String::new(),
     }
 }
 
 /// Construit un AppState avec un mock voice channels injecte.
-#[allow(dead_code)]
 pub fn build_test_state(voice_uc: Arc<dyn ManageVoiceChannelsUseCase>) -> AppState {
     let mut state = base_state();
-    state.voice_channels_uc = voice_uc;
+    state.community.voice_channels_uc = voice_uc;
     state
 }
 
 /// Construit un AppState avec un mock tickets injecte.
-#[allow(dead_code)]
 pub fn build_test_state_tickets(tickets_uc: Arc<dyn ManageTicketsUseCase>) -> AppState {
     let mut state = base_state();
-    state.tickets_uc = tickets_uc;
+    state.system.tickets_uc = tickets_uc;
     state
 }
 
 /// Construit un AppState avec un mock strikes injecte.
-#[allow(dead_code)]
 pub fn build_test_state_strikes(strikes_uc: Arc<dyn ManageStrikesUseCase>) -> AppState {
     let mut state = base_state();
-    state.strikes_uc = strikes_uc;
+    state.moderation.strikes_uc = strikes_uc;
     state
 }
 
 /// Construit un AppState avec un mock rules injecte.
-#[allow(dead_code)]
 pub fn build_test_state_rules(rules_uc: Arc<dyn ManageRulesUseCase>) -> AppState {
     let mut state = base_state();
-    state.rules_uc = rules_uc;
+    state.moderation.rules_uc = rules_uc;
     state
 }
 
 /// Construit un AppState avec un mock infractions injecte.
-#[allow(dead_code)]
 pub fn build_test_state_infractions(infractions_uc: Arc<dyn ManageInfractionsUseCase>) -> AppState {
     let mut state = base_state();
-    state.infractions_uc = infractions_uc;
+    state.moderation.infractions_uc = infractions_uc;
     state
 }
 
 /// Construit un AppState avec un mock audit logs injecte.
-#[allow(dead_code)]
 pub fn build_test_state_audit_logs(audit_logs_uc: Arc<dyn ManageAuditLogsUseCase>) -> AppState {
     let mut state = base_state();
-    state.audit_logs_uc = audit_logs_uc;
+    state.audit.audit_logs_uc = audit_logs_uc;
     state
 }
 
 /// Construit un AppState avec un mock watched users injecte.
-#[allow(dead_code)]
 pub fn build_test_state_watched_users(
     watched_users_uc: Arc<dyn ManageWatchedUsersUseCase>,
 ) -> AppState {
     let mut state = base_state();
-    state.watched_users_uc = watched_users_uc;
+    state.audit.watched_users_uc = watched_users_uc;
     state
 }
 
 /// Construit un AppState avec un mock user activity repository injecte.
-#[allow(dead_code)]
 pub fn build_test_state_user_activity(
     user_activity_repo: Arc<dyn UserActivityRepository>,
 ) -> AppState {
     let mut state = base_state();
-    state.user_activity_repo = user_activity_repo;
+    state.audit.user_activity_repo = user_activity_repo;
     state
 }
 
 /// Construit un AppState avec un mock analyze (text) use case injecte.
-#[allow(dead_code)]
 pub fn build_test_state_analyze(analyze_uc: Arc<dyn AnalyzeMessageUseCase>) -> AppState {
     let mut state = base_state();
-    state.analyze_uc = analyze_uc;
+    state.ai.analyze_uc = analyze_uc;
     state
 }
 
 /// Construit un AppState avec un mock security use case injecte.
-#[allow(dead_code)]
 pub fn build_test_state_security(security_uc: Arc<dyn ManageSecurityUseCase>) -> AppState {
     let mut state = base_state();
-    state.security_uc = security_uc;
+    state.audit.security_uc = security_uc;
     state
 }
 
 /// Construit un AppState avec un mock levels use case injecte.
-#[allow(dead_code)]
 pub fn build_test_state_levels(levels_uc: Arc<dyn ManageLevelsUseCase>) -> AppState {
     let mut state = base_state();
-    state.levels_uc = levels_uc;
+    state.community.levels_uc = levels_uc;
     state
 }
 
 /// Construit un AppState avec un mock stats use case injecte.
-#[allow(dead_code)]
 pub fn build_test_state_stats(stats_uc: Arc<dyn ManageStatsUseCase>) -> AppState {
     let mut state = base_state();
-    state.stats_uc = stats_uc;
+    state.audit.stats_uc = stats_uc;
     state
 }
 
 /// Construit un AppState avec un mock log repository injecte.
-#[allow(dead_code)]
 pub fn build_test_state_logs(log_repo: Arc<dyn LogRepository>) -> AppState {
     let mut state = base_state();
     state.log_repo = log_repo;
@@ -2991,47 +3078,42 @@ pub fn build_test_state_logs(log_repo: Arc<dyn LogRepository>) -> AppState {
 }
 
 /// Construit un AppState avec un mock guild repository injecte.
-#[allow(dead_code)]
 pub fn build_test_state_guilds(guild_repo: Arc<dyn GuildRepository>) -> AppState {
     let mut state = base_state();
-    state.guild_repo = guild_repo;
+    state.system.guild_repo = guild_repo;
     state
 }
 
 /// Construit un AppState avec un mock daily activity repository injecte.
-#[allow(dead_code)]
 pub fn build_test_state_daily_activity(
     daily_activity_repo: Arc<dyn DailyActivityRepository>,
 ) -> AppState {
     let mut state = base_state();
-    state.daily_activity_repo = daily_activity_repo;
+    state.community.daily_activity_repo = daily_activity_repo;
     state
 }
 
 /// Construit un AppState avec un mock analytics repository injecte.
-#[allow(dead_code)]
 pub fn build_test_state_analytics(analytics_repo: Arc<dyn AnalyticsRepository>) -> AppState {
     let mut state = base_state();
-    state.analytics_repo = analytics_repo;
+    state.audit.analytics_repo = analytics_repo;
     state
 }
 
 /// Construit un AppState avec un mock role panels use case injecte.
-#[allow(dead_code)]
 pub fn build_test_state_role_panels(role_panels_uc: Arc<dyn ManageRolePanelsUseCase>) -> AppState {
     let mut state = base_state();
-    state.role_panels_uc = role_panels_uc;
+    state.community.role_panels_uc = role_panels_uc;
     state
 }
 
 /// Construit un AppState avec un mock welcome config repository injecte.
 /// Le repo est wrappe dans le service applicatif pour exposer le use case
 /// (l'AppState n'expose plus le repo directement).
-#[allow(dead_code)]
 pub fn build_test_state_welcome(welcome_config_repo: Arc<dyn WelcomeConfigRepository>) -> AppState {
     let mut state = base_state();
-    state.welcome_config_uc = Arc::new(
-        sentinel_api::application::community::manage_welcome_config_service::ManageWelcomeConfigService::new(
+    state.community.welcome_config_uc = Arc::new(
+        sentinel_core::application::community::manage_welcome_config_service::ManageWelcomeConfigService::new(
             welcome_config_repo,
         ),
     );
@@ -3039,7 +3121,6 @@ pub fn build_test_state_welcome(welcome_config_repo: Arc<dyn WelcomeConfigReposi
 }
 
 /// Construit un AppState avec un mock bot_config repository injecte.
-#[allow(dead_code)]
 pub fn build_test_state_bot_config(bot_config_repo: Arc<dyn BotConfigRepository>) -> AppState {
     let mut state = base_state();
     state.bot_config_repo = bot_config_repo;
@@ -3047,7 +3128,6 @@ pub fn build_test_state_bot_config(bot_config_repo: Arc<dyn BotConfigRepository>
 }
 
 /// Construit un AppState avec un mock DiscordApi injecte.
-#[allow(dead_code)]
 pub fn build_test_state_discord_api(discord_api: Arc<dyn DiscordApi>) -> AppState {
     let mut state = base_state();
     state.discord_api = discord_api;
@@ -3066,11 +3146,9 @@ pub struct MockDiscordApi {
 }
 
 impl MockDiscordApi {
-    #[allow(dead_code)]
     pub fn new() -> Self {
         Self::default()
     }
-    #[allow(dead_code)]
     fn record(&self, call: &str) {
         self.calls.lock().unwrap().push(call.into());
     }
@@ -3157,6 +3235,7 @@ impl DiscordApi for MockDiscordApi {
             id: "u1".into(),
             username: "mock".into(),
             avatar: None,
+            global_name: None,
         })
     }
 }

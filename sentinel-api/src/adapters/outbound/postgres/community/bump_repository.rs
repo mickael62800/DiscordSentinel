@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::ports::outbound::community::bump_repository::BumpRepository;
+use sentinel_core::ports::outbound::community::bump_repository::BumpRepository;
 use sentinel_core::domain::entities::community::bump::{BumpState, DueReminder};
 use sentinel_core::domain::errors::DomainError;
 

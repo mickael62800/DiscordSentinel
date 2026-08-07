@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 
 fn default_true() -> bool {
     true
@@ -39,7 +39,7 @@ pub struct ResetGuildResponse {
 
 /// POST /api/system/guild-reset/{guild_id}
 pub async fn reset_guild(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<ResetGuildBody>,

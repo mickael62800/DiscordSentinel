@@ -23,6 +23,7 @@ struct MockWheelRepo {
     /// Valeur retournee par try_claim_today.
     claim_ok: bool,
     logged: Mutex<Vec<WheelSpin>>,
+    wallet_repo: Mutex<Option<Arc<MockWalletRepo>>>,
 }
 
 #[async_trait]
@@ -59,6 +60,25 @@ impl WheelRepository for MockWheelRepo {
         _cases: &[crate::domain::entities::wheel::WheelCaseData],
     ) -> Result<(), DomainError> {
         Ok(())
+    }
+    async fn execute_spin_transaction(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _cooldown_hours: i64,
+        spin: &WheelSpin,
+        wallet: &crate::domain::entities::wallet::Wallet,
+        mutation: Option<&crate::domain::entities::wallet::WalletMutation>,
+    ) -> Result<bool, DomainError> {
+        if self.claim_ok {
+            self.logged.lock().unwrap().push(spin.clone());
+            if let Some(w_repo) = self.wallet_repo.lock().unwrap().as_ref() {
+                if let Some(mutat) = mutation {
+                    w_repo.saved.lock().unwrap().push((wallet.clone(), mutat.clone()));
+                }
+            }
+        }
+        Ok(self.claim_ok)
     }
 }
 
@@ -123,6 +143,7 @@ fn service(claim_ok: bool, initial_coins: i64) -> (PlayWheelService, Arc<MockWhe
         initial_coins,
         ..Default::default()
     });
+    *wheel.wallet_repo.lock().unwrap() = Some(wallet.clone());
     (
         PlayWheelService::new(wheel.clone(), wallet.clone(), Arc::new(crate::application::economy_config::EmptyBotConfigRepository)),
         wheel,

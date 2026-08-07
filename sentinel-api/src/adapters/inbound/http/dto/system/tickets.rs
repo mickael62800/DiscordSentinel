@@ -1,4 +1,4 @@
-use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
+use sentinel_core::ports::inbound::system::manage_tickets::CreateTicketCommand;
 use sentinel_core::domain::entities::system::ticket::Ticket;
 use sentinel_core::domain::entities::system::ticket::TicketDetail;
 use sentinel_core::domain::entities::system::ticket::TicketMessage;

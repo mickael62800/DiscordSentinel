@@ -18,6 +18,10 @@ use sentinel_proto::ai_dataset::v1::ai_dataset_service_server::AiDatasetServiceS
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
 use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
 use sentinel_proto::export::v1::export_service_server::ExportServiceServer;
+use sentinel_proto::audit::v1::audit_service_server::AuditServiceServer;
+use sentinel_proto::guild_backup::v1::guild_backup_service_server::GuildBackupServiceServer;
+use sentinel_proto::ideas::v1::ideas_service_server::IdeasServiceServer;
+use sentinel_proto::purge::v1::purge_service_server::PurgeServiceServer;
 use sentinel_proto::images::v1::images_service_server::ImagesServiceServer;
 use sentinel_proto::members::v1::members_service_server::MembersServiceServer;
 use sentinel_proto::moderation::v1::moderation_service_server::ModerationServiceServer;
@@ -40,6 +44,7 @@ use tracing::info;
 use crate::adapters::inbound::grpc::ai::automod::AutomodGrpc;
 use crate::adapters::inbound::grpc::ai::dataset::AiDatasetGrpc;
 use crate::adapters::inbound::grpc::ai::images::ImagesGrpc;
+use crate::adapters::inbound::grpc::audit::journal::AuditGrpc;
 use crate::adapters::inbound::grpc::audit::security::SecurityGrpc;
 use crate::adapters::inbound::grpc::audit::stats::StatsGrpc;
 use crate::adapters::inbound::grpc::community::members::MembersGrpc;
@@ -48,6 +53,9 @@ use crate::adapters::inbound::grpc::community::roles::RolePanelsGrpc;
 use crate::adapters::inbound::grpc::community::sponsorships::CommunityGrpc;
 use crate::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
 use crate::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
+use crate::adapters::inbound::grpc::community::ideas::IdeasGrpc;
+use crate::adapters::inbound::grpc::guild_backup::snapshots::GuildBackupGrpc;
+use crate::adapters::inbound::grpc::moderation::purge::PurgeGrpc;
 use crate::adapters::inbound::grpc::system::export::ExportGrpc;
 use crate::adapters::inbound::grpc::system::tickets::TicketsGrpc;
 use crate::adapters::inbound::grpc::system::welcome::WelcomeGrpc;
@@ -58,52 +66,83 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let api_key = state.api_key.clone();
 
     let progression = ProgressionGrpc {
-        levels_uc: state.levels_uc.clone(),
+        levels_uc: state.community.levels_uc.clone(),
         broadcaster: state.broadcaster.clone(),
     };
     let stats = StatsGrpc {
-        stats_uc: state.stats_uc.clone(),
+        stats_uc: state.audit.stats_uc.clone(),
         broadcaster: state.broadcaster.clone(),
     };
     let tickets = TicketsGrpc {
-        tickets_uc: state.tickets_uc.clone(),
+        tickets_uc: state.system.tickets_uc.clone(),
     };
     let moderation = ModerationGrpc {
-        moderation_uc: state.moderation_uc.clone(),
-        reminders_uc: state.reminders_uc.clone(),
-        moderation_copilot_uc: state.moderation_copilot_uc.clone(),
+        moderation_uc: state.moderation.moderation_uc.clone(),
+        cancel_action_uc: state.moderation.cancel_action_uc.clone(),
+        reminders_uc: state.moderation.reminders_uc.clone(),
+        moderation_copilot_uc: state.moderation.moderation_copilot_uc.clone(),
+        assess_target_risk_uc: state.moderation.assess_target_risk_uc.clone(),
+        modstats_uc: state.moderation.modstats_uc.clone(),
+        notes_uc: state.moderation.notes_uc.clone(),
+        evidence_repo: state.moderation.evidence_repo.clone(),
+        review_repo: state.moderation.review_repo.clone(),
+        pending_action_repo: state.moderation.pending_action_repo.clone(),
+        infractions_uc: state.moderation.infractions_uc.clone(),
     };
     let roles = RolePanelsGrpc {
-        uc: state.role_panels_uc.clone(),
-        discord_role_repo: state.discord_role_repo.clone(),
+        uc: state.community.role_panels_uc.clone(),
+        discord_role_repo: state.community.discord_role_repo.clone(),
     };
     let welcome = WelcomeGrpc {
-        uc: state.welcome_config_uc.clone(),
+        uc: state.community.welcome_config_uc.clone(),
     };
-    let export = ExportGrpc {
-        uc: state.export_uc.clone(),
+    let audit = AuditGrpc {
+        audit_logs_uc: state.audit.audit_logs_uc.clone(),
+        watched_users_uc: state.audit.watched_users_uc.clone(),
+        weekly_report_uc: state.audit.weekly_report_uc.clone(),
+        detect_anomaly_uc: state.audit.detect_anomaly_uc.clone(),
+        user_activity_repo: state.audit.user_activity_repo.clone(),
     };
-    let community = CommunityGrpc {
-        uc: state.manage_sponsorships_uc.clone(),
+    let guild_backup = GuildBackupGrpc {
+        snapshots_uc: state.guild_backup.guild_snapshots_uc.clone(),
+        pending_role_grants_uc: state.guild_backup.pending_role_grants_uc.clone(),
     };
-    let members = MembersGrpc {
-        uc: state.members_uc.clone(),
+    let ideas = IdeasGrpc {
+        uc: state.community.ideas_uc.clone(),
     };
-    let security = SecurityGrpc {
-        uc: state.security_uc.clone(),
-    };
-    let automod = AutomodGrpc {
-        uc: state.analyze_uc.clone(),
+    let purge = PurgeGrpc {
+        infractions_uc: state.moderation.infractions_uc.clone(),
+        audit_logs_uc: state.audit.audit_logs_uc.clone(),
+        log_repo: state.system.log_repo.clone(),
         broadcaster: state.broadcaster.clone(),
     };
+    let export = ExportGrpc {
+        uc: state.system.export_uc.clone(),
+    };
+    let community = CommunityGrpc {
+        uc: state.community.manage_sponsorships_uc.clone(),
+        eligibility_uc: state.community.eligibility_uc.clone(),
+        monthly_ranking_uc: state.community.monthly_ranking_uc.clone(),
+    };
+    let members = MembersGrpc {
+        uc: state.community.members_uc.clone(),
+    };
+    let security = SecurityGrpc {
+        uc: state.audit.security_uc.clone(),
+    };
+    let automod = AutomodGrpc {
+        uc: state.ai.analyze_uc.clone(),
+        broadcaster: state.broadcaster.clone(),
+        adaptive_slowmode_repo: state.moderation.automod_adaptive_slowmode_repo.clone(),
+    };
     let voice = VoiceChannelsGrpc {
-        uc: state.voice_channels_uc.clone(),
+        uc: state.community.voice_channels_uc.clone(),
     };
     let images = ImagesGrpc {
-        uc: state.analyze_image_uc.clone(),
+        uc: state.ai.analyze_image_uc.clone(),
     };
     let ai_dataset = AiDatasetGrpc {
-        dataset_uc: state.dataset_uc.clone(),
+        dataset_uc: state.ai.dataset_uc.clone(),
     };
 
     // Helper local : compression Gzip (send/accept) puis wrap dans l'auth
@@ -130,6 +169,10 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let images_svc = svc!(ImagesServiceServer, images);
     // Phase 7A.opt F.3/F.4 — nouveaux services.
     let welcome_svc = svc!(WelcomeServiceServer, welcome);
+    let audit_svc = svc!(AuditServiceServer, audit);
+    let guild_backup_svc = svc!(GuildBackupServiceServer, guild_backup);
+    let ideas_svc = svc!(IdeasServiceServer, ideas);
+    let purge_svc = svc!(PurgeServiceServer, purge);
     let export_svc = svc!(ExportServiceServer, export);
     let community_svc = svc!(CommunityServiceServer, community);
     let ai_dataset_svc = svc!(AiDatasetServiceServer, ai_dataset);
@@ -169,6 +212,18 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .await;
     health_reporter
         .set_serving::<WelcomeServiceServer<WelcomeGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<AuditServiceServer<AuditGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<GuildBackupServiceServer<GuildBackupGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<IdeasServiceServer<IdeasGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<PurgeServiceServer<PurgeGrpc>>()
         .await;
     health_reporter
         .set_serving::<ExportServiceServer<ExportGrpc>>()
@@ -226,6 +281,10 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .add_service(images_svc)
         .add_service(welcome_svc)
         .add_service(export_svc)
+        .add_service(purge_svc)
+        .add_service(ideas_svc)
+        .add_service(guild_backup_svc)
+        .add_service(audit_svc)
         .add_service(community_svc)
         .add_service(ai_dataset_svc)
         .serve(bind)

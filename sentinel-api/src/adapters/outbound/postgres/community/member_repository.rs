@@ -4,7 +4,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use sqlx::PgPool;
 
-use crate::ports::outbound::community::member_repository::MemberRepository;
+use sentinel_core::ports::outbound::community::member_repository::MemberRepository;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
 use sentinel_core::domain::entities::community::guild_member_reset::MEMBER_RESET_TABLES;
 use sentinel_core::domain::entities::community::milestone::JoinAnniversary;

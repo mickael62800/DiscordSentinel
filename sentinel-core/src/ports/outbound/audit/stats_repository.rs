@@ -5,7 +5,6 @@ use crate::domain::entities::audit::user_stats::VoiceSessionStats;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-#[allow(dead_code)]
 pub trait StatsRepository: Send + Sync {
     async fn upsert(&self, stats: &UserStats) -> Result<(), DomainError>;
     async fn find_by_user(

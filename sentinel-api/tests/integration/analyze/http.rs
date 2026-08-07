@@ -14,8 +14,8 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
-use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::enums::moderation::action::Action;
 use sentinel_core::domain::errors::DomainError;

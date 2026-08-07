@@ -24,7 +24,6 @@ use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::discord_helpers::{is_module_enabled, is_module_enabled_or_reply_component};
 
 use api_client::{ApiClient, VoiceConfigResponse, VoiceThemeResponse};
@@ -300,7 +299,6 @@ async fn reconcile_voice_channels(ctx: &Context, ready: &Ready) {
 /// Initialise les TypeMapKeys voice dans `data`. Appele depuis main.rs.
 pub async fn init_typemap(
     data: &mut serenity::prelude::TypeMap,
-    api: &Arc<BaseApiClient>,
     grpc: &Arc<crate::shared::grpc_client::SentinelGrpcClient>,
 ) {
     let config = Config::from_env();
@@ -309,7 +307,7 @@ pub async fn init_typemap(
         info!("Voice module: VOICE_GUILD_ID non defini, module desactive");
     }
 
-    let voice_api = ApiClient::new(Arc::clone(api), Arc::clone(grpc));
+    let voice_api = ApiClient::new(Arc::clone(grpc));
 
     let text_to_voice: Arc<DashMap<ChannelId, ChannelId>> = Arc::new(DashMap::new());
     let voice_owner: Arc<DashMap<ChannelId, UserId>> = Arc::new(DashMap::new());

@@ -55,9 +55,9 @@ pub async fn list_name_history(
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<NameHistoryEntryDto>>, ApiError> {
-    use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+    use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
     let logs = state
-        .audit_logs_uc
+        .audit.audit_logs_uc
         .list(
             Some(&guild_id),
             AuditLogFilters {
@@ -105,7 +105,7 @@ pub async fn create_name_history(
     // Validation
     validation::validate_guild_user_path(&dto.guild_id, &dto.user_id).map_err(ApiError)?;
 
-    state.audit_logs_uc.create(crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand {
+    state.audit.audit_logs_uc.create(sentinel_core::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand {
         guild_id: dto.guild_id,
         event_type: sentinel_core::domain::entities::audit::audit_log::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.into(),
         actor_id: None,
@@ -145,7 +145,7 @@ pub async fn update_streak(
     Json(dto): Json<UpdateStreakDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
-        .bot_persistence_uc
+        .system.bot_persistence_uc
         .update_streak(
             &guild_id,
             &user_id,
@@ -183,7 +183,7 @@ pub async fn update_ticket_sla(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
     state
-        .tickets_uc
+        .system.tickets_uc
         .update_sla(
             uuid,
             dto.first_response_at.as_deref(),
@@ -232,7 +232,7 @@ pub async fn create_sponsorship(
     // Pass-through pour les appels bot-internal (user absent).
 
     state
-        .sponsorship_repo
+        .community.sponsorship_repo
         .create(&dto.guild_id, &dto.sponsor_id, &dto.sponsored_id)
         .await
         .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert sponsorship"))
@@ -246,12 +246,12 @@ pub async fn list_sponsorships(
     State(state): State<AppState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
-) -> Result<Json<Vec<crate::ports::outbound::community::sponsorship_repository::Sponsorship>>, ApiError>
+) -> Result<Json<Vec<sentinel_core::ports::outbound::community::sponsorship_repository::Sponsorship>>, ApiError>
 {
     // Validation
 
     let entries = state
-        .sponsorship_repo
+        .community.sponsorship_repo
         .list(&guild_id)
         .await
         .unwrap_or_else(|e| {
@@ -298,7 +298,7 @@ pub async fn create_temp_role(
     // C5 — Gate user : moderator+ requis pour assigner un role temporaire.
 
     state
-        .temp_role_repo
+        .community.temp_role_repo
         .create(&dto.guild_id, &dto.user_id, &dto.role_id, &dto.expires_at)
         .await
         .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert temp_role"))
@@ -312,12 +312,12 @@ pub async fn list_temp_roles(
     State(state): State<AppState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
-) -> Result<Json<Vec<crate::ports::outbound::community::temp_role_repository::TempRole>>, ApiError>
+) -> Result<Json<Vec<sentinel_core::ports::outbound::community::temp_role_repository::TempRole>>, ApiError>
 {
     // Validation
 
     let entries = state
-        .temp_role_repo
+        .community.temp_role_repo
         .list_active(&guild_id)
         .await
         .unwrap_or_else(|e| {
@@ -344,7 +344,7 @@ pub async fn delete_temp_role(
     // X-Discord-Token → pass-through non-breaking.
 
     state
-        .temp_role_repo
+        .community.temp_role_repo
         .delete(&guild_id, &user_id, &role_id)
         .await
         .inspect_err(|e| warn!(error = %e, guild_id = %guild_id, "Echec delete temp_role"))
@@ -405,7 +405,7 @@ pub async fn create_pending_action(
     .map_err(ApiError)?;
 
     match state
-        .pending_action_repo
+        .moderation.pending_action_repo
         .create(
             &dto.guild_id,
             &dto.moderator_id,
@@ -433,13 +433,13 @@ pub async fn list_pending_actions(
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<
-    Json<Vec<crate::ports::outbound::moderation::pending_action_repository::PendingAction>>,
+    Json<Vec<sentinel_core::ports::outbound::moderation::pending_action_repository::PendingAction>>,
     ApiError,
 > {
     // Validation
 
     let entries = state
-        .pending_action_repo
+        .moderation.pending_action_repo
         .list_pending(&guild_id)
         .await
         .unwrap_or_else(|e| {
@@ -459,19 +459,18 @@ pub struct ResolvePendingActionDto {
 /// PATCH /api/moderation/pending/{id}
 pub async fn resolve_pending_action(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    // TODO(secu, ex-H10) : la reverification � lookup du guild_id de l'action
+    // pending puis gate Moderator+ � n'est PAS implementee. Seuls les
+    // middlewares du routeur protegent cette route. L'ancien
+    // `if user.is_some() {}` ne verifiait rien.
+    _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<ResolvePendingActionDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // H10 — Revérif permission serveur : on lookup le guild_id de l'action
-    // pending puis on gate sur Moderator+.
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
 
-    if user.is_some() {
-    }
-
     state
-        .pending_action_repo
+        .moderation.pending_action_repo
         .resolve(uuid, &dto.status, &dto.reviewed_by)
         .await
         .inspect_err(|e| warn!(error = %e, action_id = %id, "Echec resolution pending_action"))

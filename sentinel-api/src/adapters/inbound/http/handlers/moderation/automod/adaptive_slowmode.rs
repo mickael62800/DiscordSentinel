@@ -6,7 +6,7 @@ use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 
 #[derive(Deserialize, Serialize)]
 pub struct AdaptiveSlowmodeBody {
@@ -17,7 +17,7 @@ pub struct AdaptiveSlowmodeBody {
 
 /// POST /api/automod/adaptive-slowmode — marque un salon comme actif.
 pub async fn mark_adaptive_slowmode(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Json(body): Json<AdaptiveSlowmodeBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
@@ -29,7 +29,7 @@ pub async fn mark_adaptive_slowmode(
 
 /// POST /api/automod/adaptive-slowmode/remove — retire un salon (desactive).
 pub async fn unmark_adaptive_slowmode(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Json(body): Json<AdaptiveSlowmodeBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
@@ -41,7 +41,7 @@ pub async fn unmark_adaptive_slowmode(
 
 /// GET /api/automod/adaptive-slowmode — liste tous les salons actifs (reload).
 pub async fn list_adaptive_slowmode(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
 ) -> Result<Json<Vec<AdaptiveSlowmodeBody>>, ApiError> {
     let rows = state.automod_adaptive_slowmode_repo.list_all().await?;
     Ok(Json(

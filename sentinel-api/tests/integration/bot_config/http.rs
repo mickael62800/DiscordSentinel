@@ -16,7 +16,7 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use sentinel_core::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use sentinel_core::domain::entities::system::bot_config::BotDefinition;
 use sentinel_core::domain::entities::system::bot_config::BotGuildConfig;
 use sentinel_core::domain::errors::DomainError;

@@ -16,11 +16,14 @@
 //!
 //! Archi hexagonale : tout le SQL (sessions `web_oauth_sessions`, trace de login
 //! `successful_logins`) est extrait derriere le port `ManageOAuthUseCase` (via
-//! `state.oauth_uc`). L'echange HTTP avec Discord (reqwest : /oauth2/token,
-//! /users/@me, refresh_token) RESTE volontairement dans le handler : il est
-//! indissociable du flux CSRF/state Redis et des cookies (concerns HTTP purs),
-//! n'a pas d'etat metier a persister, et le sortir sans les cookies/CSRF
-//! n'apporterait qu'une indirection. Priorite du refactor : sortir le SQL.
+//! `state.oauth_uc`). La lecture de l'identite passe par `DiscordApi::get_user_me`
+//! — elle etait refaite ici a la main alors que le port l'offrait deja.
+//!
+//! L'echange de jetons proprement dit (`/oauth2/token`, en code d'autorisation
+//! puis en refresh) RESTE volontairement dans le handler : il est indissociable
+//! du flux CSRF/state Redis et des cookies, qui sont des concerns HTTP purs, il
+//! n'a pas d'etat metier a persister, et le sortir sans les cookies ni le CSRF
+//! n'apporterait qu'une indirection. C'est un choix, pas un oubli.
 
 use axum::{
     extract::{Query, State},
@@ -30,7 +33,7 @@ use axum::{
 use redis::AsyncCommands;
 use serde::Deserialize;
 
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 use sentinel_core::domain::entities::system::oauth::{
     LoginTrace, NewOAuthSession, SessionTokenUpdate,
 };
@@ -39,7 +42,6 @@ const STATE_TTL_SECS: u64 = 600;
 const STATE_PREFIX: &str = "oauth:web:state:";
 const DISCORD_AUTHORIZE_URL: &str = "https://discord.com/api/oauth2/authorize";
 const DISCORD_TOKEN_URL: &str = "https://discord.com/api/v10/oauth2/token";
-const DISCORD_USER_URL: &str = "https://discord.com/api/v10/users/@me";
 const OAUTH_SCOPES: &str = "identify guilds";
 
 fn percent_encode(s: &str) -> String {
@@ -128,7 +130,7 @@ fn front_error_redirect(front_url: &str, reason: &str) -> Response {
 }
 
 /// `GET /auth/discord/authorize` — point d'entree du flux OAuth web.
-pub async fn authorize(State(state): State<AppState>) -> Response {
+pub async fn authorize(State(state): State<SystemState>) -> Response {
     if state.discord_oauth_client_id.is_empty()
         || state.discord_oauth_client_secret.is_empty()
         || state.discord_oauth_redirect_uri.is_empty()
@@ -190,29 +192,13 @@ pub struct CallbackQuery {
 #[derive(Debug, Deserialize)]
 struct TokenResponse {
     access_token: String,
-    #[allow(dead_code)]
-    token_type: Option<String>,
-    #[allow(dead_code)]
     expires_in: Option<i64>,
-    #[allow(dead_code)]
     refresh_token: Option<String>,
-    #[allow(dead_code)]
-    scope: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct DiscordMe {
-    id: String,
-    username: String,
-    #[serde(default)]
-    global_name: Option<String>,
-    #[serde(default)]
-    avatar: Option<String>,
 }
 
 /// `GET /auth/discord/callback` — Discord nous renvoie l'utilisateur ici.
 pub async fn callback(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     headers: axum::http::HeaderMap,
     Query(q): Query<CallbackQuery>,
 ) -> Response {
@@ -294,34 +280,14 @@ pub async fn callback(
         }
     };
 
-    // 3. Recuperer l'identite du user via /users/@me.
-    let user_resp = match client
-        .get(DISCORD_USER_URL)
-        .header(
-            header::AUTHORIZATION,
-            format!("Bearer {}", token.access_token),
-        )
-        .send()
-        .await
-    {
-        Ok(r) => r,
-        Err(e) => {
-            tracing::error!(error = %e, "Echec appel /users/@me");
-            return front_error_redirect(&front, "discord_me_error");
-        }
-    };
-
-    if !user_resp.status().is_success() {
-        let status = user_resp.status();
-        tracing::error!(%status, "Discord /users/@me a renvoye une erreur");
-        return front_error_redirect(&front, "discord_me_status");
-    }
-
-    let me: DiscordMe = match user_resp.json().await {
+    // 3. Recuperer l'identite du user via le port : `get_user_me` fait
+    // exactement cet appel, avec le meme Bearer utilisateur. Le refaire ici a
+    // la main dupliquait la gestion d'erreur et le parsing.
+    let me = match state.discord_api.get_user_me(&token.access_token).await {
         Ok(u) => u,
         Err(e) => {
-            tracing::error!(error = %e, "Parse /users/@me impossible");
-            return front_error_redirect(&front, "discord_me_parse");
+            tracing::error!(error = %e, "Echec recuperation /users/@me");
+            return front_error_redirect(&front, "discord_me_error");
         }
     };
 
@@ -438,7 +404,7 @@ fn unauthorized_clear_cookie() -> Response {
 /// `POST /auth/refresh` — ré-émet un token d'accès Discord à partir du cookie
 /// de session (refresh token côté serveur). Permet de rester connecté après
 /// fermeture du navigateur sans re-validation interactive.
-pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Response {
+pub async fn refresh(State(state): State<SystemState>, headers: HeaderMap) -> Response {
     let sid = match cookie_value(&headers, SESSION_COOKIE) {
         Some(s) if !s.is_empty() => s,
         _ => return unauthorized_clear_cookie(),
@@ -536,7 +502,7 @@ pub async fn refresh(State(state): State<AppState>, headers: HeaderMap) -> Respo
 }
 
 /// `POST /auth/logout` — supprime la session serveur + efface le cookie.
-pub async fn logout(State(state): State<AppState>, headers: HeaderMap) -> Response {
+pub async fn logout(State(state): State<SystemState>, headers: HeaderMap) -> Response {
     if let Some(sid) = cookie_value(&headers, SESSION_COOKIE) {
         if let Ok(session_id) = uuid::Uuid::parse_str(&sid) {
             let _ = state.oauth_uc.delete_session(session_id).await;

@@ -2,7 +2,7 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::Extension;
@@ -48,7 +48,7 @@ impl From<DiscordRole> for DiscordRoleDto {
 
 /// GET /api/discord-roles/{guild_id} — Liste les roles Discord d'un serveur
 pub async fn list_roles(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<DiscordRoleDto>>, ApiError> {
@@ -59,7 +59,7 @@ pub async fn list_roles(
 
 /// POST /api/discord-roles/{guild_id}/create — Creer un role Discord
 pub async fn create_role(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<CreateRoleRequest>,
@@ -78,7 +78,7 @@ pub async fn create_role(
 
 /// PATCH /api/discord-roles/{guild_id}/{role_id} — Modifier un role Discord
 pub async fn edit_role(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path((guild_id, role_id)): Path<(String, String)>,
     Json(body): Json<EditRoleRequest>,
@@ -100,7 +100,7 @@ pub async fn edit_role(
 
 /// DELETE /api/discord-roles/{guild_id}/{role_id} — Supprimer un role Discord
 pub async fn delete_role(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path((guild_id, role_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {

@@ -6,7 +6,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::moderation::moderation_repository::PgModerationRepository;
-use sentinel_api::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use sentinel_core::ports::outbound::moderation::moderation_repository::ModerationRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {

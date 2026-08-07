@@ -119,15 +119,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .unwrap_or(30) as u64;
 
     let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
-        Some(a) => a,
+    let grpc = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+        Some(g) => g,
         None => {
-            error!("ApiClientKey manquant");
+            error!("GrpcClientKey manquant");
             reply_error(ctx, command, "Erreur interne : client API non disponible.").await;
             return;
         }
     };
-    let api = ApiClient::new(base.clone());
+    let api = ApiClient::new(grpc.clone());
 
     let guild_str = guild_id.to_string();
 

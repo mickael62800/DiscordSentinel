@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::ports::outbound::system::ticket_repository::TicketRepository;
+use sentinel_core::ports::outbound::system::ticket_repository::TicketRepository;
 use sentinel_core::domain::entities::system::ticket::Ticket;
 use sentinel_core::domain::entities::system::ticket::TicketMessage;
 use sentinel_core::domain::errors::DomainError;

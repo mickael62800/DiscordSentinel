@@ -50,7 +50,7 @@ fn user_level_dto_independent_sources() {
     assert_ne!(dto.xp_current, dto.xp_text_current);
 }
 
-use crate::ports::inbound::community::manage_levels::AddXpResult;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpResult;
 
 #[test]
 fn add_xp_dto_default_source_is_text() {

@@ -5,8 +5,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
-use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use sentinel_api::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_core::ports::outbound::moderation::infraction_repository::InfractionRepository;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
 use sentinel_core::domain::entities::system::discord_ids::MessageId;

@@ -6,15 +6,15 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::bootstrap::state::ModerationState;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::Json;
 
 pub async fn list_infractions(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<InfractionQueryParams>,
 ) -> Result<Json<Vec<InfractionResponseDto>>, ApiError> {
@@ -35,7 +35,7 @@ pub async fn list_infractions(
 }
 
 pub async fn delete_infraction(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Recuperer l'infraction avant suppression pour le DM ET pour le gate RBAC

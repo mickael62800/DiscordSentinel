@@ -16,7 +16,7 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::inbound::moderation::manage_reminders::*;
+use sentinel_core::ports::inbound::moderation::manage_reminders::*;
 use sentinel_core::domain::entities::moderation::action::sanction_reminder::*;
 use sentinel_core::domain::errors::DomainError;
 
@@ -116,7 +116,7 @@ impl ManageRemindersUseCase for MockRemindersUC {
 
 fn build_app(uc: MockRemindersUC) -> axum::Router {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.reminders_uc = Arc::new(uc);
+    state.moderation.reminders_uc = Arc::new(uc);
     router::build_for_test(state)
 }
 

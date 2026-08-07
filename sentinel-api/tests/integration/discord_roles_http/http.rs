@@ -16,7 +16,7 @@ use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use sentinel_core::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 use sentinel_core::domain::errors::DomainError;
 
@@ -89,7 +89,7 @@ impl DiscordRoleRepository for MockDiscordRoleRepo {
 
 fn build_state(repo: Arc<MockDiscordRoleRepo>) -> AppState {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.discord_role_repo = repo;
+    state.community.discord_role_repo = repo;
     state.discord_api = Arc::new(test_helpers::MockDiscordApi::new());
     state
 }

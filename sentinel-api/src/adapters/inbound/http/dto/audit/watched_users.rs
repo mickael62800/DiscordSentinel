@@ -4,7 +4,7 @@ use crate::adapters::inbound::http::dto::audit::security::SecurityEventResponseD
 use crate::adapters::inbound::http::dto::moderation::actions::ModerationActionResponseDto;
 use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
-use crate::ports::inbound::audit::manage_watched_users::UserDossier;
+use sentinel_core::ports::inbound::audit::manage_watched_users::UserDossier;
 use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;

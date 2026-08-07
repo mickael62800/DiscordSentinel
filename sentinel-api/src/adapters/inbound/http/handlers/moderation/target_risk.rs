@@ -15,12 +15,12 @@ use crate::adapters::inbound::http::dto::moderation::target_risk::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 use sentinel_core::ports::inbound::moderation::assess_target_risk::AssessTargetRiskCommand;
 
 /// POST /api/moderation/{guild_id}/assess-target-risk
 pub async fn assess_target_risk(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<AssessTargetRiskRequestDto>,
 ) -> Result<Json<TargetRiskDecisionDto>, ApiError> {

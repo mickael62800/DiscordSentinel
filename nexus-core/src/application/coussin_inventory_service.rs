@@ -15,3 +15,7 @@ impl CoussinInventoryUseCase for CoussinInventoryService {
         self.repo.buy(guild_id, user_id, item.key, cfg.shop_price(item.key, item.price)).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/coussin_inventory_service.rs"]
+mod tests;

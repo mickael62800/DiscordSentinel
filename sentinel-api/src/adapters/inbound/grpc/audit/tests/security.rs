@@ -47,10 +47,10 @@ fn security_event_to_proto_no_users() {
 
 // ── RPC handlers avec mock ManageSecurityUseCase ──
 
-use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
-use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
-use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
-use crate::ports::inbound::audit::manage_security::SecurityDecision;
+use sentinel_core::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
+use sentinel_core::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use sentinel_core::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use sentinel_core::ports::inbound::audit::manage_security::SecurityDecision;
 use async_trait::async_trait;
 use sentinel_core::domain::errors::DomainError;
 use std::sync::Arc;

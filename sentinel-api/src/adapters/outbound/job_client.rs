@@ -10,7 +10,6 @@ pub struct JobClient {
 }
 
 #[derive(Serialize)]
-#[allow(dead_code)]
 struct Job<'a> {
     #[serde(rename = "type")]
     job_type: &'a str,
@@ -18,7 +17,6 @@ struct Job<'a> {
     created_at: chrono::DateTime<chrono::Utc>,
 }
 
-#[allow(dead_code)]
 impl JobClient {
     pub fn new(redis: redis::Client, queue_key: String) -> Self {
         Self { redis, queue_key }

@@ -20,7 +20,6 @@ pub struct Rule {
     pub updated_at: DateTime<Utc>,
 }
 
-#[allow(dead_code)]
 impl Rule {
     pub fn new(guild_id: GuildId, flag_type: FlagType) -> Self {
         let now = Utc::now();

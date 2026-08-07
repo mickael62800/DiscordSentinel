@@ -3,8 +3,8 @@ use crate::adapters::outbound::postgres::pg_err;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
-use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
+use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
 use sentinel_core::domain::errors::DomainError;
 pub struct PgWelcomeConfigRepository {
     pool: PgPool,

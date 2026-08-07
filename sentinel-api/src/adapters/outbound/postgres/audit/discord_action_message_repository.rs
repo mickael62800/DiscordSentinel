@@ -7,7 +7,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository;
+use sentinel_core::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository;
 use sentinel_core::domain::entities::audit::discord_action_message::DiscordActionMessage;
 use sentinel_core::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
 use sentinel_core::domain::errors::DomainError;

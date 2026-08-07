@@ -9,7 +9,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 use super::super::pg_err_ctx;
-use crate::ports::outbound::system::security_log_repository::SecurityLogRepository;
+use sentinel_core::ports::outbound::system::security_log_repository::SecurityLogRepository;
 use sentinel_core::domain::entities::system::security_log::{
     AuthFailure, LogWindow, TopIp, TrafficPoint,
 };

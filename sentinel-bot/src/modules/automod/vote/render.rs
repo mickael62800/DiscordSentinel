@@ -205,8 +205,6 @@ pub(super) fn render_votes(votes: &[VoteDto]) -> String {
 
 #[derive(serde::Deserialize)]
 pub(super) struct VoteDto {
-    #[allow(dead_code)]
-    voter_id: String,
     voter_name: String,
     vote_action: String,
 }

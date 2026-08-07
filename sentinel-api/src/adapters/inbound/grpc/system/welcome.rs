@@ -11,7 +11,7 @@ use tonic::Request;
 use tonic::Response;
 use tonic::Status;
 
-use crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
+use sentinel_core::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
 
 pub struct WelcomeGrpc {
     pub uc: Arc<dyn ManageWelcomeConfigUseCase>,

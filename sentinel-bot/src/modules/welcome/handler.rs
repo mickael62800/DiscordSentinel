@@ -182,7 +182,7 @@ async fn update_voice_counter(
 /// a jour. Ne renomme le salon que si le nombre a change (rate limit Discord).
 pub async fn refresh_counters(ctx: &Context, guild_id: GuildId) {
     if !is_module_enabled(
-        &ctx,
+        ctx,
         &guild_id.to_string(),
         crate::modules::welcome::MODULE_BOT_NAME,
     )
@@ -191,18 +191,17 @@ pub async fn refresh_counters(ctx: &Context, guild_id: GuildId) {
         return;
     }
 
-    let (base, grpc) = {
+    let grpc = {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().map(Arc::clone);
         let grpc = data
             .get::<crate::shared::grpc_client::GrpcClientKey>()
             .map(Arc::clone);
-        match (base, grpc) {
-            (Some(b), Some(g)) => (b, g),
+        match grpc {
+            Some(g) => g,
             _ => return,
         }
     };
-    let api = WelcomeApiClient::new(base, grpc);
+    let api = WelcomeApiClient::new(grpc);
     let config = match api.get_config(&guild_id.to_string()).await {
         Ok(c) => c,
         Err(_) => return,
@@ -259,17 +258,13 @@ pub async fn on_voice_state_update(
     }
 
     let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
-        Some(b) => Arc::clone(b),
-        None => return,
-    };
     let grpc = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
         Some(g) => Arc::clone(g),
         None => return,
     };
     drop(data);
 
-    let api = WelcomeApiClient::new(base, grpc);
+    let api = WelcomeApiClient::new(grpc);
     let config = match api.get_config(&guild_id.to_string()).await {
         Ok(c) => c,
         Err(_) => return,
@@ -324,7 +319,7 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
     };
     drop(data);
 
-    let api = WelcomeApiClient::new(base.clone(), grpc);
+    let api = WelcomeApiClient::new(grpc);
     let config = match api.get_config(&guild_id.to_string()).await {
         Ok(c) => c,
         Err(e) => {
@@ -518,7 +513,7 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
     };
     drop(data);
 
-    let api = WelcomeApiClient::new(base.clone(), grpc);
+    let api = WelcomeApiClient::new(grpc);
     let config = match api.get_config(&guild_id.to_string()).await {
         Ok(c) => c,
         Err(_) => return,
@@ -656,7 +651,7 @@ pub async fn publish_rules_panel(ctx: &Context, guild_id: GuildId) -> Result<(),
         (base, grpc)
     };
 
-    let api = WelcomeApiClient::new(base.clone(), grpc);
+    let api = WelcomeApiClient::new(grpc);
     let config = api
         .get_config(&guild_id.to_string())
         .await
@@ -878,15 +873,12 @@ async fn load_welcome_config(
     ctx: &Context,
     guild_id: GuildId,
 ) -> Option<super::api_client::WelcomeConfig> {
-    let (base, grpc) = {
+    let grpc = {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().map(Arc::clone)?;
-        let grpc = data
-            .get::<crate::shared::grpc_client::GrpcClientKey>()
-            .map(Arc::clone)?;
-        (base, grpc)
+        data.get::<crate::shared::grpc_client::GrpcClientKey>()
+            .map(Arc::clone)?
     };
-    WelcomeApiClient::new(base, grpc)
+    WelcomeApiClient::new(grpc)
         .get_config(&guild_id.to_string())
         .await
         .ok()

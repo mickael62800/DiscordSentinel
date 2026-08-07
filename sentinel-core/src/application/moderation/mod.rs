@@ -1,4 +1,5 @@
 pub mod assess_target_risk_service;
+pub mod cancel_action_service;
 pub mod manage_automod_reviews_service;
 pub mod manage_infractions_service;
 pub mod manage_moderation_copilot_service;
@@ -7,6 +8,5 @@ pub mod manage_notes_service;
 pub mod manage_reminders_service;
 pub mod manage_rules_service;
 pub mod manage_strikes_service;
-pub mod read_modstats_service;
-
 pub mod manage_sursis_service;
+pub mod read_modstats_service;

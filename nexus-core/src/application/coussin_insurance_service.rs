@@ -16,11 +16,7 @@ use crate::ports::{
     },
 };
 
-/// Une assurance sur vingt est une arnaque. Volontairement NON configurable :
-/// c'est la blague de la mecanique, pas un curseur d'equilibrage. La rendre
-/// reglable inviterait a la mettre a 0 — et l'assurance deviendrait un achat
-/// sans histoire — ou a 100, ce qui n'est plus une assurance.
-const SCAM_PERCENT: u32 = 5;
+// Note: insurance_scam_pct est désormais configurable dans CoussinConfig (défaut: 5%).
 
 pub struct CoussinInsuranceService {
     repo: Arc<dyn CoussinInsuranceRepository>,
@@ -47,7 +43,7 @@ impl CoussinInsuranceUseCase for CoussinInsuranceService {
             ));
         }
 
-        let is_scam = rand::thread_rng().gen_range(0..100) < SCAM_PERCENT;
+        let is_scam = rand::thread_rng().gen_range(0..100) < cfg.insurance_scam_pct;
         self.repo
             .buy(
                 guild_id,
@@ -70,3 +66,7 @@ impl CoussinInsuranceUseCase for CoussinInsuranceService {
         self.repo.active(guild_id, user_id).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/coussin_insurance_service.rs"]
+mod tests;

@@ -18,7 +18,7 @@ use crate::adapters::inbound::http::handlers::community::public_guard::{
     clamp_limit, ensure_guild_id,
 };
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use sentinel_core::domain::entities::community::lfg::{LfgPost, UpsertLfgCommand};
 use sentinel_core::domain::errors::DomainError;
 
@@ -128,7 +128,7 @@ fn require_ctx(
 /// Un membre absent de la table (jamais synchronise) ne doit pas empecher de
 /// publier : on retombe silencieusement sur une chaine vide, que le front
 /// remplace par un libelle generique.
-async fn display_name(state: &AppState, guild_id: &str, user_id: &str) -> String {
+async fn display_name(state: &CommunityState, guild_id: &str, user_id: &str) -> String {
     match state.members_uc.get_member(guild_id, user_id).await {
         Ok(m) => m.display_name.unwrap_or(m.username),
         Err(_) => String::new(),
@@ -139,7 +139,7 @@ async fn display_name(state: &AppState, guild_id: &str, user_id: &str) -> String
 
 /// GET /api/lfg/{guild_id}
 pub async fn list_lfg(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
@@ -158,7 +158,7 @@ pub async fn list_lfg(
 
 /// POST /api/lfg/{guild_id}
 pub async fn create_lfg(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<CreateLfgDto>,
@@ -204,7 +204,7 @@ const CALLER_IS_STAFF: bool = true;
 
 /// POST /api/lfg/detail/{id}/close
 pub async fn close_lfg(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -219,7 +219,7 @@ pub async fn close_lfg(
 
 /// DELETE /api/lfg/detail/{id}
 pub async fn delete_lfg(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -234,7 +234,7 @@ pub async fn delete_lfg(
 
 /// POST /api/lfg/detail/{id}/join — « je viens ».
 pub async fn join_lfg(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<LfgDto>, ApiError> {
@@ -248,7 +248,7 @@ pub async fn join_lfg(
 
 /// DELETE /api/lfg/detail/{id}/join — se retirer.
 pub async fn leave_lfg(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<LfgDto>, ApiError> {
@@ -283,7 +283,7 @@ pub struct PublicLfgDto {
 
 /// GET /api/public/lfg/{guild_id}
 pub async fn public_lfg(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,

@@ -158,11 +158,8 @@ pub async fn handle_invite_select(ctx: &Context, component: &ComponentInteractio
 
     if let Some(ref ticket_id) = get_ticket_id_from_channel(ctx, component.channel_id).await {
         let data = ctx.data.read().await;
-        if let (Some(base), Some(grpc)) = (
-            data.get::<ApiClientKey>(),
-            data.get::<crate::shared::grpc_client::GrpcClientKey>(),
-        ) {
-            let api = ApiClient::new(base.clone(), grpc.clone());
+        if let Some(grpc) = data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            let api = ApiClient::new(grpc.clone());
             if let Err(e) = api
                 .update_ticket_channel(ticket_id, None, Some(user_id.to_string()))
                 .await
@@ -397,11 +394,8 @@ pub async fn handle_vocal_user_accept(ctx: &Context, component: &ComponentIntera
             if let Some(ref ticket_id) = get_ticket_id_from_channel(ctx, component.channel_id).await
             {
                 let data = ctx.data.read().await;
-                if let (Some(base), Some(grpc)) = (
-                    data.get::<ApiClientKey>(),
-                    data.get::<crate::shared::grpc_client::GrpcClientKey>(),
-                ) {
-                    let api = ApiClient::new(base.clone(), grpc.clone());
+                if let Some(grpc) = data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+                    let api = ApiClient::new(grpc.clone());
                     if let Err(e) = api
                         .update_ticket_channel(ticket_id, Some(vc.id.to_string()), None)
                         .await

@@ -5,7 +5,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::ports::outbound::moderation::notes_repository::NotesRepository;
+use sentinel_core::ports::outbound::moderation::notes_repository::NotesRepository;
 use sentinel_core::domain::entities::moderation::user_note::UserNote;
 use sentinel_core::domain::errors::DomainError;
 

@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::community::public_guard::ensure_guild_id;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use sentinel_core::domain::entities::community::spotlight::{
     Spotlight, UpsertSpotlightCommand,
 };
@@ -57,7 +57,7 @@ pub struct DesignateDto {
 
 /// GET /api/spotlight/{guild_id} — historique des designations.
 pub async fn list_spotlight(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<SpotlightDto>>, ApiError> {
@@ -68,7 +68,7 @@ pub async fn list_spotlight(
 
 /// POST /api/spotlight/{guild_id} — designer (ou remplacer) le membre du mois.
 pub async fn designate_spotlight(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<DesignateDto>,
@@ -100,7 +100,7 @@ pub async fn designate_spotlight(
 
 /// DELETE /api/spotlight/detail/{id}
 pub async fn delete_spotlight(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path((_guild_id, id)): Path<(String, Uuid)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -124,7 +124,7 @@ pub struct PublicSpotlightDto {
 
 /// GET /api/public/spotlight/{guild_id}?period=
 pub async fn public_spotlight(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<PeriodQuery>,

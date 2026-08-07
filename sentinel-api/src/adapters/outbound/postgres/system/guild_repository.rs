@@ -2,7 +2,7 @@ use crate::adapters::outbound::postgres::pg_err;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::ports::outbound::system::guild_repository::GuildRepository;
+use sentinel_core::ports::outbound::system::guild_repository::GuildRepository;
 use sentinel_core::domain::entities::system::guild::Guild;
 use sentinel_core::domain::errors::DomainError;
 

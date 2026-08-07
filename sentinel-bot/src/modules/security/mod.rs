@@ -21,7 +21,6 @@ use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::discord_helpers::{
     is_module_enabled_or_reply_command, is_module_enabled_or_reply_component,
 };
@@ -145,11 +144,10 @@ use std::sync::Arc;
 /// Insere tous les TypeMapKeys du module security (trackers + config + API client).
 pub fn init_typemap(
     data: &mut serenity::prelude::TypeMap,
-    api: &Arc<BaseApiClient>,
     grpc: &Arc<crate::shared::grpc_client::SentinelGrpcClient>,
 ) {
     let sec_config = SecurityConfig::from_env();
-    data.insert::<SecurityApiKey>(ApiClient::new(Arc::clone(api), Arc::clone(grpc)));
+    data.insert::<SecurityApiKey>(ApiClient::new(Arc::clone(grpc)));
     data.insert::<RaidDetectorKey>(RaidDetector::new(
         sec_config.raid_join_threshold,
         sec_config.raid_join_window_secs,

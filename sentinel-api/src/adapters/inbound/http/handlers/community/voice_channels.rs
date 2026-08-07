@@ -35,17 +35,17 @@ async fn moderated_guilds(
     state: &AppState,
     user_id: &str,
 ) -> Result<std::collections::HashSet<String>, ApiError> {
-    Ok(state.tickets_uc.moderated_guilds(user_id).await?)
+    Ok(state.system.tickets_uc.moderated_guilds(user_id).await?)
 }
-use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
-use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
-use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
-use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
-use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
-use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
-use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
-use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
-use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 
@@ -70,7 +70,7 @@ async fn log_voice_event(
         channel_name,
         details,
     };
-    if let Err(e) = state.audit_logs_uc.create(cmd).await {
+    if let Err(e) = state.audit.audit_logs_uc.create(cmd).await {
         tracing::warn!("failed to log voice audit event: {e}");
     }
 }
@@ -91,7 +91,7 @@ pub async fn list_all_channels(
     let limit =
         crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 500) as usize;
     let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset) as usize;
-    let channels = state.voice_channels_uc.list_all_channels().await?;
+    let channels = state.community.voice_channels_uc.list_all_channels().await?;
 
     // Endpoint guild-less : on scope au web. Le chemin bot/interne (pas de
     // WebUser) n'est PAS filtre. Un superadmin voit tout ; sinon on ne
@@ -129,7 +129,7 @@ pub async fn list_channels(
     let limit =
         crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200) as usize;
     let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset) as usize;
-    let channels = state.voice_channels_uc.list_channels(&guild_id).await?;
+    let channels = state.community.voice_channels_uc.list_channels(&guild_id).await?;
     let page: Vec<_> = channels.into_iter().skip(offset).take(limit).collect();
     Ok(map_to_dtos(page))
 }
@@ -143,7 +143,7 @@ pub async fn list_history_channels(
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 100, 500);
     let channels = state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .list_history_channels(&guild_id, limit)
         .await?;
     Ok(map_to_dtos(channels))
@@ -154,14 +154,13 @@ pub async fn list_history_channels(
 /// est toujours ouvert — utilisez /close d'abord.
 pub async fn purge_channel(
     State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    // TODO(secu) : le gate par guilde (lookup du guild via channel_id puis
+    // verification du role) n'est PAS implemente. Seuls les middlewares du
+    // routeur protegent cette route.
+    _user: Option<Extension<WebUser>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Resolution component-gate par lookup guild via channel_id puis check.
-    if user.is_some() {
-    }
-
-    let deleted = state.voice_channels_uc.purge_channel(&channel_id).await?;
+    let deleted = state.community.voice_channels_uc.purge_channel(&channel_id).await?;
 
     if !deleted {
         return Err(ApiError(DomainError::ValidationError(
@@ -185,7 +184,7 @@ pub async fn purge_history(
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
 
-    let deleted = state.voice_channels_uc.purge_history(&guild_id).await?;
+    let deleted = state.community.voice_channels_uc.purge_history(&guild_id).await?;
 
     state.broadcaster.broadcast(
         "voice_channel_closed",
@@ -207,7 +206,7 @@ pub async fn list_channel_events(
     // La liste blanche des events voix (règle métier) et le SQL vivent
     // derrière le use case audit_logs — plus de sqlx dans l'inbound.
     let logs = state
-        .audit_logs_uc
+        .audit.audit_logs_uc
         .list_voice_channel_events(&channel_id, limit)
         .await?;
 
@@ -236,7 +235,7 @@ pub async fn get_channel_detail(
     Path(channel_id): Path<String>,
 ) -> Result<Json<VoiceChannelDetailDto>, ApiError> {
     let detail = state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .get_channel_detail(&channel_id)
         .await?;
     Ok(single_dto(detail))
@@ -250,7 +249,7 @@ pub async fn create_channel(
     // Gate user : moderator+ requis pour creer un voice channel.
     // Pass-through pour les appels bot-internal (user absent).
     let command = dto.into();
-    let channel = state.voice_channels_uc.create_channel(command).await?;
+    let channel = state.community.voice_channels_uc.create_channel(command).await?;
 
     log_voice_event(
         &state,
@@ -290,11 +289,11 @@ pub async fn close_channel(
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let before = state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .get_channel_detail(&channel_id)
         .await
         .ok();
-    state.voice_channels_uc.close_channel(&channel_id).await?;
+    state.community.voice_channels_uc.close_channel(&channel_id).await?;
 
     let payload = if let Some(d) = &before {
         log_voice_event(
@@ -329,7 +328,7 @@ pub async fn delete_channel(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate user : moderator+ pour fermer un voice channel.
     // DELETE fait un soft-delete (close)
-    state.voice_channels_uc.delete_channel(&channel_id).await?;
+    state.community.voice_channels_uc.delete_channel(&channel_id).await?;
 
     state.broadcaster.broadcast(
         "voice_channel_closed",
@@ -357,7 +356,7 @@ pub async fn update_channel(
     });
 
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .update_channel(UpdateVoiceChannelCommand {
             channel_id: channel_id.clone().into(),
             visibility: dto.visibility,
@@ -372,7 +371,7 @@ pub async fn update_channel(
         .await?;
 
     let detail_opt = state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .get_channel_detail(&channel_id)
         .await
         .ok();
@@ -422,7 +421,7 @@ pub async fn transfer_ownership(
     let new_owner_name = dto.new_owner_name.clone();
 
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .transfer_ownership(TransferOwnershipCommand {
             channel_id: channel_id.clone().into(),
             new_owner_id: dto.new_owner_id,
@@ -451,7 +450,7 @@ pub async fn add_co_admin(
     Json(dto): Json<AddCoAdminDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .add_co_admin(ManageCoAdminCommand {
             channel_id: channel_id.into(),
             user_id: dto.user_id,
@@ -468,7 +467,7 @@ pub async fn remove_co_admin(
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .remove_co_admin(&channel_id, &user_id)
         .await?;
 
@@ -483,7 +482,7 @@ pub async fn get_whitelist(
     Path((guild_id, owner_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<WhitelistEntryResponseDto>>, ApiError> {
     let entries = state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .get_whitelist(&guild_id, &owner_id)
         .await?;
     Ok(map_to_dtos(entries))
@@ -495,7 +494,7 @@ pub async fn add_to_whitelist(
     Json(dto): Json<AddWhitelistDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .add_to_whitelist(ManageWhitelistCommand {
             guild_id: dto.guild_id,
             owner_id: dto.owner_id,
@@ -514,7 +513,7 @@ pub async fn remove_from_whitelist(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate user : moderator+ pour toucher aux permissions voice.
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .remove_from_whitelist(&guild_id, &owner_id, &target_id)
         .await?;
 
@@ -530,7 +529,7 @@ pub async fn ban_from_channel(
     Json(dto): Json<BanFromChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .ban_from_channel(BanFromChannelCommand {
             channel_id: channel_id.into(),
             user_id: dto.user_id,
@@ -550,7 +549,7 @@ pub async fn unban_from_channel(
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .unban_from_channel(&channel_id, &user_id)
         .await?;
 
@@ -563,7 +562,7 @@ pub async fn check_ban(
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let banned = state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .is_banned(&channel_id, &user_id)
         .await?;
     Ok(Json(serde_json::json!({ "banned": banned })))
@@ -577,7 +576,7 @@ pub async fn list_invite_links(
     Path(channel_id): Path<String>,
 ) -> Result<Json<Vec<InviteLinkResponseDto>>, ApiError> {
     let links = state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .list_invite_links(&channel_id)
         .await?;
     Ok(map_to_dtos(links))
@@ -597,7 +596,7 @@ pub async fn create_invite_link(
         max_uses: dto.max_uses,
     };
 
-    let link = state.voice_channels_uc.create_invite_link(cmd).await?;
+    let link = state.community.voice_channels_uc.create_invite_link(cmd).await?;
 
     state.broadcaster.broadcast(
         "voice_invite_created",
@@ -634,7 +633,7 @@ pub async fn use_invite_link(
         user_name: dto.user_name,
     };
 
-    let link = state.voice_channels_uc.use_invite_link(cmd).await?;
+    let link = state.community.voice_channels_uc.use_invite_link(cmd).await?;
 
     state.broadcaster.broadcast(
         "voice_invite_used",
@@ -654,7 +653,7 @@ pub async fn revoke_invite_link(
     Path((channel_id, link_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .revoke_invite_link(&channel_id, &link_id)
         .await?;
 
@@ -673,7 +672,7 @@ pub async fn list_themes(
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ThemeResponseDto>>, ApiError> {
-    let themes = state.voice_channels_uc.list_themes(&guild_id).await?;
+    let themes = state.community.voice_channels_uc.list_themes(&guild_id).await?;
     Ok(map_to_dtos(themes))
 }
 
@@ -689,7 +688,7 @@ pub async fn create_theme(
     let mut cmd: CreateThemeCommand = dto.into();
     cmd.guild_id = guild_id.into();
 
-    let theme = state.voice_channels_uc.create_theme(cmd).await?;
+    let theme = state.community.voice_channels_uc.create_theme(cmd).await?;
     Ok(single_dto(theme))
 }
 
@@ -702,7 +701,7 @@ pub async fn update_theme(
     let mut cmd: CreateThemeCommand = dto.into();
     cmd.guild_id = guild_id.into();
 
-    let theme = state.voice_channels_uc.update_theme(&theme_id, cmd).await?;
+    let theme = state.community.voice_channels_uc.update_theme(&theme_id, cmd).await?;
     Ok(single_dto(theme))
 }
 
@@ -713,7 +712,7 @@ pub async fn delete_theme(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Phase 7 B — Gate user : admin+ requis pour modifier la config themes voice.
     state
-        .voice_channels_uc
+        .community.voice_channels_uc
         .delete_theme(&guild_id, &theme_id)
         .await?;
     Ok(ok_response())

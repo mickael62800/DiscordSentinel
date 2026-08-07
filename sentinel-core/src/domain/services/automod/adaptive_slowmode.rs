@@ -62,7 +62,6 @@ impl<K: Eq + Hash + Clone> SlowmodeTracker<K> {
     }
 
     /// Reset le compteur d'un salon.
-    #[allow(dead_code)]
     pub fn reset(&self, key: K) {
         self.counters.clear(&key);
     }
@@ -99,7 +98,6 @@ impl<K: Eq + Hash + Clone> SlowmodeTracker<K> {
     }
 
     /// Retourne le nombre de messages dans la fenêtre pour un salon.
-    #[allow(dead_code)]
     pub fn count(&self, key: K) -> usize {
         self.counters.count(&key, self.window)
     }

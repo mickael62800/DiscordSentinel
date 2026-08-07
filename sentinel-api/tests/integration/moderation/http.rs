@@ -15,7 +15,7 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::inbound::moderation::manage_moderation::*;
+use sentinel_core::ports::inbound::moderation::manage_moderation::*;
 use sentinel_core::domain::entities::moderation::action::applied::*;
 use sentinel_core::domain::errors::DomainError;
 
@@ -175,7 +175,7 @@ fn build_test_state_moderation(
     moderation_uc: Arc<dyn ManageModerationUseCase>,
 ) -> sentinel_api::adapters::inbound::http::state::AppState {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.moderation_uc = moderation_uc;
+    state.moderation.moderation_uc = moderation_uc;
     state
 }
 

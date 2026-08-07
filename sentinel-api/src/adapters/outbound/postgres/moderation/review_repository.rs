@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use super::super::pg_err;
-use crate::ports::outbound::moderation::review_repository::ReviewEntry;
-use crate::ports::outbound::moderation::review_repository::ReviewRepository;
+use sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry;
+use sentinel_core::ports::outbound::moderation::review_repository::ReviewRepository;
 
 pub struct PgReviewRepository {
     pool: PgPool,

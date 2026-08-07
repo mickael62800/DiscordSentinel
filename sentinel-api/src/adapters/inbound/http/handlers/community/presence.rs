@@ -29,7 +29,7 @@ use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::community::public_guard::ensure_guild_id;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use sentinel_core::domain::errors::DomainError;
 
 /// Salons ecrits remontes. Au-dela, la liste cesse d'informer.
@@ -70,7 +70,7 @@ pub struct PresenceDto {
 
 /// GET /api/public/presence/{guild_id} — visiteurs anonymes.
 pub async fn public_presence(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<PresenceDto>, ApiError> {
@@ -83,7 +83,7 @@ pub async fn public_presence(
 /// sur Discord, les lui masquer ici ne protegeait rien et donnait une image
 /// fausse de qui est connecte.
 pub async fn member_presence(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<PresenceDto>, ApiError> {
@@ -98,7 +98,7 @@ pub async fn member_presence(
 }
 
 async fn presence_dto(
-    state: AppState,
+    state: CommunityState,
     guild_id: String,
     inclure_restreints: bool,
 ) -> Result<Json<PresenceDto>, ApiError> {

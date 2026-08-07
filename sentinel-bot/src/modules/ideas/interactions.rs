@@ -130,19 +130,25 @@ pub async fn handle_reason_modal(ctx: &Context, modal: &ModalInteraction) {
         warn!(error = %e, "Echec defer modale de motif");
     }
 
-    let (base, cfg) = {
+    // `base` sert uniquement a lire la config guild (toujours en HTTP) ;
+    // les operations sur les idees passent par gRPC.
+    let (grpc, cfg) = {
         let data = ctx.data.read().await;
         let base = match data.get::<ApiClientKey>() {
             Some(b) => b.clone(),
+            None => return,
+        };
+        let grpc = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
             None => return,
         };
         let cfg = base
             .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
             .await
             .unwrap_or_default();
-        (base, cfg)
+        (grpc, cfg)
     };
-    let api = ApiClient::new(base);
+    let api = ApiClient::new(grpc);
 
     // L'idee est retrouvee par le salon d'ou vient le clic.
     let idea = match api.idea_by_channel(&modal.channel_id.to_string()).await {

@@ -17,10 +17,6 @@ pub struct WheelSpinRequest {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WheelSpinResponse {
-    #[allow(dead_code)]
-    pub spin_id: String,
-    #[allow(dead_code)]
-    pub case_key: String,
     pub case_label: String,
     pub payout: i64,
     pub balance_after: i64,
@@ -34,11 +30,7 @@ struct ApiErrorBody {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct WalletResponse {
-    #[allow(dead_code)]
-    pub guild_id: String,
     pub user_id: String,
-    #[allow(dead_code)]
-    pub username: String,
     pub coins: i64,
     pub total_earned: i64,
     pub total_spent: i64,
@@ -65,8 +57,6 @@ pub struct CoussinChallengeRequest {
 #[derive(Debug, Deserialize)]
 pub struct CoussinChallengeResponse {
     pub id: String,
-    #[allow(dead_code)]
-    pub status: String,
     pub mise: i64,
 }
 
@@ -99,8 +89,6 @@ pub struct CoussinTrainRequest { pub username: String, pub stat: String }
 pub struct TransferResponse {
     pub amount: i64,
     pub from_balance: i64,
-    #[allow(dead_code)]
-    pub to_balance: i64,
 }
 
 /// URL-encode un segment de path pour eviter qu'un nom de jeu avec `/` ou
@@ -119,12 +107,9 @@ fn encode_segment(s: &str) -> String {
 // ── Types du module games (catalogue + panels) ──
 
 #[derive(Debug, Deserialize, Clone)]
-#[allow(dead_code)]
 pub struct Game {
     pub id: String,
-    pub guild_id: String,
     pub game_name: String,
-    pub created_by: String,
     #[serde(default)]
     pub emoji: Option<String>,
     #[serde(default)]
@@ -134,10 +119,8 @@ pub struct Game {
 }
 
 #[derive(Debug, Deserialize, Clone)]
-#[allow(dead_code)]
 pub struct GamePanel {
     pub id: String,
-    pub guild_id: String,
     pub channel_id: String,
     pub message_id: String,
     #[serde(default)]
@@ -160,7 +143,6 @@ pub struct ServerDetailResponse {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct GameServer {
     pub guild_id: String,
     pub template_id: String,
@@ -173,7 +155,6 @@ pub struct GameServer {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct GameTemplate {
     pub slug: String,
     pub name: String,

@@ -1,6 +1,8 @@
 [workspace]
 resolver = "2"
 members = [
+    "platform-common",
+    "platform-common-api",
     "sentinel-proto",
     "sentinel-core",
     "sentinel-api",
@@ -76,6 +78,11 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 # Internes (paths)
 sentinel-proto = { path = "sentinel-proto" }
 sentinel-core = { path = "sentinel-core" }
+# Socle partage par les deux plateformes. `platform-common` n'a aucune
+# dependance framework (Redis pur) ; `platform-common-api` tire axum/tower-http
+# et n'est donc consomme que par les APIs, jamais par les bots.
+platform-common = { path = "platform-common" }
+platform-common-api = { path = "platform-common-api" }
 
 # ── Lints partagés (à activer dans chaque crate via `[lints] workspace = true`) ──
 [workspace.lints.clippy]

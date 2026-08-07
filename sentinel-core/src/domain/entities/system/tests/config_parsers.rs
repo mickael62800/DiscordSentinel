@@ -140,8 +140,8 @@ fn default_log_category_by_name() {
 }
 
 #[test]
-fn enabled_flag_absent_is_enabled() {
-    assert!(parse_enabled_flag(None));
+fn enabled_flag_absent_is_disabled() {
+    assert!(!parse_enabled_flag(None));
 }
 
 #[test]

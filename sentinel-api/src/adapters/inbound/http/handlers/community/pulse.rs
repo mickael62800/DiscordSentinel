@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::community::public_guard::ensure_guild_id;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 
 /// Fenetres par defaut. Une semaine pour les nouveaux venus : au-dela, un
 /// membre n'est plus vraiment « nouveau ». Deux semaines pour les
@@ -54,7 +54,7 @@ pub struct PulseDto {
 
 /// GET /api/public/pulse/{guild_id}
 pub async fn public_pulse(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Path(guild_id): Path<String>,
     Query(q): Query<PulseQuery>,
 ) -> Result<Json<PulseDto>, ApiError> {

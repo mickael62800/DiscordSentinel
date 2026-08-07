@@ -1,5 +1,5 @@
 use super::*;
-use crate::ports::inbound::audit::manage_watched_users::UserDossier;
+use sentinel_core::ports::inbound::audit::manage_watched_users::UserDossier;
 use chrono::TimeZone;
 use chrono::Utc;
 use sentinel_core::domain::entities::audit::watched_user::WatchedUser;

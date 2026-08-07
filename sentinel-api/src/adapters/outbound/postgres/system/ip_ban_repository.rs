@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 use super::super::pg_err_ctx;
-use crate::ports::outbound::system::ip_ban_repository::IpBanRepository;
+use sentinel_core::ports::outbound::system::ip_ban_repository::IpBanRepository;
 use sentinel_core::domain::entities::system::ip_ban::ManualIpBan;
 use sentinel_core::domain::errors::DomainError;
 

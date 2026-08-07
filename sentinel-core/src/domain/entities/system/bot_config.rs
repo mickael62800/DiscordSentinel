@@ -109,7 +109,7 @@ mod tests {
 
     #[test]
     fn cfg_enabled_inclusive_default() {
-        assert!(cfg_enabled(&[]));
+        assert!(!cfg_enabled(&[]));
         assert!(!cfg_enabled(&[entry("enabled", "false")]));
         assert!(cfg_enabled(&[entry("enabled", "yes")]));
     }

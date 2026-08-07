@@ -1,15 +1,20 @@
-//! Client HTTP du module guild_backup vers l'API interne.
+//! Client du module guild_backup, entierement en gRPC.
 //!
-//! Le bot appelle l'API SANS `X-Discord-Token` : la gate RBAC Owner de l'API
-//! est alors en pass-through (bypass interne), ce qui autorise capture et
-//! restauration. L'authentification reste la cle API interne (Bearer) posee
-//! par [`BaseApiClient::auth`].
+//! Le bot appelle l'API en interne (Bearer API key, pas de `X-Discord-Token`) :
+//! le controle d'acces a la capture et a la restauration est assure cote API
+//! par les middlewares du routeur, avant meme la publication de l'event.
+//!
+//! Le `GuildSnapshot` transite serialise en JSON — voir `guild_backup.proto`
+//! pour le raisonnement (payload document, stocke en JSONB, jamais inspecte
+//! champ par champ en transit).
 
-use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
+use serde::Deserialize;
+
+use crate::shared::grpc_client::{grpc_err_to_string, SentinelGrpcClient};
 use sentinel_core::domain::entities::guild_backup::snapshot::GuildSnapshot;
-
-use crate::shared::api_client::BaseApiClient;
+use sentinel_proto::guild_backup::v1 as proto;
 
 /// Identifiant d'une sauvegarde stockee (UUID renvoye par l'API).
 pub type SnapshotId = String;
@@ -18,133 +23,125 @@ pub type SnapshotId = String;
 #[derive(Debug, Clone, Deserialize)]
 pub struct SnapshotSummary {
     pub id: String,
-    #[allow(dead_code)]
-    pub guild_id: String,
     pub label: String,
     pub created_at: String,
-    #[allow(dead_code)]
-    pub created_by: Option<String>,
-    #[allow(dead_code)]
-    pub schema_version: u32,
     pub role_count: u32,
     pub channel_count: u32,
 }
 
-#[derive(Debug, Deserialize)]
-struct StoredSnapshotDto {
-    id: String,
-}
-
-/// POST /api/guild-backup/{guild_id}/snapshots — stocke une capture.
-pub async fn store_snapshot(
-    api: &BaseApiClient,
-    guild_id: &str,
-    snapshot: &GuildSnapshot,
-) -> Result<SnapshotId, String> {
-    let dto: StoredSnapshotDto = api
-        .post_json(&format!("/api/guild-backup/{guild_id}/snapshots"), snapshot)
-        .await?;
-    Ok(dto.id)
-}
-
-/// GET /api/guild-backup/{guild_id}/snapshots — liste les captures (resumes).
-pub async fn list_snapshots(
-    api: &BaseApiClient,
-    guild_id: &str,
-) -> Result<Vec<SnapshotSummary>, String> {
-    api.get_json(&format!("/api/guild-backup/{guild_id}/snapshots"))
-        .await
-}
-
-/// GET /api/guild-backup/snapshots/{snapshot_id} — capture complete.
-pub async fn get_snapshot(api: &BaseApiClient, snapshot_id: &str) -> Result<GuildSnapshot, String> {
-    api.get_json(&format!("/api/guild-backup/snapshots/{snapshot_id}"))
-        .await
-}
-
-/// Une re-attribution de roles en attente (envoyee au restore).
-#[derive(Debug, Serialize)]
+/// Roles a re-attribuer a un membre absent au moment du restore.
+#[derive(Debug)]
 pub struct PendingRoleGrant {
     pub user_id: String,
     pub role_ids: Vec<String>,
 }
 
-#[derive(Debug, Deserialize)]
-struct SavedGrantsDto {
-    saved: u64,
+/// Stocke une capture. Renvoie son identifiant.
+pub async fn store_snapshot(
+    grpc: &Arc<SentinelGrpcClient>,
+    guild_id: &str,
+    snapshot: &GuildSnapshot,
+) -> Result<SnapshotId, String> {
+    let snapshot_json =
+        serde_json::to_string(snapshot).map_err(|e| format!("Serialisation capture : {e}"))?;
+    let req = proto::StoreSnapshotRequest {
+        guild_id: guild_id.to_string(),
+        snapshot_json,
+    };
+    let resp = crate::grpc_call!(grpc, guild_backup, store_snapshot, req)?;
+    Ok(resp.snapshot_id)
 }
 
-#[derive(Debug, Deserialize)]
-struct ConsumedGrantDto {
-    role_ids: Vec<String>,
+/// Liste les captures d'un serveur (resumes, sans le payload).
+pub async fn list_snapshots(
+    grpc: &Arc<SentinelGrpcClient>,
+    guild_id: &str,
+) -> Result<Vec<SnapshotSummary>, String> {
+    let req = proto::ListSnapshotsRequest {
+        guild_id: guild_id.to_string(),
+    };
+    let resp = crate::grpc_call!(grpc, guild_backup, list_snapshots, req)?;
+    Ok(resp
+        .snapshots
+        .into_iter()
+        .map(|s| SnapshotSummary {
+            id: s.id,
+            label: s.label,
+            created_at: s.created_at,
+            role_count: s.role_count,
+            channel_count: s.channel_count,
+        })
+        .collect())
 }
 
-/// POST /api/guild-backup/{guild_id}/pending-roles — enregistre les grants a
-/// re-attribuer aux membres a leur retour. Renvoie le nombre d'entrees ecrites.
+/// Charge une capture complete.
+pub async fn get_snapshot(
+    grpc: &Arc<SentinelGrpcClient>,
+    snapshot_id: &str,
+) -> Result<GuildSnapshot, String> {
+    let req = proto::GetSnapshotRequest {
+        snapshot_id: snapshot_id.to_string(),
+    };
+    let resp = crate::grpc_call!(grpc, guild_backup, get_snapshot, req)?;
+    serde_json::from_str(&resp.snapshot_json)
+        .map_err(|e| format!("Capture illisible (schema incompatible ?) : {e}"))
+}
+
+/// Supprime une capture.
+pub async fn delete_snapshot(
+    grpc: &Arc<SentinelGrpcClient>,
+    snapshot_id: &str,
+) -> Result<(), String> {
+    let req = proto::DeleteSnapshotRequest {
+        snapshot_id: snapshot_id.to_string(),
+    };
+    crate::grpc_call!(@unit grpc, guild_backup, delete_snapshot, req)
+}
+
+/// Enregistre les roles a re-attribuer aux membres absents. Renvoie le nombre
+/// d'entrees ecrites.
 pub async fn save_pending_roles(
-    api: &BaseApiClient,
+    grpc: &Arc<SentinelGrpcClient>,
     guild_id: &str,
     grants: &[PendingRoleGrant],
 ) -> Result<u64, String> {
-    let dto: SavedGrantsDto = api
-        .post_json(
-            &format!("/api/guild-backup/{guild_id}/pending-roles"),
-            &grants,
-        )
-        .await?;
-    Ok(dto.saved)
+    let req = proto::SavePendingRolesRequest {
+        guild_id: guild_id.to_string(),
+        grants: grants
+            .iter()
+            .map(|g| proto::PendingRoleGrant {
+                user_id: g.user_id.clone(),
+                role_ids: g.role_ids.clone(),
+            })
+            .collect(),
+    };
+    let resp = crate::grpc_call!(grpc, guild_backup, save_pending_roles, req)?;
+    Ok(resp.saved)
 }
 
-/// POST /api/guild-backup/{guild_id}/pending-roles/{user_id}/consume — lit ET
-/// supprime (atomique) les roles en attente d'un membre. Vecteur vide si aucun.
+/// Lit ET supprime (atomique) les roles en attente d'un membre. Vecteur vide
+/// si aucun : c'est le cas de la quasi-totalite des arrivees.
 pub async fn consume_pending_roles(
-    api: &BaseApiClient,
+    grpc: &Arc<SentinelGrpcClient>,
     guild_id: &str,
     user_id: &str,
 ) -> Result<Vec<String>, String> {
-    let dto: ConsumedGrantDto = api
-        .post_json(
-            &format!("/api/guild-backup/{guild_id}/pending-roles/{user_id}/consume"),
-            &serde_json::json!({}),
-        )
-        .await?;
-    Ok(dto.role_ids)
+    let req = proto::ConsumePendingRolesRequest {
+        guild_id: guild_id.to_string(),
+        user_id: user_id.to_string(),
+    };
+    let resp = crate::grpc_call!(grpc, guild_backup, consume_pending_roles, req)?;
+    Ok(resp.role_ids)
 }
 
-/// DELETE /api/guild-backup/{guild_id}/pending-roles — purge les grants d'une
-/// guild (repartir propre avant un nouveau restore). Best-effort.
-pub async fn clear_pending_roles(api: &BaseApiClient, guild_id: &str) -> Result<(), String> {
-    let path = format!("/api/guild-backup/{guild_id}/pending-roles");
-    let req = api.client().delete(format!("{}{}", api.base_url(), path));
-    let resp = api
-        .auth(req)
-        .send()
-        .await
-        .map_err(|e| format!("Purge impossible : {e}"))?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(format!("Purge refusee ({status}) : {body}"));
-    }
-    Ok(())
-}
-
-/// DELETE /api/guild-backup/snapshots/{snapshot_id} — supprime une capture.
-///
-/// L'API repond 204 No Content (corps vide) : `delete_json` attend un JSON,
-/// donc on utilise directement le client bas-niveau pour ne rien deserialiser.
-pub async fn delete_snapshot(api: &BaseApiClient, snapshot_id: &str) -> Result<(), String> {
-    let path = format!("/api/guild-backup/snapshots/{snapshot_id}");
-    let req = api.client().delete(format!("{}{}", api.base_url(), path));
-    let resp = api
-        .auth(req)
-        .send()
-        .await
-        .map_err(|e| format!("Suppression impossible : {e}"))?;
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(format!("Suppression refusee ({status}) : {body}"));
-    }
-    Ok(())
+/// Purge les roles en attente d'un serveur (repartir propre avant un nouveau
+/// restore). Best-effort cote appelant.
+pub async fn clear_pending_roles(
+    grpc: &Arc<SentinelGrpcClient>,
+    guild_id: &str,
+) -> Result<(), String> {
+    let req = proto::ClearPendingRolesRequest {
+        guild_id: guild_id.to_string(),
+    };
+    crate::grpc_call!(@unit grpc, guild_backup, clear_pending_roles, req)
 }

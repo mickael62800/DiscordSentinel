@@ -9,7 +9,6 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
 
 use sentinel_proto::members::v1 as proto_members;
@@ -53,14 +52,12 @@ pub struct UpdateMemberPayload {
 }
 
 pub struct ApiClient {
-    #[allow(dead_code)]
-    pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
-        Self { base, grpc }
+    pub fn new(grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { grpc }
     }
 
     // ── Security events (gRPC) ──
@@ -185,7 +182,6 @@ impl ApiClient {
             raid_score: resp.raid_score,
             is_suspicious_account: resp.is_suspicious_account,
             is_alt_account: resp.is_alt_account,
-            alt_similar_to: resp.alt_similar_to,
             quarantine: resp.quarantine,
             send_captcha: resp.send_captcha,
             activate_lockdown: resp.activate_lockdown,
@@ -207,13 +203,11 @@ pub struct RecentJoinEntry {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct SecurityDecisionResponse {
     pub is_raid: bool,
     pub raid_score: u32,
     pub is_suspicious_account: bool,
     pub is_alt_account: bool,
-    pub alt_similar_to: String,
     pub quarantine: bool,
     pub send_captcha: bool,
     pub activate_lockdown: bool,

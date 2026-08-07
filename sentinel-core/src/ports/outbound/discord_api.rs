@@ -63,6 +63,29 @@ pub trait DiscordApi: Send + Sync {
         limit: u32,
     ) -> Result<Vec<DiscordMember>, DomainError>;
     async fn send_dm(&self, user_id: &str, content: &str) -> Result<(), DomainError>;
+    /// Poste un embed dans un salon.
+    ///
+    /// Existe pour que les handlers cessent de fabriquer un `reqwest::Client`
+    /// et d'appeler `discord.com` eux-memes : un adaptateur inbound qui fait de
+    /// l'I/O sortante court-circuite le port, donc l'inversion de dependance.
+    ///
+    /// L'implementation reelle VALIDE `channel_id` comme snowflake avant de
+    /// l'interpoler dans l'URL. Cette garantie appartient a l'adaptateur, pas
+    /// a l'appelant : c'est lui qui construit l'URL, donc lui qui doit
+    /// empecher qu'un identifiant malforme atteigne un autre endpoint de l'API
+    /// Discord avec le token du bot.
+    ///
+    /// Implementation par defaut en erreur : les doubles de test qui ne postent
+    /// rien n'ont pas a la stubber.
+    async fn send_channel_embed(
+        &self,
+        _channel_id: &str,
+        _embed: serde_json::Value,
+    ) -> Result<(), DomainError> {
+        Err(DomainError::Internal(
+            "Envoi d'embed non supporte par cet adaptateur Discord".into(),
+        ))
+    }
     async fn create_role(
         &self,
         guild_id: &str,
@@ -149,6 +172,11 @@ pub struct DiscordUser {
     pub username: String,
     #[serde(default)]
     pub avatar: Option<String>,
+    /// Pseudo d'affichage global (Discord 2023). Absent des vieux comptes,
+    /// d'ou le `default`. Le flux OAuth le renvoie au front pour afficher le
+    /// nom que le membre a reellement choisi.
+    #[serde(default)]
+    pub global_name: Option<String>,
 }
 
 /// Phase 9 Part E — Salon d'une guild (pour channel picker web).

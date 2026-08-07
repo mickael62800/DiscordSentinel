@@ -18,16 +18,16 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 use crate::adapters::inbound::http::validation;
-use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
-use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
-use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
+use sentinel_core::ports::inbound::system::manage_tickets::AssignTicketCommand;
+use sentinel_core::ports::inbound::system::manage_tickets::ReplyTicketCommand;
+use sentinel_core::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
 use sentinel_core::domain::enums::system::ticket_status::TicketStatus;
 use sentinel_core::domain::errors::DomainError;
 
 pub async fn list_tickets(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Query(params): Query<ListTicketsQuery>,
 ) -> Result<Json<Vec<TicketResponseDto>>, ApiError> {
@@ -77,7 +77,7 @@ pub async fn list_tickets(
 }
 
 pub async fn get_ticket_detail(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
 ) -> Result<Json<TicketDetailDto>, ApiError> {
@@ -86,14 +86,14 @@ pub async fn get_ticket_detail(
 }
 
 pub async fn create_ticket(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateTicketDto>,
 ) -> Result<Json<TicketResponseDto>, ApiError> {
     // Validation
     validation::validate_title(&dto.title).map_err(ApiError)?;
 
-    let mut command: crate::ports::inbound::system::manage_tickets::CreateTicketCommand =
+    let mut command: sentinel_core::ports::inbound::system::manage_tickets::CreateTicketCommand =
         dto.into();
 
     // S1/S4 — chemin web : la creation HTTP exige Moderator+ sur la guild cible,
@@ -126,7 +126,7 @@ pub async fn create_ticket(
 }
 
 pub async fn reply_ticket(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<ReplyDto>,
@@ -165,7 +165,7 @@ pub async fn reply_ticket(
 }
 
 pub async fn close_ticket(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -188,7 +188,7 @@ pub async fn close_ticket(
 }
 
 pub async fn assign_ticket(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<AssignDto>,
@@ -214,7 +214,7 @@ pub async fn assign_ticket(
 }
 
 pub async fn update_status(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<UpdateStatusDto>,
@@ -246,7 +246,7 @@ pub async fn update_status(
 }
 
 pub async fn update_ticket_channel(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Json(dto): Json<UpdateTicketChannelDto>,
@@ -296,7 +296,7 @@ pub struct BulkDeleteTicketsParams {
 ///
 /// Gate user : admin+ (avec bypass superadmin).
 pub async fn bulk_delete_tickets(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Query(params): Query<BulkDeleteTicketsParams>,
 ) -> Result<Json<serde_json::Value>, ApiError> {

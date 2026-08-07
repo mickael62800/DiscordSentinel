@@ -1,7 +1,7 @@
 use crate::adapters::outbound::postgres::pg_err;
 use async_trait::async_trait;
 
-use crate::ports::outbound::community::voice_channel_repository::VoicePresetStore;
+use sentinel_core::ports::outbound::community::voice_channel_repository::VoicePresetStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelPreset;
 use sentinel_core::domain::errors::DomainError;
 

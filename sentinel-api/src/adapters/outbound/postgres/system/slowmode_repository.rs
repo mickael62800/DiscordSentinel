@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::ports::outbound::system::slowmode_repository::SlowmodeRepository;
+use sentinel_core::ports::outbound::system::slowmode_repository::SlowmodeRepository;
 use sentinel_core::domain::errors::DomainError;
 
 pub struct PgSlowmodeRepository {

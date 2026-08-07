@@ -13,14 +13,14 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::community::manage_levels::AddXpCommand;
-use crate::ports::inbound::community::manage_levels::ResetTarget;
-use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
+use crate::bootstrap::state::CommunityState;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpCommand;
+use sentinel_core::ports::inbound::community::manage_levels::ResetTarget;
+use sentinel_core::ports::inbound::community::manage_levels::SetUserXpCommand;
 use sentinel_core::domain::entities::community::level::XpSource;
 
 pub async fn add_xp(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Json(dto): Json<AddXpDto>,
 ) -> Result<Json<AddXpResponseDto>, ApiError> {
     // L'attribution d'XP est une operation du BOT (Bearer API_KEY -> Internal,
@@ -56,7 +56,7 @@ pub async fn add_xp(
 }
 
 pub async fn get_user_level(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserLevelDto>, ApiError> {
     let level = state.levels_uc.get_user_level(&guild_id, &user_id).await?;
@@ -64,7 +64,7 @@ pub async fn get_user_level(
 }
 
 pub async fn get_leaderboard(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<LevelLeaderboardParams>,
 ) -> Result<Json<Vec<UserLevelDto>>, ApiError> {
@@ -88,7 +88,7 @@ pub async fn get_leaderboard(
 }
 
 pub async fn set_user_xp(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Json(dto): Json<SetUserXpDto>,
 ) -> Result<Json<UserLevelDto>, ApiError> {
     let guild_id = dto.guild_id.clone();
@@ -115,7 +115,7 @@ pub async fn set_user_xp(
 }
 
 pub async fn reset_user_xp(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     Json(dto): Json<ResetUserXpDto>,
 ) -> Result<Json<UserLevelDto>, ApiError> {
     let target = match dto.target.as_str() {

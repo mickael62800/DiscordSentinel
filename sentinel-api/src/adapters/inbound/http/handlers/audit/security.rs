@@ -6,7 +6,7 @@ use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::AuditState;
 use crate::adapters::inbound::http::validation;
 use axum::extract::Query;
 use axum::extract::State;
@@ -15,7 +15,7 @@ use axum::Json;
 
 /// POST /api/security/events — signaler un événement de sécurité (depuis le security-bot)
 pub async fn report_event(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     _user: Option<Extension<WebUser>>,
     Json(dto): Json<ReportEventDto>,
 ) -> Result<Json<SecurityEventResponseDto>, ApiError> {
@@ -48,7 +48,7 @@ pub async fn report_event(
 /// Purge tous les evenements de securite d'une guild + les manual_watched_users
 /// crees automatiquement par ces evenements.
 pub async fn purge_events(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -64,7 +64,7 @@ pub async fn purge_events(
 
 /// GET /api/security/events — lister les événements de sécurité
 pub async fn list_events(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     _user: Option<Extension<WebUser>>,
     Query(params): Query<SecurityQueryParams>,
 ) -> Result<Json<Vec<SecurityEventResponseDto>>, ApiError> {

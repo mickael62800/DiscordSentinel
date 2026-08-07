@@ -15,7 +15,7 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::inbound::moderation::manage_notes::*;
+use sentinel_core::ports::inbound::moderation::manage_notes::*;
 use sentinel_core::domain::entities::moderation::user_note::*;
 use sentinel_core::domain::errors::DomainError;
 
@@ -102,7 +102,7 @@ impl ManageNotesUseCase for MockNotesUC {
 
 fn build_app(uc: MockNotesUC) -> axum::Router {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.notes_uc = Arc::new(uc);
+    state.moderation.notes_uc = Arc::new(uc);
     router::build_for_test(state)
 }
 

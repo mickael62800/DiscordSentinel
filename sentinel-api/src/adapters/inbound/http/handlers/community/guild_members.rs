@@ -10,11 +10,11 @@ use tracing::warn;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use crate::adapters::outbound::discord_api::DiscordMember;
-use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
-use crate::ports::inbound::community::manage_members::SyncMembersCommand;
-use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
+use sentinel_core::ports::inbound::community::manage_members::RegisterMemberCommand;
+use sentinel_core::ports::inbound::community::manage_members::SyncMembersCommand;
+use sentinel_core::ports::inbound::community::manage_members::UpdateMemberCommand;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
 use sentinel_core::domain::entities::community::guild_member::MemberSummary;
 use sentinel_core::domain::entities::community::guild_member_reset::DISCORD_LIST_MEMBERS_CAP;
@@ -22,7 +22,7 @@ use sentinel_core::domain::entities::community::guild_member_reset::MEMBERS_CACH
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 /// GET /api/guilds/{guild_id}/members — liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<DiscordMember>>, ApiError> {
@@ -59,7 +59,7 @@ pub async fn list_members(
 
 /// GET /api/members/{guild_id} — liste les membres depuis la BDD
 pub async fn list_members_db(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<GuildMember>>, ApiError> {
@@ -69,7 +69,7 @@ pub async fn list_members_db(
 
 /// GET /api/members/{guild_id}/{user_id} — profil d'un membre
 pub async fn get_member(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<GuildMember>, ApiError> {
@@ -79,7 +79,7 @@ pub async fn get_member(
 
 /// GET /api/members/{guild_id}/{user_id}/summary — profil complet agrege
 pub async fn get_member_summary(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<MemberSummary>, ApiError> {
@@ -92,7 +92,7 @@ pub async fn get_member_summary(
 
 /// POST /api/members/sync — sync bulk depuis un bot
 pub async fn sync_members(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Json(payload): Json<SyncMembersPayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -108,7 +108,7 @@ pub async fn sync_members(
 
 /// POST /api/members/register — enregistre un nouveau membre
 pub async fn register_member(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Json(member): Json<GuildMember>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -121,7 +121,7 @@ pub async fn register_member(
 
 /// DELETE /api/members/{guild_id}/{user_id} — supprime un membre
 pub async fn remove_member(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -132,7 +132,7 @@ pub async fn remove_member(
 
 /// PATCH /api/members/{guild_id}/{user_id} — met a jour un membre
 pub async fn update_member(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(payload): Json<UpdateMemberPayload>,
@@ -173,7 +173,7 @@ pub struct SyncMembersPayload {
 /// Tout se fait dans une transaction atomique : en cas d'erreur sur un DELETE,
 /// on rollback et on retourne l'erreur — l'etat DB reste coherent.
 pub async fn reset_member(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -227,7 +227,7 @@ pub struct UpdateMemberPayload {
 ///
 /// Endpoint appele par sentinel-bot sur GuildMemberRemove. Idempotent.
 pub async fn leave_member(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -251,7 +251,7 @@ pub async fn leave_member(
 ///
 /// Endpoint appele par sentinel-bot sur GuildMemberAdd. Idempotent.
 pub async fn rejoin_member(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {

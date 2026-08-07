@@ -1,4 +1,4 @@
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
+﻿use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::Json;
@@ -9,10 +9,10 @@ use crate::adapters::inbound::http::dto::moderation::rules::RuleResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 
 pub async fn get_rules(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<RuleResponseDto>>, ApiError> {
     let rules = state.rules_uc.get_rules(&guild_id).await?;
@@ -20,7 +20,7 @@ pub async fn get_rules(
 }
 
 pub async fn create_rule(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Json(dto): Json<CreateRuleDto>,
 ) -> Result<Json<RuleResponseDto>, ApiError> {
     // Guild fourni dans le body (pas dans le path) : lookup explicite via
@@ -31,7 +31,7 @@ pub async fn create_rule(
 }
 
 pub async fn delete_rule(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path((guild_id, rule_id)): Path<(String, Uuid)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.rules_uc.delete_rule(&guild_id, rule_id).await?;

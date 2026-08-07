@@ -11,9 +11,9 @@ use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
-use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
-use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
-use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use sentinel_core::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;
 pub struct StatsGrpc {

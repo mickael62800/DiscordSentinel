@@ -169,15 +169,11 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
     };
 
     let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
-        Some(client) => client,
-        None => return,
-    };
     let grpc = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
         Some(g) => g.clone(),
         None => return,
     };
-    let api = ApiClient::new(base.clone(), grpc);
+    let api = ApiClient::new(grpc);
 
     let author_role = match msg.guild_id {
         Some(guild_id) => {
@@ -614,11 +610,8 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
             if let Some(id) = ticket::extract_ticket_id_from_topic(topic) {
                 if id == ticket_id {
                     let data_lock = ctx.data.read().await;
-                    if let (Some(base), Some(grpc)) = (
-                        data_lock.get::<ApiClientKey>(),
-                        data_lock.get::<crate::shared::grpc_client::GrpcClientKey>(),
-                    ) {
-                        let api = ApiClient::new(base.clone(), grpc.clone());
+                    if let Some(grpc) = data_lock.get::<crate::shared::grpc_client::GrpcClientKey>() {
+                        let api = ApiClient::new(grpc.clone());
                         if let Ok(detail) = api.get_ticket(ticket_id).await {
                             if let Some(last_msg) = detail.messages.last() {
                                 if last_msg.author_role == "moderator" {

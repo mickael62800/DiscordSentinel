@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::ports::outbound::system::alert_rule_repository::AlertRuleRepository;
+use sentinel_core::ports::outbound::system::alert_rule_repository::AlertRuleRepository;
 use sentinel_core::domain::entities::system::alert_rule::{AlertRule, AlertRuleUpdate};
 use sentinel_core::domain::errors::DomainError;
 

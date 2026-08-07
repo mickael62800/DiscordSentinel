@@ -15,6 +15,7 @@ pub mod game_events {
     pub const SERVER_DELETED: &str = "game_server_deleted";
     pub const IP_REVEAL: &str = "game_ip_reveal";
     pub const DAILY_PING: &str = "game_daily_ping";
+    pub const GAMES_PANEL_DEPLOY: &str = "games_panel_deploy";
 }
 
 #[async_trait]

@@ -17,7 +17,6 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
 
 use sentinel_proto::automod::v1 as proto;
@@ -60,13 +59,10 @@ pub enum Routing {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct AnalyzeResponse {
     pub action: Action,
     #[serde(default)]
     pub reason: Option<String>,
-    #[serde(default)]
-    pub duration: Option<u64>,
     #[serde(default)]
     pub score: Option<f64>,
     /// Decision de routage (cote serveur).
@@ -88,14 +84,12 @@ pub enum Action {
 }
 
 pub struct ApiClient {
-    #[allow(dead_code)]
-    pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
-        Self { base, grpc }
+    pub fn new(grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { grpc }
     }
 
     /// gRPC `AutomodService.AnalyzeMessage` (hot path le plus chaud).
@@ -132,7 +126,6 @@ impl ApiClient {
             } else {
                 Some(resp.reason)
             },
-            duration: resp.duration,
             score: Some(resp.score),
             route: proto_routing_to_routing(resp.route),
             severe: resp.severe,
@@ -230,38 +223,41 @@ use crate::shared::grpc_client::grpc_err_to_string;
 // Le tracker est en memoire ; on mirroir l'ensemble actif cote API pour le
 // recharger apres un redemarrage (sinon salons bloques en slowmode a vie).
 
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct AdaptiveSlowmodeEntry {
-    #[serde(default)]
-    pub guild_id: String,
-    pub channel_id: String,
-}
-
 /// Marque un salon comme slowmode adaptatif actif (best-effort).
-pub async fn persist_slowmode(api: &BaseApiClient, guild_id: &str, channel_id: &str) {
-    let body = AdaptiveSlowmodeEntry {
+pub async fn persist_slowmode(grpc: &Arc<SentinelGrpcClient>, guild_id: &str, channel_id: &str) {
+    let req = proto::AdaptiveSlowmodeChannel {
         guild_id: guild_id.to_string(),
         channel_id: channel_id.to_string(),
     };
-    let _ = api
-        .post_json::<_, serde_json::Value>("/api/automod/adaptive-slowmode", &body)
-        .await;
+    if let Err(e) = crate::grpc_call!(@raw_unit grpc, automod, mark_adaptive_slowmode, req) {
+        tracing::warn!(error = %e, channel_id, "slowmode adaptatif non persiste");
+    }
 }
 
 /// Retire un salon (slowmode desactive) — best-effort.
-pub async fn forget_slowmode(api: &BaseApiClient, channel_id: &str) {
-    let body = AdaptiveSlowmodeEntry {
+pub async fn forget_slowmode(grpc: &Arc<SentinelGrpcClient>, channel_id: &str) {
+    // `guild_id` vide : la cle de suppression est le salon, unique en base.
+    let req = proto::AdaptiveSlowmodeChannel {
         guild_id: String::new(),
         channel_id: channel_id.to_string(),
     };
-    let _ = api
-        .post_json::<_, serde_json::Value>("/api/automod/adaptive-slowmode/remove", &body)
-        .await;
+    if let Err(e) = crate::grpc_call!(@raw_unit grpc, automod, unmark_adaptive_slowmode, req) {
+        tracing::warn!(error = %e, channel_id, "retrait du slowmode adaptatif non persiste");
+    }
 }
 
-/// Liste tous les salons actifs (rechargement au demarrage).
-pub async fn list_slowmode(api: &BaseApiClient) -> Vec<AdaptiveSlowmodeEntry> {
-    api.get_json("/api/automod/adaptive-slowmode")
-        .await
-        .unwrap_or_default()
+/// Salons a relacher au demarrage. Le serveur porte aussi le `guild_id` pour
+/// le dashboard ; le tracker du bot ne s'indexe que par salon.
+pub async fn list_slowmode(grpc: &Arc<SentinelGrpcClient>) -> Vec<String> {
+    let req = proto::ListAdaptiveSlowmodeRequest {};
+    match crate::grpc_call!(@raw grpc, automod, list_adaptive_slowmode, req) {
+        Ok(resp) => resp.channels.into_iter().map(|c| c.channel_id).collect(),
+        Err(e) => {
+            // Liste vide = aucun salon relache au demarrage. On le dit, sinon
+            // le symptome (slowmode fige) est indiscernable d'un ensemble
+            // reellement vide.
+            tracing::warn!(error = %e, "rechargement du slowmode adaptatif impossible");
+            Vec::new()
+        }
+    }
 }

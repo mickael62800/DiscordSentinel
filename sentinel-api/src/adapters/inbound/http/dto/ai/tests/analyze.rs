@@ -32,7 +32,7 @@ fn make_dto(content: String, n_context: usize) -> AnalyzeRequestDto {
 #[test]
 fn from_dto_short_content_preserved() {
     let dto = make_dto("hello world".into(), 0);
-    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
+    let cmd: sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.content, "hello world");
 }
 
@@ -40,7 +40,7 @@ fn from_dto_short_content_preserved() {
 fn from_dto_content_exactly_2500_preserved() {
     let content = "a".repeat(2500);
     let dto = make_dto(content.clone(), 0);
-    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
+    let cmd: sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.content.len(), 2500);
     assert_eq!(cmd.content, content);
 }
@@ -49,7 +49,7 @@ fn from_dto_content_exactly_2500_preserved() {
 fn from_dto_content_above_2500_truncated() {
     let content = "x".repeat(3000);
     let dto = make_dto(content, 0);
-    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
+    let cmd: sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.content.chars().count(), 2500);
     assert!(cmd.content.chars().all(|c| c == 'x'));
 }
@@ -60,14 +60,14 @@ fn from_dto_truncation_counts_chars_not_bytes() {
     // Apres truncation : 2500 chars = 5000 bytes.
     let content: String = "é".repeat(3000);
     let dto = make_dto(content, 0);
-    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
+    let cmd: sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.content.chars().count(), 2500);
 }
 
 #[test]
 fn from_dto_copies_ids_and_flags() {
     let dto = make_dto("hi".into(), 0);
-    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
+    let cmd: sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.guild_id, "g".into());
     assert_eq!(cmd.channel_id, "c".into());
     assert_eq!(cmd.user_id, "u".into());
@@ -79,7 +79,7 @@ fn from_dto_copies_ids_and_flags() {
 #[test]
 fn from_dto_maps_context_messages() {
     let dto = make_dto("hi".into(), 3);
-    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
+    let cmd: sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.context_messages.len(), 3);
     assert_eq!(cmd.context_messages[0].username, "u0");
     assert_eq!(cmd.context_messages[0].content, "msg0");
@@ -89,7 +89,7 @@ fn from_dto_maps_context_messages() {
 #[test]
 fn from_dto_empty_context_produces_empty_vec() {
     let dto = make_dto("x".into(), 0);
-    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
+    let cmd: sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert!(cmd.context_messages.is_empty());
 }
 

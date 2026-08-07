@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_core::ports::outbound::moderation::infraction_repository::InfractionRepository;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
 use sentinel_core::domain::enums::moderation::action::Action;
@@ -207,6 +207,23 @@ impl InfractionRepository for PgInfractionRepository {
             .await
             .map_err(pg_ctx("delete_infractions_older"))?;
         Ok(result.rows_affected())
+    }
+
+    async fn count_by_action_for_user(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<(String, u64)>, DomainError> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT action, COUNT(*) FROM infractions \
+             WHERE guild_id = $1 AND user_id = $2 GROUP BY action",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_ctx("count_infractions_by_action"))?;
+        Ok(rows.into_iter().map(|(a, n)| (a, n.max(0) as u64)).collect())
     }
 }
 

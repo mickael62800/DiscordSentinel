@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 
-use crate::ports::outbound::system::host_probe_reader::HostProbeReader;
+use sentinel_core::ports::outbound::system::host_probe_reader::HostProbeReader;
 use sentinel_core::domain::entities::system::host_probe::HostProbe;
 use sentinel_core::domain::errors::DomainError;
 

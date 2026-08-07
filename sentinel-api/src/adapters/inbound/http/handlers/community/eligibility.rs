@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use sentinel_core::ports::inbound::community::check_eligibility::{
     CheckRoleEligibilityCommand, ValidateSponsorshipCommand,
 };
@@ -36,7 +36,7 @@ pub struct RoleEligibilityBody {
 
 /// POST /api/community/eligibility/{guild_id}/role — decide de l'eligibilite au role.
 pub async fn check_role_eligibility(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<RoleEligibilityBody>,
 ) -> Result<Json<EligibilityDto>, ApiError> {
@@ -74,7 +74,7 @@ pub struct SponsorshipEligibilityBody {
 
 /// POST /api/community/eligibility/{guild_id}/sponsorship — valide un parrainage.
 pub async fn validate_sponsorship(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<SponsorshipEligibilityBody>,
 ) -> Result<Json<EligibilityDto>, ApiError> {

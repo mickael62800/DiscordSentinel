@@ -15,6 +15,7 @@ pub async fn get_activity_trend(
 ) -> Result<Json<Vec<DailyActivityDto>>, ApiError> {
     let days = normalize_days(params.days, 30, 90);
     let activity = state
+        .community
         .daily_activity_repo
         .get_activity(params.guild_id.as_deref(), days)
         .await?;

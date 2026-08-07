@@ -89,3 +89,7 @@ impl CoussinPrimeUseCase for CoussinPrimeService {
             .await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/coussin_prime_service.rs"]
+mod tests;

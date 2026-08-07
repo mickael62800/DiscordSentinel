@@ -2,7 +2,7 @@ use crate::adapters::outbound::postgres::pg_ctx;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use sentinel_core::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 use sentinel_core::domain::errors::DomainError;
 

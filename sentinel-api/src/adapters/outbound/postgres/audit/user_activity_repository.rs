@@ -5,7 +5,7 @@ use sentinel_core::domain::entities::audit::user_activity::UserActivity;
 use sentinel_core::domain::errors::DomainError;
 
 use super::super::pg_err;
-use crate::ports::outbound::audit::user_activity_repository::UserActivityRepository;
+use sentinel_core::ports::outbound::audit::user_activity_repository::UserActivityRepository;
 
 pub struct PgUserActivityRepository {
     pool: PgPool,

@@ -129,10 +129,10 @@ fn add_xp_result_to_proto_no_levelup() {
 // ── RPC tests avec mock ──
 
 use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
-use crate::ports::inbound::community::manage_levels::AddXpCommand;
-use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
-use crate::ports::inbound::community::manage_levels::ResetTarget;
-use crate::ports::inbound::community::manage_levels::SetUserXpCommand;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpCommand;
+use sentinel_core::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use sentinel_core::ports::inbound::community::manage_levels::ResetTarget;
+use sentinel_core::ports::inbound::community::manage_levels::SetUserXpCommand;
 use async_trait::async_trait;
 use sentinel_core::domain::errors::DomainError;
 use std::sync::Arc;
@@ -149,15 +149,15 @@ struct MockLevelsUc {
 impl ManageLevelsUseCase for MockLevelsUc {
     async fn record_text_activity(
         &self,
-        _: crate::ports::inbound::community::manage_levels::RecordTextActivityCommand,
-    ) -> Result<crate::ports::inbound::community::manage_levels::RecordActivityResult, DomainError>
+        _: sentinel_core::ports::inbound::community::manage_levels::RecordTextActivityCommand,
+    ) -> Result<sentinel_core::ports::inbound::community::manage_levels::RecordActivityResult, DomainError>
     {
         unimplemented!()
     }
     async fn record_voice_activity(
         &self,
-        _: crate::ports::inbound::community::manage_levels::RecordVoiceActivityCommand,
-    ) -> Result<crate::ports::inbound::community::manage_levels::RecordActivityResult, DomainError>
+        _: sentinel_core::ports::inbound::community::manage_levels::RecordVoiceActivityCommand,
+    ) -> Result<sentinel_core::ports::inbound::community::manage_levels::RecordActivityResult, DomainError>
     {
         unimplemented!()
     }

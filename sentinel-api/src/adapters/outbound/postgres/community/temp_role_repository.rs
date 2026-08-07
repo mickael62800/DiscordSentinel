@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use super::super::pg_err;
-use crate::ports::outbound::community::temp_role_repository::TempRole;
-use crate::ports::outbound::community::temp_role_repository::TempRoleRepository;
+use sentinel_core::ports::outbound::community::temp_role_repository::TempRole;
+use sentinel_core::ports::outbound::community::temp_role_repository::TempRoleRepository;
 
 pub struct PgTempRoleRepository {
     pool: PgPool,

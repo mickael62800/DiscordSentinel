@@ -101,6 +101,8 @@ pub struct CoussinConfig {
     pub insurance_enabled: bool,
     pub insurance_cost: i64,
     pub insurance_duration_minutes: i64,
+    /// Pourcentage de chance que l'assurance soit une arnaque (0-100, defaut 5).
+    pub insurance_scam_pct: u32,
     /// Gain d'un pari gagnant, en % de la mise. 200 = mise doublee.
     pub bet_payout_pct: i64,
     // ── Bagarres ──
@@ -158,6 +160,7 @@ impl Default for CoussinConfig {
             // c'est ce prix-la que les joueurs connaissent.
             insurance_cost: 50,
             insurance_duration_minutes: 60,
+            insurance_scam_pct: 5,
             bet_payout_pct: 200,
             combat_mise_min: 1,
             combat_mise_max: 0,
@@ -422,6 +425,7 @@ pub async fn load_coussin(
             "insurance_duration_minutes",
             d.insurance_duration_minutes,
         ),
+        insurance_scam_pct: n(&items, "insurance_scam_pct", d.insurance_scam_pct),
         bet_payout_pct: n(&items, "bet_payout_pct", d.bet_payout_pct),
         combat_mise_min: n(&items, "combat_mise_min", d.combat_mise_min),
         combat_mise_max: n(&items, "combat_mise_max", d.combat_mise_max),

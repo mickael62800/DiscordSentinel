@@ -1,4 +1,4 @@
-use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use serde::Deserialize;

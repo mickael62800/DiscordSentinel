@@ -15,12 +15,12 @@ use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
-use sentinel_api::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
-use sentinel_api::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
-use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
-use sentinel_api::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_core::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use sentinel_core::ports::outbound::system::log_repository::LogRepository;
 use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;
@@ -32,6 +32,16 @@ struct MockInfUC {
 }
 #[async_trait]
 impl ManageInfractionsUseCase for MockInfUC {
+    async fn count_user_infractions(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        sentinel_core::ports::inbound::moderation::manage_infractions::UserInfractionCounts,
+        DomainError,
+    > {
+        unimplemented!("count_user_infractions non exerce par ces tests")
+    }
     async fn list_infractions(
         &self,
         _: &str,
@@ -117,8 +127,8 @@ fn build_state() -> (AppState, Arc<MockInfUC>, Arc<MockAuditUC>, Arc<MockLogRepo
     let audit = Arc::new(MockAuditUC::default());
     let log = Arc::new(MockLogRepo::default());
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.infractions_uc = inf.clone();
-    state.audit_logs_uc = audit.clone();
+    state.moderation.infractions_uc = inf.clone();
+    state.audit.audit_logs_uc = audit.clone();
     state.log_repo = log.clone();
     (state, inf, audit, log)
 }
@@ -142,9 +152,9 @@ async fn delete_json(
         serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null),
     )
 }
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // purge_infractions
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_infractions_success_positive_days() {
@@ -188,9 +198,9 @@ async fn purge_infractions_invalid_guild_422() {
     let (status, _) = delete_json(app, "/api/purge/infractions", body).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // purge_audit_logs
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_audit_logs_success() {
@@ -225,9 +235,9 @@ async fn purge_audit_logs_rejects_negative_days() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // purge_logs (superadmin)
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_logs_success_without_rbac() {

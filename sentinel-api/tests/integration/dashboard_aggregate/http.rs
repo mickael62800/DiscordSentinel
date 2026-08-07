@@ -19,15 +19,15 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
-use sentinel_api::ports::inbound::audit::manage_stats::RecordMessagesCommand;
-use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
-use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
-use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
-use sentinel_api::ports::inbound::moderation::manage_rules::CreateRuleCommand;
-use sentinel_api::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
+use sentinel_core::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_core::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use sentinel_core::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use sentinel_core::ports::inbound::moderation::manage_rules::CreateRuleCommand;
+use sentinel_core::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
 use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
 use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
 use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
@@ -88,6 +88,16 @@ struct MockInfractionsUC {
 
 #[async_trait]
 impl ManageInfractionsUseCase for MockInfractionsUC {
+    async fn count_user_infractions(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        sentinel_core::ports::inbound::moderation::manage_infractions::UserInfractionCounts,
+        DomainError,
+    > {
+        unimplemented!("count_user_infractions non exerce par ces tests")
+    }
     async fn list_infractions(
         &self,
         guild_id: &str,
@@ -211,9 +221,9 @@ struct TestMocks {
 
 fn build_state(mocks: &TestMocks) -> AppState {
     let mut state = build_test_state_stats(mocks.stats.clone());
-    state.infractions_uc = mocks.infractions.clone();
-    state.moderation_uc = mocks.moderation.clone();
-    state.rules_uc = mocks.rules.clone();
+    state.moderation.infractions_uc = mocks.infractions.clone();
+    state.moderation.moderation_uc = mocks.moderation.clone();
+    state.moderation.rules_uc = mocks.rules.clone();
     state
 }
 

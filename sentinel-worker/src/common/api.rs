@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Helpers d'appel HTTP vers l'API Sentinel.
 //!
 //! Centralise le boilerplate `reqwest::Client::new() + bearer_auth(API_KEY)
@@ -72,25 +71,3 @@ where
     post_json(path, &serde_json::json!({})).await
 }
 
-/// `GET {API_URL}{path}` avec Bearer auth optionnel, retour JSON parse en `T`.
-pub async fn get_json<T>(path: &str) -> Result<T, String>
-where
-    T: DeserializeOwned,
-{
-    let url = full_url(path);
-    let client = Client::new();
-    let req = client.get(&url);
-    let resp = add_auth(req)
-        .send()
-        .await
-        .map_err(|e| format!("HTTP send: {e}"))?;
-
-    let status = resp.status();
-    if !status.is_success() {
-        let body = resp.text().await.unwrap_or_default();
-        return Err(format!("HTTP {status}: {body}"));
-    }
-    resp.json::<T>()
-        .await
-        .map_err(|e| format!("HTTP parse: {e}"))
-}

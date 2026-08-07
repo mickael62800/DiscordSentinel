@@ -89,6 +89,16 @@ impl WatchedUserRepository for MockRepo {
 struct StubInf;
 #[async_trait]
 impl ManageInfractionsUseCase for StubInf {
+    async fn count_user_infractions(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        crate::ports::inbound::moderation::manage_infractions::UserInfractionCounts,
+        crate::domain::errors::DomainError,
+    > {
+        Ok(Default::default())
+    }
     async fn list_infractions(
         &self,
         _: &str,
@@ -205,7 +215,6 @@ fn make_service(repo: Arc<MockRepo>) -> ManageWatchedUsersService {
 }
 
 // Silence unused imports warnings pour le Stats UC non utilise.
-#[allow(dead_code)]
 fn _silence_unused(
     _: UserStats,
     _: DashboardStats,

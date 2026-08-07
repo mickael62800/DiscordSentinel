@@ -14,8 +14,8 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
-use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
 use sentinel_core::domain::entities::ai::image_analysis::ImageClassification;
 use sentinel_core::domain::enums::moderation::action::Action;
@@ -69,7 +69,7 @@ fn payload(image_data: &str, content_type: &str) -> serde_json::Value {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn analyze_image_happy_path() {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.analyze_image_uc = Arc::new(OkAnalyzeImage);
+    state.ai.analyze_image_uc = Arc::new(OkAnalyzeImage);
     let app = router::build_for_test(state);
     let data = base64::engine::general_purpose::STANDARD.encode(b"fake-png-bytes");
     let (status, json) = post(app, payload(&data, "image/png")).await;
@@ -80,7 +80,7 @@ async fn analyze_image_happy_path() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn analyze_image_rejects_oversized() {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.analyze_image_uc = Arc::new(OkAnalyzeImage);
+    state.ai.analyze_image_uc = Arc::new(OkAnalyzeImage);
     let app = router::build_for_test(state);
     let data = "A".repeat(14_000_001);
     let (status, _) = post(app, payload(&data, "image/png")).await;
@@ -95,7 +95,7 @@ async fn analyze_image_rejects_oversized() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn analyze_image_rejects_invalid_content_type() {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.analyze_image_uc = Arc::new(OkAnalyzeImage);
+    state.ai.analyze_image_uc = Arc::new(OkAnalyzeImage);
     let app = router::build_for_test(state);
     let data = base64::engine::general_purpose::STANDARD.encode(b"x");
     let (status, json) = post(app, payload(&data, "application/pdf")).await;
@@ -106,7 +106,7 @@ async fn analyze_image_rejects_invalid_content_type() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn analyze_image_rejects_invalid_base64() {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.analyze_image_uc = Arc::new(OkAnalyzeImage);
+    state.ai.analyze_image_uc = Arc::new(OkAnalyzeImage);
     let app = router::build_for_test(state);
     let (status, json) = post(app, payload("not!!valid!!base64", "image/png")).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
@@ -134,7 +134,7 @@ impl AnalyzeImageUseCase for FlaggedAnalyzeImage {
 async fn analyze_image_with_action_broadcasts_infraction() {
     // Exerce la branche `action != "none"` du handler (broadcast infraction_new).
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.analyze_image_uc = Arc::new(FlaggedAnalyzeImage);
+    state.ai.analyze_image_uc = Arc::new(FlaggedAnalyzeImage);
     let app = router::build_for_test(state);
     let data = base64::engine::general_purpose::STANDARD.encode(b"png");
     let (status, json) = post(app, payload(&data, "image/jpeg")).await;
@@ -148,7 +148,7 @@ async fn analyze_image_with_action_broadcasts_infraction() {
 async fn analyze_image_accepts_webp_and_gif() {
     // Couvre plusieurs branches de is_allowed_image_content_type.
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.analyze_image_uc = Arc::new(OkAnalyzeImage);
+    state.ai.analyze_image_uc = Arc::new(OkAnalyzeImage);
     let app = router::build_for_test(state);
     let data = base64::engine::general_purpose::STANDARD.encode(b"x");
     for ct in ["image/webp", "image/gif", "image/jpeg"] {

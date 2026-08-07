@@ -21,14 +21,14 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::ports::outbound::moderation::evidence_repository::EvidenceEntry;
-use sentinel_api::ports::outbound::moderation::evidence_repository::EvidenceRepository;
-use sentinel_api::ports::outbound::moderation::review_repository::ReviewEntry;
-use sentinel_api::ports::outbound::moderation::review_repository::ReviewRepository;
+use sentinel_core::ports::outbound::moderation::evidence_repository::EvidenceEntry;
+use sentinel_core::ports::outbound::moderation::evidence_repository::EvidenceRepository;
+use sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry;
+use sentinel_core::ports::outbound::moderation::review_repository::ReviewRepository;
 use sentinel_core::domain::errors::DomainError;
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Mocks
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[derive(Default)]
 struct MockEvidenceRepo {
@@ -150,8 +150,8 @@ impl ReviewRepository for MockReviewRepo {
 
 fn build_state(evidence: Arc<MockEvidenceRepo>, review: Arc<MockReviewRepo>) -> AppState {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.evidence_repo = evidence;
-    state.review_repo = review;
+    state.moderation.evidence_repo = evidence;
+    state.moderation.review_repo = review;
     state
 }
 
@@ -160,8 +160,8 @@ fn build_state(evidence: Arc<MockEvidenceRepo>, review: Arc<MockReviewRepo>) -> 
 fn build_state_with_discord_mock() -> AppState {
     use async_trait::async_trait;
     use chrono::Utc;
-    use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-    use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+    use sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+    use sentinel_core::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
     use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
     use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
     use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
@@ -231,7 +231,7 @@ fn build_state_with_discord_mock() -> AppState {
 
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
     state.discord_api = Arc::new(test_helpers::MockDiscordApi::new());
-    state.moderation_uc = Arc::new(MockModerationUC);
+    state.moderation.moderation_uc = Arc::new(MockModerationUC);
     state
 }
 
@@ -290,9 +290,9 @@ async fn patch_json(
     )
 }
 
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Evidence
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_evidence_success() {
@@ -385,9 +385,9 @@ async fn list_evidence_invalid_uuid_422() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // Review queue
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_review_success() {
@@ -536,9 +536,9 @@ async fn resolve_review_invalid_uuid_422() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // modstats (sqlx direct -> utilise la vraie DB de test)
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_modstats_empty_when_no_actions() {
@@ -565,9 +565,9 @@ async fn get_modstats_invalid_guild_422() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
 
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // delete_action (sqlx direct + discord API)
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 async fn delete_req(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
     let req = Request::builder()
@@ -605,10 +605,10 @@ async fn delete_action_not_found_returns_404() {
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // execute_ban / execute_mute / execute_unban
 // (Discord API non configure -> 500, mais validation + flux ok)
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_ban_without_token_returns_500() {
@@ -678,10 +678,10 @@ async fn execute_unban_success_with_mock_discord() {
     assert_eq!(json["ok"], true);
 }
 
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // delete_action : insert une vraie ligne puis supprime-la
 // (couvre les branches ban*/mute*/default du reversal Discord)
-// ══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 async fn insert_action(pool: &sqlx::PgPool, guild_id: &str, action_type: &str) -> Uuid {
     let id = Uuid::new_v4();

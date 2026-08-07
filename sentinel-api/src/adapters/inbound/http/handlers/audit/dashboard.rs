@@ -27,7 +27,7 @@ use sentinel_core::domain::entities::system::log_entry::LogEntry;
 pub async fn get_dashboard_stats(
     State(state): State<AppState>,
 ) -> Result<Json<DashboardStatsDto>, ApiError> {
-    let stats = state.stats_uc.get_dashboard_stats().await?;
+    let stats = state.audit.stats_uc.get_dashboard_stats().await?;
     Ok(Json(DashboardStatsDto::from(stats)))
 }
 
@@ -66,14 +66,14 @@ pub async fn get_logs(
     } else {
         // Postgres : le use case pousse le filtre guild dans la requete.
         let filters =
-            crate::ports::inbound::system::manage_system_logs::SystemLogFilters {
+            sentinel_core::ports::inbound::system::manage_system_logs::SystemLogFilters {
                 category: None,
                 level: params.level.clone(),
                 guild_id: params.guild_id.clone(),
                 limit,
             };
         state
-            .system_logs_uc
+            .system.system_logs_uc
             .list_logs(filters)
             .await?
             .into_iter()
@@ -93,7 +93,7 @@ pub async fn delete_logs_by_category(
     // La garde "discord non purgeable" vit desormais dans le use case : on
     // purge Postgres d'abord (erreur avant tout effet pour `discord`), puis on
     // vide la stream Redis (cache).
-    let count = state.system_logs_uc.purge_category(&category).await?;
+    let count = state.system.system_logs_uc.purge_category(&category).await?;
     redis_log_stream::delete_stream(&state.redis_client, &category).await;
     Ok(Json(serde_json::json!({ "deleted": count })))
 }
@@ -165,19 +165,19 @@ pub async fn get_all_infractions(
     let infractions = match &params.guild_id {
         Some(gid) => {
             let filters =
-                crate::ports::inbound::moderation::manage_infractions::InfractionFilters {
+                sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters {
                     user_id: None,
                     action: None,
                     limit: 200,
                     offset: 0,
                 };
-            state.infractions_uc.list_infractions(gid, filters).await?
+            state.moderation.infractions_uc.list_infractions(gid, filters).await?
         }
-        None => state.infractions_uc.list_all_infractions(200, 0).await?,
+        None => state.moderation.infractions_uc.list_all_infractions(200, 0).await?,
     };
 
     let actions = state
-        .moderation_uc
+        .moderation.moderation_uc
         .list_actions(params.guild_id.as_deref(), 200)
         .await
         .unwrap_or_default();
@@ -201,8 +201,8 @@ pub async fn get_all_rules(
     Query(params): Query<GuildFilterParams>,
 ) -> Result<Json<Vec<DashboardRuleDto>>, ApiError> {
     let rules = match &params.guild_id {
-        Some(gid) => state.rules_uc.get_rules(gid).await?,
-        None => state.rules_uc.get_all_rules().await?,
+        Some(gid) => state.moderation.rules_uc.get_rules(gid).await?,
+        None => state.moderation.rules_uc.get_all_rules().await?,
     };
     Ok(Json(
         rules.into_iter().map(DashboardRuleDto::from).collect(),
@@ -215,7 +215,7 @@ pub async fn toggle_rule(
     Path(id): Path<Uuid>,
     Json(payload): Json<TogglePayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let enabled = state.rules_uc.toggle_rule(id, payload.enabled).await?;
+    let enabled = state.moderation.rules_uc.toggle_rule(id, payload.enabled).await?;
     Ok(Json(serde_json::json!({ "enabled": enabled })))
 }
 
@@ -266,7 +266,7 @@ pub async fn list_guilds(State(state): State<AppState>) -> Result<Json<Vec<Guild
         }
     }
 
-    let guilds = state.guild_repo.find_all().await?;
+    let guilds = state.system.guild_repo.find_all().await?;
     let dtos: Vec<GuildDto> = guilds.into_iter().map(GuildDto::from).collect();
 
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
@@ -295,11 +295,11 @@ pub async fn register_guild(
         registered_at: chrono::Utc::now(),
         updated_at: chrono::Utc::now(),
     };
-    state.guild_repo.upsert(&guild).await?;
+    state.system.guild_repo.upsert(&guild).await?;
 
     // Seed des regles de moderation par defaut (idempotent). Couvre les
     // nouvelles guilds + le retro-seed des anciennes au prochain bot startup.
-    if let Err(e) = state.rules_uc.seed_default_rules(&guild_id).await {
+    if let Err(e) = state.moderation.rules_uc.seed_default_rules(&guild_id).await {
         warn!(error = %e, guild_id = %guild_id, "Echec seed rules par defaut");
     }
 
@@ -321,7 +321,7 @@ pub async fn delete_guild(
     State(state): State<AppState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<StatusCode, ApiError> {
-    state.guild_repo.delete(&guild_id).await?;
+    state.system.guild_repo.delete(&guild_id).await?;
     invalidate_guilds_cache(&state).await;
     Ok(StatusCode::NO_CONTENT)
 }
@@ -333,7 +333,7 @@ pub async fn reconcile_guilds(
     State(state): State<AppState>,
     Json(dto): Json<ReconcileGuildsDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let deleted = state.guild_repo.delete_absent(&dto.guild_ids).await?;
+    let deleted = state.system.guild_repo.delete_absent(&dto.guild_ids).await?;
     if deleted > 0 {
         invalidate_guilds_cache(&state).await;
     }

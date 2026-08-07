@@ -39,10 +39,8 @@ impl TypeMapKey for ModerationApiKey {
     type Value = Arc<ApiClient>;
 }
 
-#[allow(dead_code)]
 pub struct PendingAction {
     pub action: ModerationAction,
-    pub moderator_id: String,
     pub proposed_at: Instant,
 }
 

@@ -2,8 +2,8 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
-use crate::ports::inbound::moderation::manage_strikes::SaveStrikeConfigCommand;
+use sentinel_core::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
+use sentinel_core::ports::inbound::moderation::manage_strikes::SaveStrikeConfigCommand;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeConfig;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeResult;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeThreshold;

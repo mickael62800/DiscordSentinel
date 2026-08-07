@@ -40,6 +40,14 @@ pub struct CoussinCombatSnapshot {
     pub defender: CoussinProfile,
 }
 
+#[derive(Debug, Clone)]
+pub struct CoussinProgress {
+    pub xp: i64,
+    pub level: i32,
+    pub stat_points: i32,
+    pub title: String,
+}
+
 /// Un combat resolu, tel qu'on le raconte apres coup.
 ///
 /// Distinct de `CoussinCombat`, qui decrit un combat EN COURS de negociation
@@ -134,9 +142,17 @@ pub trait CoussinRepository: Send + Sync {
         limit: i64,
     ) -> Result<Vec<CoussinProfile>, DomainError>;
     async fn create_profile(&self, profile: &CoussinProfile) -> Result<(), DomainError>;
-    async fn update_class(&self, guild_id: &str, user_id: &str, class: PlayerClass, atk: i32, def: i32, hp_max: i32) -> Result<(), DomainError>;
+    async fn update_class(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        class: PlayerClass,
+        atk: i32,
+        def: i32,
+        hp_max: i32,
+        cooldown_minutes: i64,
+    ) -> Result<(), DomainError>;
     async fn spend_stat_point(&self, guild_id: &str, user_id: &str, stat: &str) -> Result<CoussinProfile, DomainError>;
-    async fn set_progress(&self, guild_id: &str, user_id: &str, xp: i64, level: i32, stat_points: i32, title: &str) -> Result<(), DomainError>;
     async fn create_combat(
         &self,
         guild_id: &str,
@@ -144,6 +160,7 @@ pub trait CoussinRepository: Send + Sync {
         attacker: &CoussinProfile,
         defender: &CoussinProfile,
         mise: i64,
+        cooldown_minutes: i64,
     ) -> Result<CoussinCombat, DomainError>;
     async fn accept_combat(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError>;
     async fn refuse_combat(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError>;
@@ -164,5 +181,7 @@ pub trait CoussinRepository: Send + Sync {
         attacker_hp: i32,
         defender_hp: i32,
         bet_payout_pct: i64,
+        attacker_progress: Option<CoussinProgress>,
+        defender_progress: Option<CoussinProgress>,
     ) -> Result<bool, DomainError>;
 }

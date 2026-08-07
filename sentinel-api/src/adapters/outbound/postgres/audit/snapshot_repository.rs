@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::ports::outbound::audit::snapshot_repository::SnapshotRepository;
+use sentinel_core::ports::outbound::audit::snapshot_repository::SnapshotRepository;
 use sentinel_core::domain::errors::DomainError;
 
 pub struct PgSnapshotRepository {

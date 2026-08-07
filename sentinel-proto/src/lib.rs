@@ -22,6 +22,30 @@ pub mod progression {
     }
 }
 
+pub mod audit {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.audit.v1");
+    }
+}
+
+pub mod guild_backup {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.guild_backup.v1");
+    }
+}
+
+pub mod ideas {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.ideas.v1");
+    }
+}
+
+pub mod purge {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.purge.v1");
+    }
+}
+
 pub mod stats {
     pub mod v1 {
         tonic::include_proto!("sentinel.stats.v1");

@@ -278,7 +278,7 @@ pub(super) async fn send_to_backend(
     };
     drop(data);
 
-    let api_client = ApiClient::new(Arc::clone(&base), grpc);
+    let api_client = ApiClient::new(grpc);
 
     match api_client.analyze(&request).await {
         Ok(response) => {

@@ -14,9 +14,9 @@ use uuid::Uuid;
 use sentinel_api::adapters::outbound::batching::audit_log_batcher::BatchedPgAuditLogRepository;
 use sentinel_api::adapters::outbound::batching::batch_writer::BatchWriterConfig;
 use sentinel_api::adapters::outbound::batching::log_batcher::BatchedPgLogRepository;
-use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
-use sentinel_api::ports::outbound::audit::audit_log_repository::AuditLogRepository;
-use sentinel_api::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_core::ports::outbound::audit::audit_log_repository::AuditLogRepository;
+use sentinel_core::ports::outbound::system::log_repository::LogRepository;
 use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;
 async fn pool() -> PgPool {

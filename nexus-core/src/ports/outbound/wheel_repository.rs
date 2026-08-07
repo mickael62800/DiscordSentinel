@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 
+use crate::domain::entities::wallet::{Wallet, WalletMutation};
 use crate::domain::entities::wheel::{WheelCaseData, WheelSpin};
 use crate::domain::errors::DomainError;
 
@@ -55,4 +56,18 @@ pub trait WheelRepository: Send + Sync {
         guild_id: &str,
         cases: &[WheelCaseData],
     ) -> Result<(), DomainError>;
+
+    /// Exécute le tirage de façon 100% atomique.
+    ///
+    /// Renvoie `true` si le claim a réussi et que le wallet/spin ont été persistés.
+    /// Renvoie `false` si le joueur avait déjà un cooldown actif (le claim échoue).
+    async fn execute_spin_transaction(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        cooldown_hours: i64,
+        spin: &WheelSpin,
+        wallet: &Wallet,
+        mutation: Option<&WalletMutation>,
+    ) -> Result<bool, DomainError>;
 }

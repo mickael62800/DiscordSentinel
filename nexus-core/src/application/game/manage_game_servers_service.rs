@@ -382,7 +382,7 @@ impl ManageGameServersUseCase for ManageGameServersService {
                 .map_err(DomainError::ValidationError)?;
         }
 
-        // 1. Creation DB en statut `created` (pas encore de container).
+        // 1. Creation DB (serveur + configs) en statut `created` (pas encore de container).
         let new = NewGameServer {
             guild_id: cmd.guild_id.clone(),
             template_id: template.id,
@@ -394,21 +394,11 @@ impl ManageGameServersUseCase for ManageGameServersService {
             cpu_limit: cmd.cpu_limit.map(|c| c.clamp(0.5, 32.0)),
             owner_user_id: cmd.owner_user_id.clone(),
             idle_shutdown_days: None,
+            initial_config: cmd.initial_config,
         };
         let server = self.server_repo.create(new).await?;
         let server_id = server.id;
         info!(server_id = %server_id, guild_id = %cmd.guild_id, "game_server cree (DB)");
-
-        // 2. Configs initiales (overrides eventuels).
-        if !cmd.initial_config.is_empty() {
-            self.config_repo
-                .replace_all(
-                    server_id,
-                    cmd.initial_config.clone(),
-                    Some(&cmd.owner_user_id),
-                )
-                .await?;
-        }
 
         // 3. Audit
         self.audit(
@@ -980,3 +970,7 @@ impl ManageGameServersUseCase for ManageGameServersService {
         Ok(resp.raw)
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_game_servers_service.rs"]
+mod tests;

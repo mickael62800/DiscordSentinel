@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 //! Helpers de connection gRPC vers l'API Sentinel.
 //!
 //! Centralise le boilerplate `Endpoint::from_shared + connect_timeout +
@@ -10,9 +9,7 @@
 
 use std::time::Duration;
 
-use tonic::metadata::MetadataValue;
 use tonic::transport::{Channel, Endpoint};
-use tonic::Request;
 
 const DEFAULT_GRPC_URL: &str = "http://127.0.0.1:50051";
 const DEFAULT_CONNECT_TIMEOUT_SECS: u64 = 5;
@@ -70,47 +67,3 @@ pub async fn connect() -> Result<Channel, String> {
         .map_err(|e| format!("connect gRPC {url}: {e}"))
 }
 
-/// Construit un interceptor `tonic` qui ajoute `Authorization: Bearer
-/// {API_KEY}` a chaque requete sortante. Utilisable avec
-/// `MyServiceClient::with_interceptor(channel, common::grpc::bearer_interceptor()?)`.
-///
-/// Si `API_KEY` est vide ou invalide en metadata, l'interceptor laisse
-/// passer la requete sans auth (l'API repondra 401).
-// L'intercepteur tonic impose Result<_, tonic::Status> (Err volumineux non evitable).
-#[allow(clippy::result_large_err)]
-pub fn bearer_interceptor(
-) -> Result<impl Fn(Request<()>) -> Result<Request<()>, tonic::Status> + Clone, String> {
-    let api_key = std::env::var("API_KEY").unwrap_or_default();
-    let auth: Option<MetadataValue<_>> = if api_key.is_empty() {
-        None
-    } else {
-        Some(
-            format!("Bearer {api_key}")
-                .parse()
-                .map_err(|e| format!("invalid api_key: {e}"))?,
-        )
-    };
-    Ok(
-        move |mut req: Request<()>| -> Result<Request<()>, tonic::Status> {
-            if let Some(ref v) = auth {
-                req.metadata_mut().insert("authorization", v.clone());
-            }
-            Ok(req)
-        },
-    )
-}
-
-/// Helper pour ajouter le header Bearer a une requete tonic specifique
-/// (alternative a `with_interceptor` quand on construit le client a la volee
-/// avec `Channel::clone`).
-pub fn with_bearer<T>(req: &mut Request<T>) -> Result<(), String> {
-    let api_key = std::env::var("API_KEY").unwrap_or_default();
-    if api_key.is_empty() {
-        return Ok(());
-    }
-    let v: MetadataValue<_> = format!("Bearer {api_key}")
-        .parse()
-        .map_err(|e| format!("invalid api_key: {e}"))?;
-    req.metadata_mut().insert("authorization", v);
-    Ok(())
-}

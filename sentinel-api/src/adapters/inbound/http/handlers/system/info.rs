@@ -19,7 +19,7 @@ use std::time::Instant;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 use crate::adapters::outbound::system::host_metrics::{
     collect_disks, parse_redis_info, DiskInfo, RedisMetrics,
 };
@@ -132,7 +132,7 @@ impl From<DiskInfo> for DiskDto {
 }
 
 pub async fn get_system_info(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<SystemInfoDto>, ApiError> {
     // SECURITE : cet endpoint divulgue des infos host (CPU/RAM, points de

@@ -20,7 +20,7 @@ use axum::response::Response;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::AuditState;
 use sentinel_core::domain::entities::audit::snapshot::JobReport;
 use sentinel_core::domain::errors::DomainError;
 
@@ -30,21 +30,21 @@ const ANALYTICS_BOT: &str = "analytics";
 
 /// POST /api/analytics/snapshot/daily
 pub async fn snapshot_daily_all(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
 ) -> Result<Json<JobReport>, ApiError> {
     Ok(Json(state.snapshots_uc.snapshot_daily_all().await?))
 }
 
 /// POST /api/analytics/snapshot/hourly
 pub async fn snapshot_hourly_all(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
 ) -> Result<Json<JobReport>, ApiError> {
     Ok(Json(state.snapshots_uc.snapshot_hourly_all().await?))
 }
 
 /// POST /api/analytics/retention-cleanup
 pub async fn retention_cleanup_all(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
 ) -> Result<Json<JobReport>, ApiError> {
     Ok(Json(state.snapshots_uc.retention_cleanup_all().await?))
 }
@@ -55,58 +55,28 @@ pub async fn retention_cleanup_all(
 /// top infracteurs). Ce handler poste l'embed Discord (concern inbound) et
 /// persiste l'horodatage via le use case apres un post reussi.
 pub async fn publish_top_users_all(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
 ) -> Result<Json<JobReport>, ApiError> {
-    if state.discord_bot_token.is_empty() {
-        return Err(ApiError(DomainError::Internal(
-            "SENTINEL_DISCORD_TOKEN non configure — publication impossible".into(),
-        )));
-    }
-
     let plan = state.snapshots_uc.plan_top_publications().await?;
-    let client = reqwest::Client::new();
     let mut processed = 0;
 
     for pub_ in &plan.publications {
-        // Securite : channel_id vient de la config guild (DB). On le valide comme
-        // snowflake numerique avant de l'interpoler dans l'URL Discord, pour
-        // qu'un id malforme (`../`, %2F...) ne puisse pas atteindre un autre
-        // endpoint de l'API Discord avec le bot token.
-        if crate::adapters::inbound::http::validation::validate_discord_id(
-            "channel_id",
-            &pub_.channel_id,
-        )
-        .is_err()
-        {
-            continue;
-        }
         let embed = serde_json::json!({
             "title": pub_.title,
             "description": pub_.description,
             "color": pub_.color,
             "timestamp": pub_.published_at,
         });
-        let url = format!(
-            "https://discord.com/api/v10/channels/{}/messages",
-            pub_.channel_id
-        );
-        let resp = match client
-            .post(&url)
-            .header("Authorization", format!("Bot {}", state.discord_bot_token))
-            .json(&serde_json::json!({ "embeds": [embed] }))
-            .send()
+
+        // Validation du salon, absence de token et statut HTTP : traites par
+        // l'adaptateur. On n'avance `processed` et on n'horodate qu'apres un
+        // envoi reussi, sinon une publication ratee serait consideree faite.
+        if let Err(e) = state
+            .discord_api
+            .send_channel_embed(&pub_.channel_id, embed)
             .await
         {
-            Ok(r) => r,
-            Err(e) => {
-                tracing::warn!(error = %e, guild = %pub_.guild_id, "publish_top_users: send echec");
-                continue;
-            }
-        };
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            tracing::warn!(guild = %pub_.guild_id, status = %status, body = %body, "publish_top_users: Discord refus");
+            tracing::warn!(error = %e, guild = %pub_.guild_id, "publish_top_users: publication echouee");
             continue;
         }
 
@@ -135,7 +105,7 @@ pub struct ExportQuery {
 
 /// GET /api/analytics/export?guild_id=...&days=N&format=json|csv
 pub async fn export_analytics(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     Query(params): Query<ExportQuery>,
 ) -> Result<Response, ApiError> {
     if params.guild_id.is_empty() {
@@ -224,7 +194,7 @@ pub async fn export_analytics(
 
 /// Lit la cle `export_format` du guild (fallback "json"). Concern handler : ne
 /// touche pas au SQL (passe par le repo de config).
-async fn read_export_format(state: &AppState, guild_id: &str) -> String {
+async fn read_export_format(state: &AuditState, guild_id: &str) -> String {
     state
         .bot_config_repo
         .get_config(guild_id, ANALYTICS_BOT)

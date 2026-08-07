@@ -28,8 +28,6 @@ use serenity::all::{
 };
 use tracing::warn;
 
-use crate::shared::api_client::BaseApiClient;
-use crate::shared::heartbeat::ApiClientKey;
 
 const CONFIRM_PREFIX: &str = "gbackup:confirm:";
 const CANCEL_ID: &str = "gbackup:cancel";
@@ -167,8 +165,15 @@ pub async fn on_member_add(ctx: &Context, member: &serenity::all::Member) {
 
 // ── Helpers ──
 
-async fn api(ctx: &Context) -> Option<Arc<BaseApiClient>> {
-    ctx.data.read().await.get::<ApiClientKey>().cloned()
+/// Client gRPC du module. Le nom pi est conserve : dans ce fichier il n'a
+/// jamais servi qu'aux operations de capture/restauration, toutes passees en
+/// gRPC. La lecture de configuration se fait ailleurs (guild_config.rs).
+async fn api(ctx: &Context) -> Option<Arc<crate::shared::grpc_client::SentinelGrpcClient>> {
+    ctx.data
+        .read()
+        .await
+        .get::<crate::shared::grpc_client::GrpcClientKey>()
+        .cloned()
 }
 
 /// RBAC : autorise l'owner du serveur OU un membre Administrateur.

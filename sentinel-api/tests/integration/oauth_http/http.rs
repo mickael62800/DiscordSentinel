@@ -20,10 +20,10 @@ use sentinel_api::adapters::inbound::http::router;
 
 fn configured_state(front_url: &str) -> sentinel_api::adapters::inbound::http::state::AppState {
     let mut s = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    s.discord_oauth_client_id = "test-client-id".into();
-    s.discord_oauth_client_secret = "test-secret".into();
-    s.discord_oauth_redirect_uri = "https://api.example/auth/discord/callback".into();
-    s.web_front_url = front_url.into();
+    s.system.discord_oauth_client_id = "test-client-id".into();
+    s.system.discord_oauth_client_secret = "test-secret".into();
+    s.system.discord_oauth_redirect_uri = "https://api.example/auth/discord/callback".into();
+    s.system.web_front_url = front_url.into();
     s
 }
 

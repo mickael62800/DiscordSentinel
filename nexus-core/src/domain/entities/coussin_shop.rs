@@ -22,3 +22,32 @@ pub const ITEMS: &[ShopItem] = &[
 ];
 
 pub fn item(key: &str) -> Option<ShopItem> { ITEMS.iter().copied().find(|item| item.key == key) }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_find_valid_item() {
+        let rage = item("rage");
+        assert!(rage.is_some());
+        let item = rage.unwrap();
+        assert_eq!(item.name, "Coussin Plombe");
+        assert_eq!(item.price, 100);
+    }
+
+    #[test]
+    fn test_find_unknown_item() {
+        assert!(item("unknown_item_key").is_none());
+    }
+
+    #[test]
+    fn test_all_items_have_unique_keys_and_positive_prices() {
+        let mut keys = std::collections::HashSet::new();
+        for item in ITEMS {
+            assert!(item.price > 0, "Item {} must have positive price", item.key);
+            assert!(!item.key.is_empty(), "Item key cannot be empty");
+            assert!(keys.insert(item.key), "Duplicate key: {}", item.key);
+        }
+    }
+}

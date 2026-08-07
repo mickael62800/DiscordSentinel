@@ -1,7 +1,7 @@
 use super::*;
-use crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
-use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
-use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use sentinel_core::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
+use sentinel_core::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
+use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use async_trait::async_trait;
 use sentinel_core::domain::errors::DomainError;
 use std::sync::Arc;

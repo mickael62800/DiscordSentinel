@@ -129,16 +129,16 @@ fn voice_channel_to_proto_locked_with_no_limit() {
 
 // ── RPC tests avec mock ──
 
-use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
-use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
-use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
-use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
-use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
-use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
-use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
-use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
-use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
-use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
 use async_trait::async_trait;
 use chrono::Utc;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan;

@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 
 #[derive(Deserialize)]
 pub struct CreateSlowmodeDto {
@@ -25,7 +25,7 @@ pub struct CreateSlowmodeDto {
 /// POST /api/security/slowmode — bot enregistre un slowmode actif.
 /// UPSERT pour idempotence (re-activation reset le timer + states).
 pub async fn create_slowmode(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     Json(dto): Json<CreateSlowmodeDto>,
 ) -> Result<StatusCode, ApiError> {
     state
@@ -43,7 +43,7 @@ pub async fn create_slowmode(
 /// DELETE /api/security/slowmode/{guild_id} — bot retire un slowmode
 /// (deactivation manuelle ou via worker).
 pub async fn delete_slowmode(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<StatusCode, ApiError> {
     state.slowmode_uc.deactivate(&guild_id).await?;

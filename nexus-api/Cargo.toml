@@ -6,10 +6,16 @@ description = "API HTTP (axum) de la plateforme jeux Nexus — adapters + bootst
 
 [dependencies]
 nexus-core = { path = "../nexus-core" }
-axum = "0.8"
+platform-common-api = { workspace = true }
+axum = { version = "0.8", features = ["multipart"] }
 tokio = { workspace = true }
+# Pile de middlewares HTTP — memes features que sentinel-api, pour que les
+# deux APIs offrent les memes garanties (CORS, compression, limite de corps,
+# request-id, trace). Nexus pilote Docker : il ne peut pas etre moins protege.
+tower-http = { version = "0.6", features = ["cors", "trace", "limit", "request-id", "propagate-header", "set-header", "compression-zstd", "compression-gzip"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+
 sqlx = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -21,6 +27,12 @@ redis = { workspace = true }
 futures-util = { workspace = true }
 bollard = { workspace = true }
 tar = { workspace = true }
+reqwest = { workspace = true, features = ["json", "multipart"] }
+base64 = "0.23.1"
+
+[dev-dependencies]
+# `oneshot` sur un Router pour tester un middleware sans ouvrir de socket.
+tower = { version = "0.5", features = ["util"] }
 
 [lints]
 workspace = true

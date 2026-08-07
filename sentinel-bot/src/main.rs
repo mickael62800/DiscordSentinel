@@ -70,16 +70,16 @@ async fn main() {
         data.insert::<ApiClientKey>(Arc::clone(&api));
         data.insert::<GrpcClientKey>(Arc::clone(&grpc));
 
-        progression::init_typemap(&mut data, &api, &grpc);
-        community::init_typemap(&mut data, &api, &grpc);
-        security::init_typemap(&mut data, &api, &grpc);
+        progression::init_typemap(&mut data, &grpc);
+        community::init_typemap(&mut data, &grpc);
+        security::init_typemap(&mut data, &grpc);
         automod::init_typemap(&mut data);
         audit::init_typemap(&mut data);
         moderation::init_typemap(&mut data, &api, &grpc);
         tickets::init_typemap(&mut data);
 
         // Voice fait des appels API async au boot (channels).
-        voice::init_typemap(&mut data, &api, &grpc).await;
+        voice::init_typemap(&mut data, &grpc).await;
     }
 
     spawn_heartbeat(api);

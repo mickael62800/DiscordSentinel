@@ -268,14 +268,21 @@ pub async fn list_panels(
     Ok(Json(panels.into_iter().map(Into::into).collect()))
 }
 
-/// POST /api/games/{guild_id}/panel/deploy — dependait du broadcaster
-/// websocket sentinel (event `games_panel_deploy` consomme par le bot).
-/// Non porte dans nexus pour l'instant : 501.
-pub async fn deploy_panel(State(_state): State<AppState>) -> Result<StatusCode, ApiError> {
-    Err(DomainError::NotImplemented(
-        "panel/deploy non porte dans nexus (pas de broadcaster d'events)".into(),
-    )
-    .into())
+#[derive(Debug, Deserialize)]
+pub struct DeployPanelDto {
+    pub channel_id: String,
+    pub category: Option<String>,
+}
+
+pub async fn deploy_panel(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(dto): Json<DeployPanelDto>,
+) -> Result<StatusCode, ApiError> {
+    use nexus_core::application::deploy_panel_service::DeployGamesPanelUseCase;
+    let uc = DeployGamesPanelUseCase::new(state.events.clone());
+    uc.execute(&guild_id, &dto.channel_id, dto.category.as_deref()).await;
+    Ok(StatusCode::ACCEPTED)
 }
 
 pub async fn list_games_by_category(
@@ -297,11 +304,54 @@ pub struct CategoryQuery {
     pub category: Option<String>,
 }
 
-/// POST /api/games/{guild_id}/upload-emoji — dependait de l'API Discord
-/// (upload d'emoji custom) cote sentinel-api. Non porte dans nexus : 501.
-pub async fn upload_emoji(State(_state): State<AppState>) -> Result<StatusCode, ApiError> {
-    Err(DomainError::NotImplemented(
-        "upload-emoji non porte dans nexus (pas d'adapter Discord API)".into(),
-    )
-    .into())
+use axum::extract::Multipart;
+use serde_json::json;
+
+pub async fn upload_emoji(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    mut multipart: Multipart,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    use nexus_core::application::upload_emoji_service::UploadEmojiUseCase;
+
+    let mut name = String::new();
+    let mut image_bytes = Vec::new();
+    let mut mime_type = String::from("image/png");
+
+    while let Some(field) = multipart.next_field().await.unwrap_or(None) {
+        let field_name = field.name().unwrap_or("").to_string();
+        if field_name == "name" {
+            name = field.text().await.unwrap_or_default();
+        } else if field_name == "image" {
+            if let Some(content_type) = field.content_type() {
+                mime_type = content_type.to_string();
+            }
+            image_bytes = field.bytes().await.unwrap_or_default().to_vec();
+        }
+    }
+
+    if name.is_empty() || image_bytes.is_empty() {
+        return Err(DomainError::ValidationError("Le nom et l'image sont requis.".into()).into());
+    }
+
+    let uc = UploadEmojiUseCase::new(state.discord_api.clone());
+    let (id, emoji_name) = uc.execute(&guild_id, &name, &image_bytes, &mime_type).await?;
+
+    Ok(Json(json!({ "id": id, "name": emoji_name })))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DetectGameMentionsDto {
+    pub content: String,
+}
+
+pub async fn detect_mentions(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(dto): Json<DetectGameMentionsDto>,
+) -> Result<Json<Vec<GameDto>>, ApiError> {
+    use nexus_core::application::game_mentions_service::DetectGameMentionsUseCase;
+    let uc = DetectGameMentionsUseCase::new(state.game_repo.clone());
+    let detected = uc.execute(&guild_id, &dto.content).await?;
+    Ok(Json(detected.into_iter().map(Into::into).collect()))
 }

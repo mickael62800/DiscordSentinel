@@ -10,11 +10,11 @@ use tonic::Response;
 use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
-use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
-use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
-use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
-use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
+use sentinel_core::ports::inbound::system::manage_tickets::AssignTicketCommand;
+use sentinel_core::ports::inbound::system::manage_tickets::CreateTicketCommand;
+use sentinel_core::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
+use sentinel_core::ports::inbound::system::manage_tickets::ReplyTicketCommand;
+use sentinel_core::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
 use sentinel_core::domain::entities::system::ticket::Ticket;
 use sentinel_core::domain::entities::system::ticket::TicketDetail;
 use sentinel_core::domain::entities::system::ticket::TicketMessage;

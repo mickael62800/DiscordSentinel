@@ -1,0 +1,15 @@
+[package]
+name = "platform-common"
+version = "0.1.0"
+edition = "2021"
+description = "Socle partage Sentinel/Nexus : bus d'evenements Redis Streams"
+
+[dependencies]
+redis = { workspace = true }
+tokio = { workspace = true }
+futures-util = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

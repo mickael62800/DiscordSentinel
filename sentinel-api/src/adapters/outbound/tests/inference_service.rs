@@ -390,7 +390,7 @@ fn real_pipeline_neutral_message_no_flags() {
         return;
     };
     let cls = classify(&service, &tokenizer, "Salut, on fait une partie ce soir ?");
-    let result = crate::application::ai::analyze_message_service::score_classifications(
+    let result = sentinel_core::application::ai::analyze_message_service::score_classifications(
         &cls,
         &[],
         0.5,
@@ -409,7 +409,7 @@ fn real_pipeline_neutral_no_flags_even_low_threshold() {
         &tokenizer,
         "Bonjour tout le monde, bonne journee !",
     );
-    let result = crate::application::ai::analyze_message_service::score_classifications(
+    let result = sentinel_core::application::ai::analyze_message_service::score_classifications(
         &cls,
         &[],
         0.1,

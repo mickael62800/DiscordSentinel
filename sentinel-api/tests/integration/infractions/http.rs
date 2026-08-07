@@ -16,8 +16,8 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_core::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
 use sentinel_core::domain::enums::moderation::action::Action;
@@ -45,6 +45,16 @@ impl MockInfractionsUC {
 
 #[async_trait]
 impl ManageInfractionsUseCase for MockInfractionsUC {
+    async fn count_user_infractions(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        sentinel_core::ports::inbound::moderation::manage_infractions::UserInfractionCounts,
+        DomainError,
+    > {
+        unimplemented!("count_user_infractions non exerce par ces tests")
+    }
     async fn list_infractions(
         &self,
         guild_id: &str,

@@ -4,11 +4,12 @@
 //! heartbeat, scheduler, pool creation, observabilité Prometheus,
 //! appels HTTP/gRPC vers l'API, init Redis client.
 
-// Bibliotheque utilitaire : certaines fonctions ne sont pas appelees
-// par les jobs actuels mais sont gardees pour les futurs jobs (ex
-// xadd_event, get_json HTTP, with_bearer pour grpc). Pas de dead code
-// metier ici.
-#![allow(dead_code)]
+// Tout ce qui est ici est appele par au moins un job. Les helpers gardes
+// "pour un futur job" (get_json, bearer_interceptor, with_bearer,
+// is_feature_enabled, config_or_env_bool) ont ete supprimes : ils vivaient
+// derriere un `#![allow(dead_code)]` global qui masquait aussi les vrais
+// oublis. Un helper dont on a besoin se réécrit en quelques minutes ; un
+// helper mort se maintient indéfiniment.
 
 pub mod api;
 pub mod grpc;
@@ -203,37 +204,6 @@ pub async fn is_worker_enabled(pool: &PgPool, guild_id: &str, worker_name: &str)
     sentinel_core::domain::entities::system::config_parsers::parse_enabled_flag(result.as_deref())
 }
 
-/// Verifie si une sous-feature d'un module est activee pour une guild.
-/// Lit la row `(guild_id, bot_name, feature_key)` dans bot_guild_config,
-/// fallback sur `default_value` si la row n'existe pas.
-///
-/// Pattern : pour les modules avec sub-toggles UI (chaos_enabled,
-/// monthly_report_enabled, vacuum_enabled, etc.) — chaque job lit son
-/// propre flag en plus du `is_worker_enabled` top-level.
-pub async fn is_feature_enabled(
-    pool: &PgPool,
-    guild_id: &str,
-    bot_name: &str,
-    feature_key: &str,
-    default_value: bool,
-) -> bool {
-    let result: Option<String> = sqlx::query_scalar(
-        "SELECT config_value FROM bot_guild_config \
-         WHERE guild_id = $1 AND bot_name = $2 AND config_key = $3",
-    )
-    .bind(guild_id)
-    .bind(bot_name)
-    .bind(feature_key)
-    .fetch_optional(pool)
-    .await
-    .unwrap_or(None);
-
-    match result {
-        Some(v) => parse_bool_str(&v),
-        None => default_value,
-    }
-}
-
 /// Verifie si le worker est active pour au moins une guild.
 /// Retourne true si:
 /// - Aucune entree `enabled` trouvee (defaut = active)
@@ -372,23 +342,6 @@ pub fn config_or_env<T: std::str::FromStr>(
     }
     // Priorite 3 : defaut
     default
-}
-
-/// Version bool de config_or_env. Sémantique de vérité partagée avec le core
-/// (`parse_bool_str` : "true"/"1"/"yes", insensible à la casse).
-pub fn config_or_env_bool(
-    db_config: &std::collections::HashMap<String, String>,
-    db_key: &str,
-    env_key: &str,
-    default: bool,
-) -> bool {
-    if let Some(val) = db_config.get(db_key) {
-        return parse_bool_str(val);
-    }
-    match std::env::var(env_key) {
-        Ok(v) => parse_bool_str(&v),
-        Err(_) => default,
-    }
 }
 
 /// Charge une variable d'environnement avec un fallback par defaut.
@@ -610,58 +563,5 @@ mod tests {
         db.insert("key".into(), "not_a_number".into());
         let result: u64 = config_or_env(&db, "key", "NONEXISTENT_ENV_VAR_XYZ", 50);
         assert_eq!(result, 50);
-    }
-
-    #[test]
-    fn config_or_env_bool_db_true() {
-        let mut db = std::collections::HashMap::new();
-        db.insert("flag".into(), "true".into());
-        assert!(config_or_env_bool(
-            &db,
-            "flag",
-            "NONEXISTENT_ENV_VAR_XYZ",
-            false
-        ));
-    }
-
-    #[test]
-    fn config_or_env_bool_db_false() {
-        let mut db = std::collections::HashMap::new();
-        db.insert("flag".into(), "false".into());
-        assert!(!config_or_env_bool(
-            &db,
-            "flag",
-            "NONEXISTENT_ENV_VAR_XYZ",
-            true
-        ));
-    }
-
-    #[test]
-    fn config_or_env_bool_db_one() {
-        let mut db = std::collections::HashMap::new();
-        db.insert("flag".into(), "1".into());
-        assert!(config_or_env_bool(
-            &db,
-            "flag",
-            "NONEXISTENT_ENV_VAR_XYZ",
-            false
-        ));
-    }
-
-    #[test]
-    fn config_or_env_bool_missing_uses_default() {
-        let db = std::collections::HashMap::new();
-        assert!(config_or_env_bool(
-            &db,
-            "missing",
-            "NONEXISTENT_ENV_VAR_XYZ",
-            true
-        ));
-        assert!(!config_or_env_bool(
-            &db,
-            "missing",
-            "NONEXISTENT_ENV_VAR_XYZ",
-            false
-        ));
     }
 }

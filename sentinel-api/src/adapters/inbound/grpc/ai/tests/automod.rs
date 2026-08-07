@@ -77,8 +77,8 @@ fn analysis_to_proto_no_action() {
 
 // ── RPC handler tests avec mock AnalyzeMessageUseCase ──
 
-use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
-use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use async_trait::async_trait;
 use sentinel_core::domain::errors::DomainError;
 use std::sync::Arc;
@@ -107,20 +107,20 @@ impl AnalyzeMessageUseCase for MockAnalyzeUc {
         &self,
         _guild_id: &str,
         _flood_count: i32,
-    ) -> Result<crate::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
         unimplemented!()
     }
     async fn evaluate_attachments(
         &self,
         _: &str,
         _: Vec<String>,
-    ) -> Result<crate::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError> {
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError> {
         unimplemented!()
     }
     async fn evaluate_caps(
         &self,
         _: &str,
-    ) -> Result<crate::ports::inbound::ai::analyze_message::CapsDecision, DomainError> {
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::CapsDecision, DomainError> {
         unimplemented!()
     }
 }
@@ -144,6 +144,7 @@ async fn analyze_message_rejects_empty_guild_id() {
     let g = AutomodGrpc {
         uc: Arc::new(MockAnalyzeUc::default()),
         broadcaster: Arc::new(EventBroadcaster::new()),
+        adaptive_slowmode_repo: Arc::new(MockSlowmodeRepo::default()),
     };
     let err = g
         .analyze_message(make_req("", "u", "hello"))
@@ -158,6 +159,7 @@ async fn analyze_message_rejects_too_long_guild_id() {
     let g = AutomodGrpc {
         uc: Arc::new(MockAnalyzeUc::default()),
         broadcaster: Arc::new(EventBroadcaster::new()),
+        adaptive_slowmode_repo: Arc::new(MockSlowmodeRepo::default()),
     };
     let long = "1".repeat(21);
     let err = g
@@ -172,6 +174,7 @@ async fn analyze_message_rejects_empty_user_id() {
     let g = AutomodGrpc {
         uc: Arc::new(MockAnalyzeUc::default()),
         broadcaster: Arc::new(EventBroadcaster::new()),
+        adaptive_slowmode_repo: Arc::new(MockSlowmodeRepo::default()),
     };
     let err = g
         .analyze_message(make_req("g", "", "hello"))
@@ -186,6 +189,7 @@ async fn analyze_message_rejects_empty_content() {
     let g = AutomodGrpc {
         uc: Arc::new(MockAnalyzeUc::default()),
         broadcaster: Arc::new(EventBroadcaster::new()),
+        adaptive_slowmode_repo: Arc::new(MockSlowmodeRepo::default()),
     };
     let err = g.analyze_message(make_req("g", "u", "")).await.unwrap_err();
     assert_eq!(err.code(), tonic::Code::InvalidArgument);
@@ -198,6 +202,7 @@ async fn analyze_message_delegates_to_uc_and_returns_analysis() {
     let g = AutomodGrpc {
         uc: uc.clone(),
         broadcaster: Arc::new(EventBroadcaster::new()),
+        adaptive_slowmode_repo: Arc::new(MockSlowmodeRepo::default()),
     };
     let resp = g
         .analyze_message(make_req("g1", "u1", "message content"))
@@ -219,6 +224,7 @@ async fn analyze_message_maps_flags_from_proto() {
     let g = AutomodGrpc {
         uc: uc.clone(),
         broadcaster: Arc::new(EventBroadcaster::new()),
+        adaptive_slowmode_repo: Arc::new(MockSlowmodeRepo::default()),
     };
     let req = Request::new(proto::AnalyzeMessageRequest {
         guild_id: "g".into(),
@@ -251,6 +257,7 @@ async fn analyze_message_maps_context_messages() {
     let g = AutomodGrpc {
         uc: uc.clone(),
         broadcaster: Arc::new(EventBroadcaster::new()),
+        adaptive_slowmode_repo: Arc::new(MockSlowmodeRepo::default()),
     };
     let req = Request::new(proto::AnalyzeMessageRequest {
         guild_id: "g".into(),
@@ -284,6 +291,7 @@ async fn analyze_message_flags_none_defaults_all_false() {
     let g = AutomodGrpc {
         uc: uc.clone(),
         broadcaster: Arc::new(EventBroadcaster::new()),
+        adaptive_slowmode_repo: Arc::new(MockSlowmodeRepo::default()),
     };
     let _ = g.analyze_message(make_req("g", "u", "hi")).await.unwrap();
     let calls = uc.calls.lock().unwrap();
@@ -291,4 +299,122 @@ async fn analyze_message_flags_none_defaults_all_false() {
     assert!(!calls[0].flags.insult);
     assert!(!calls[0].flags.link);
     assert!(!calls[0].flags.phishing);
+}
+
+// ── Slowmode adaptatif ──
+
+/// Repo en memoire : enregistre les appels pour verifier que le handler
+/// delegue bien, et sur quelle cle.
+#[derive(Default)]
+struct MockSlowmodeRepo {
+    marques: std::sync::Mutex<Vec<(String, String)>>,
+    retires: std::sync::Mutex<Vec<String>>,
+    contenu: std::sync::Mutex<Vec<(String, String)>>,
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::outbound::moderation::adaptive_slowmode_repository::AdaptiveSlowmodeRepository
+    for MockSlowmodeRepo
+{
+    async fn mark(
+        &self,
+        guild_id: &str,
+        channel_id: &str,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
+        self.marques
+            .lock()
+            .unwrap()
+            .push((guild_id.to_string(), channel_id.to_string()));
+        Ok(())
+    }
+    async fn unmark(
+        &self,
+        channel_id: &str,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
+        self.retires.lock().unwrap().push(channel_id.to_string());
+        Ok(())
+    }
+    async fn list_all(
+        &self,
+    ) -> Result<Vec<(String, String)>, sentinel_core::domain::errors::DomainError> {
+        Ok(self.contenu.lock().unwrap().clone())
+    }
+}
+
+fn grpc_avec(repo: Arc<MockSlowmodeRepo>) -> AutomodGrpc {
+    AutomodGrpc {
+        uc: Arc::new(MockAnalyzeUc::default()),
+        broadcaster: Arc::new(EventBroadcaster::new()),
+        adaptive_slowmode_repo: repo,
+    }
+}
+
+#[tokio::test]
+async fn mark_adaptive_slowmode_delegue_au_repo() {
+    let repo = Arc::new(MockSlowmodeRepo::default());
+    let g = grpc_avec(repo.clone());
+    g.mark_adaptive_slowmode(tonic::Request::new(proto::AdaptiveSlowmodeChannel {
+        guild_id: "g1".into(),
+        channel_id: "c1".into(),
+    }))
+    .await
+    .unwrap();
+    assert_eq!(
+        repo.marques.lock().unwrap().as_slice(),
+        [("g1".to_string(), "c1".to_string())]
+    );
+}
+
+#[tokio::test]
+async fn unmark_adaptive_slowmode_ne_cle_que_sur_le_salon() {
+    let repo = Arc::new(MockSlowmodeRepo::default());
+    let g = grpc_avec(repo.clone());
+    // guild_id vide : le retrait est cle par salon, la contrainte d'unicite
+    // porte sur channel_id. Il ne doit pas etre rejete.
+    g.unmark_adaptive_slowmode(tonic::Request::new(proto::AdaptiveSlowmodeChannel {
+        guild_id: String::new(),
+        channel_id: "c1".into(),
+    }))
+    .await
+    .unwrap();
+    assert_eq!(repo.retires.lock().unwrap().as_slice(), ["c1".to_string()]);
+}
+
+#[tokio::test]
+async fn adaptive_slowmode_refuse_un_salon_vide() {
+    let g = grpc_avec(Arc::new(MockSlowmodeRepo::default()));
+    for req in [
+        proto::AdaptiveSlowmodeChannel {
+            guild_id: "g1".into(),
+            channel_id: String::new(),
+        },
+        proto::AdaptiveSlowmodeChannel {
+            guild_id: String::new(),
+            channel_id: String::new(),
+        },
+    ] {
+        let err = g
+            .mark_adaptive_slowmode(tonic::Request::new(req))
+            .await
+            .unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+    }
+}
+
+#[tokio::test]
+async fn list_adaptive_slowmode_rend_les_paires() {
+    let repo = Arc::new(MockSlowmodeRepo::default());
+    repo.contenu
+        .lock()
+        .unwrap()
+        .push(("g1".into(), "c1".into()));
+    let g = grpc_avec(repo.clone());
+    let resp = g
+        .list_adaptive_slowmode(tonic::Request::new(proto::ListAdaptiveSlowmodeRequest {}))
+        .await
+        .unwrap()
+        .into_inner();
+    assert_eq!(resp.channels.len(), 1);
+    assert_eq!(resp.channels[0].guild_id, "g1");
+    assert_eq!(resp.channels[0].channel_id, "c1");
 }

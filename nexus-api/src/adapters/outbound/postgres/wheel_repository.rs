@@ -1,6 +1,7 @@
 //! Adapter Postgres du port `WheelRepository`.
 
 use async_trait::async_trait;
+use nexus_core::domain::entities::wallet::{Wallet, WalletMutation};
 use nexus_core::domain::entities::wheel::{WheelCaseData, WheelSpin};
 use nexus_core::domain::errors::DomainError;
 use nexus_core::ports::outbound::wheel_repository::WheelRepository;
@@ -145,5 +146,100 @@ impl WheelRepository for PgWheelRepository {
             .map_err(pg_err)?;
         }
         tx.commit().await.map_err(pg_err)
+    }
+
+    async fn execute_spin_transaction(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        cooldown_hours: i64,
+        spin: &WheelSpin,
+        wallet: &Wallet,
+        mutation: Option<&WalletMutation>,
+    ) -> Result<bool, DomainError> {
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+
+        // 1. Essayer le claim
+        let res = sqlx::query(
+            "INSERT INTO nexus_wheel_daily_claims (guild_id, user_id, day)
+             SELECT $1, $2, CURRENT_DATE
+             WHERE NOT EXISTS (
+                 SELECT 1 FROM nexus_wheel_daily_claims
+                 WHERE guild_id = $1 AND user_id = $2
+                   AND claimed_at > NOW() - make_interval(hours => $3::int)
+             )",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(cooldown_hours.clamp(1, 8760) as i32)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
+        if res.rows_affected() == 0 {
+            tx.rollback().await.map_err(pg_err)?;
+            return Ok(false);
+        }
+
+        // 2. Toujours mettre à jour le wallet (pour sync le pseudo, même à 0)
+        sqlx::query(
+            "INSERT INTO nexus_wallets (guild_id, user_id, username, coins, total_earned, total_spent)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (guild_id, user_id) DO UPDATE SET
+                username = CASE WHEN EXCLUDED.username <> '' THEN EXCLUDED.username
+                                ELSE nexus_wallets.username END,
+                coins = EXCLUDED.coins,
+                total_earned = EXCLUDED.total_earned,
+                total_spent = EXCLUDED.total_spent,
+                updated_at = NOW()",
+        )
+        .bind(&wallet.guild_id)
+        .bind(&wallet.user_id)
+        .bind(&wallet.username)
+        .bind(wallet.coins)
+        .bind(wallet.total_earned)
+        .bind(wallet.total_spent)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
+        if let Some(mutation) = mutation {
+            sqlx::query(
+                "INSERT INTO nexus_wallet_transactions
+                 (guild_id, user_id, amount, balance_after, source, description, reason)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            )
+            .bind(&wallet.guild_id)
+            .bind(&wallet.user_id)
+            .bind(mutation.amount)
+            .bind(mutation.balance_after)
+            .bind(&mutation.source)
+            .bind(&mutation.description)
+            .bind(&mutation.reason)
+            .execute(&mut *tx)
+            .await
+            .map_err(pg_err)?;
+        }
+
+        // 3. Historiser le tirage
+        sqlx::query(
+            "INSERT INTO nexus_wheel_spin_log
+             (id, guild_id, user_id, username, case_key, case_label, payout, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        )
+        .bind(spin.id)
+        .bind(&spin.guild_id)
+        .bind(&spin.user_id)
+        .bind(&spin.username)
+        .bind(&spin.case_key)
+        .bind(&spin.case_label)
+        .bind(spin.payout)
+        .bind(spin.created_at)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
+        tx.commit().await.map_err(pg_err)?;
+        Ok(true)
     }
 }

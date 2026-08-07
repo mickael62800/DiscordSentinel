@@ -17,7 +17,7 @@ use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 use sentinel_core::domain::entities::system::host_probe::HostProbe;
 use sentinel_core::domain::entities::system::security_audit::{AuditLogFilter, CleanupOptions};
 use sentinel_core::domain::entities::system::security_log::LogWindow;
@@ -49,7 +49,7 @@ pub struct TopIpEntry {
 }
 
 pub async fn top_ips(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<TopIpEntry>>, ApiError> {
@@ -86,7 +86,7 @@ pub struct AuthFailureEntry {
 }
 
 pub async fn auth_failures(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<AuthFailureEntry>>, ApiError> {
@@ -130,7 +130,7 @@ pub struct BannedIpsResponse {
 }
 
 pub async fn banned_ips(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<BannedIpsResponse>, ApiError> {
 
@@ -188,7 +188,7 @@ pub struct AuditEntry {
 }
 
 pub async fn audit_logs(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Query(q): Query<AuditQuery>,
 ) -> Result<Json<Vec<AuditEntry>>, ApiError> {
@@ -240,7 +240,7 @@ pub struct BanIpResponse {
 /// persistance + purge logs). Le handler ne fait que le gate, l'audit et le
 /// mapping de la reponse.
 pub async fn ban_ip(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<BanIpDto>,
 ) -> Result<Json<BanIpResponse>, ApiError> {
@@ -280,7 +280,7 @@ pub async fn ban_ip(
 // ── Unban IP : retire une IP de la blocklist ────────────────────────────
 
 pub async fn unban_ip(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<BanIpDto>,
 ) -> Result<Json<BanIpResponse>, ApiError> {
@@ -322,7 +322,7 @@ pub async fn unban_ip(
 /// Helper : lit une sonde host via le use case et la deserialise dans le DTO
 /// de reponse. Toute l'infra (fichier, chemin) est dans l'adapter outbound.
 async fn read_probe<T: for<'de> serde::Deserialize<'de>>(
-    state: &AppState,
+    state: &SystemState,
     probe: HostProbe,
 ) -> Result<T, ApiError> {
     let value = state.host_probe_uc.read(probe).await.map_err(ApiError)?;
@@ -350,7 +350,7 @@ pub struct SshFailuresResponse {
 }
 
 pub async fn ssh_failures(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<SshFailuresResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::SshFailures).await?))
@@ -372,7 +372,7 @@ pub struct DiskTrendResponse {
 }
 
 pub async fn disk_trend(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<DiskTrendResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::DiskTrend).await?))
@@ -394,7 +394,7 @@ pub struct ConnectionsResponse {
 }
 
 pub async fn active_connections(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<ConnectionsResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::Connections).await?))
@@ -416,7 +416,7 @@ pub struct OpenPortsResponse {
 }
 
 pub async fn open_ports(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<OpenPortsResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::OpenPorts).await?))
@@ -442,7 +442,7 @@ pub struct TrivyResponse {
 }
 
 pub async fn trivy_vulns(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<TrivyResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::Trivy).await?))
@@ -473,7 +473,7 @@ pub struct GeoIpEntry {
 }
 
 pub async fn geoip_lookup(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Query(q): Query<GeoIpQuery>,
 ) -> Result<Json<Vec<GeoIpEntry>>, ApiError> {
@@ -527,7 +527,7 @@ pub struct ContainerChangesResponse {
 }
 
 pub async fn container_changes(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<ContainerChangesResponse>, ApiError> {
     let monitor = state
@@ -562,7 +562,7 @@ pub struct SuspiciousResponse {
 }
 
 pub async fn nginx_suspicious(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<SuspiciousResponse>, ApiError> {
     let mut data: SuspiciousResponse = read_probe(&state, HostProbe::NginxSuspicious).await?;
@@ -604,7 +604,7 @@ pub struct ManualBanEntry {
 }
 
 pub async fn manual_bans(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<Vec<ManualBanEntry>>, ApiError> {
     let bans = state
@@ -639,7 +639,7 @@ pub struct TlsErrorsResponse {
 }
 
 pub async fn tls_errors(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<TlsErrorsResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::TlsErrors).await?))
@@ -662,7 +662,7 @@ pub struct FileIntegrityResponse {
 }
 
 pub async fn file_integrity(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<FileIntegrityResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::FileIntegrity).await?))
@@ -684,7 +684,7 @@ pub struct OutboundResponse {
 }
 
 pub async fn outbound_connections(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<OutboundResponse>, ApiError> {
     Ok(Json(read_probe(&state, HostProbe::Outbound).await?))
@@ -707,7 +707,7 @@ pub struct LimitQuery {
 }
 
 pub async fn last_successful_logins(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Query(q): Query<LimitQuery>,
 ) -> Result<Json<Vec<SuccessfulLoginEntry>>, ApiError> {
@@ -758,7 +758,7 @@ pub struct TrafficTrendResponse {
 }
 
 pub async fn traffic_trend(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Query(q): Query<TrafficTrendQuery>,
 ) -> Result<Json<TrafficTrendResponse>, ApiError> {
@@ -829,7 +829,7 @@ pub struct CleanupResponse {
 /// Supprime les entrees de logs (table `logs` cat='api') et optionnellement
 /// `audit_logs`. Gate superadmin uniquement (operation destructive).
 pub async fn cleanup_security_logs(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Query(q): Query<CleanupQuery>,
 ) -> Result<Json<CleanupResponse>, ApiError> {
@@ -923,7 +923,7 @@ pub struct TlsCertInfo {
 }
 
 pub async fn tls_cert(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<TlsCertInfo>, ApiError> {
     let info = state.tls_cert_uc.read().await.map_err(ApiError)?;

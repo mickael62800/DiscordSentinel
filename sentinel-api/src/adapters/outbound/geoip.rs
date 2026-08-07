@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 
-use crate::ports::outbound::system::geoip_lookup::GeoIpLookup;
+use sentinel_core::ports::outbound::system::geoip_lookup::GeoIpLookup;
 use sentinel_core::domain::entities::system::geoip::GeoIpEntry;
 use sentinel_core::domain::errors::DomainError;
 

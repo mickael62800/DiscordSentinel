@@ -35,23 +35,32 @@ scrape_configs:
           service: 'api'
           component: 'backend'
 
-  # ── Workers ──
-  # Tous les workers exposent /metrics sur le port 9100 (cf. METRICS_PORT env var).
+  # ── API Nexus (plateforme jeux) ──
+  # Memes noms de metriques que sentinel-api (http_requests_total,
+  # http_request_duration_seconds, tokio_*) : les dashboards Grafana se
+  # reutilisent tels quels en filtrant sur le label `service`.
+  # Durcissement optionnel : si NEXUS_METRICS_TOKEN est defini cote API,
+  # decommenter le bloc `authorization` avec le meme token.
+  - job_name: 'nexus-api'
+    metrics_path: '/metrics'
+    # authorization:
+    #   type: Bearer
+    #   credentials: '<NEXUS_METRICS_TOKEN>'
+    static_configs:
+      - targets: ['nexus-api:3100']
+        labels:
+          service: 'nexus-api'
+          component: 'backend'
+
+  # ── Worker unifie ──
+  # Les workers par domaine ont ete fusionnes dans le binaire `sentinel-worker`
+  # (meta-scheduler, cf. sentinel-worker/src/scheduler.rs). Une seule cible
+  # remplace donc les 11 anciennes, qui ne resolvaient plus.
   - job_name: 'sentinel-workers'
     metrics_path: '/metrics'
     static_configs:
       - targets:
-          - 'ai-worker:9100'
-          - 'analytics-worker:9100'
-          - 'appeal-sla-worker:9100'
-          - 'audit-cache-worker:9100'
-          - 'cache-worker:9100'
-          - 'cleanup-worker:9100'
-          - 'discord-audit-sync-worker:9100'
-          - 'export-worker:9100'
-          - 'moderation-worker:9100'
-          - 'monitoring-worker:9100'
-          - 'temp-roles-worker:9100'
+          - 'sentinel-worker:9100'
         labels:
           component: 'worker'
     relabel_configs:

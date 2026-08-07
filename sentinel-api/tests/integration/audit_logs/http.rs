@@ -16,9 +16,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
-use sentinel_api::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
-use sentinel_api::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
 use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_audit_logs;

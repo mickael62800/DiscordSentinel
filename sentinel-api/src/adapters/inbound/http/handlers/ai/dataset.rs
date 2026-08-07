@@ -20,8 +20,8 @@ use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::ai::manage_dataset::{BulkDeleteCommand, ListDatasetQuery};
+use crate::bootstrap::state::AiState;
+use sentinel_core::ports::inbound::ai::manage_dataset::{BulkDeleteCommand, ListDatasetQuery};
 
 #[derive(Debug, Deserialize)]
 pub struct ListMessagesQuery {
@@ -51,7 +51,7 @@ pub struct ListMessagesResponse {
 
 /// GET /api/ai-dataset/messages/{guild_id}
 pub async fn list_messages(
-    State(state): State<AppState>,
+    State(state): State<AiState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(q): Query<ListMessagesQuery>,
@@ -107,7 +107,7 @@ pub struct BulkDeleteResponse {
 
 /// DELETE /api/ai-dataset/messages/{guild_id}
 pub async fn bulk_delete(
-    State(state): State<AppState>,
+    State(state): State<AiState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<BulkDeleteDto>,

@@ -10,7 +10,7 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::AuditState;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 
@@ -22,7 +22,7 @@ pub struct WatchedUsersQueryParams {
 }
 
 pub async fn list_watched_users(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     Query(params): Query<WatchedUsersQueryParams>,
 ) -> Result<Json<Vec<WatchedUserResponseDto>>, ApiError> {
     // IDOR : sans guild_id la liste est GLOBALE (tous serveurs) et les GET
@@ -42,7 +42,7 @@ pub async fn list_watched_users(
 }
 
 pub async fn get_user_dossier(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<UserDossierResponseDto>, ApiError> {
     // IDOR + donnees tres sensibles (infractions, notes internes) : le dossier
@@ -65,7 +65,7 @@ pub struct AddWatchDto {
 
 /// POST /api/watched-users — ajouter un utilisateur en surveillance manuelle
 pub async fn add_watched_user(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     Json(dto): Json<AddWatchDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Meme role que le retrait (remove_watched_user). Guild fourni dans le
@@ -90,7 +90,7 @@ pub async fn add_watched_user(
 
 /// DELETE /api/watched-users/{guild_id}/{user_id} — retirer de la surveillance manuelle
 pub async fn remove_watched_user(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Utilise check_role_for_guild (async, avec bypass superadmin) plutot

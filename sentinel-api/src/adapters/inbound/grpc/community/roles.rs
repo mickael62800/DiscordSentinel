@@ -10,9 +10,9 @@ use tonic::Response;
 use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
-use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
-use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use sentinel_core::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use sentinel_core::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
+use sentinel_core::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
 use sentinel_core::domain::entities::community::role_panel::RolePanel;
 use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;

@@ -11,3 +11,6 @@ pub mod coussin_bet_service;
 pub mod play_wheel_service;
 pub mod wheel_cases_service;
 pub mod wallet_service;
+pub mod game_mentions_service;
+pub mod upload_emoji_service;
+pub mod deploy_panel_service;

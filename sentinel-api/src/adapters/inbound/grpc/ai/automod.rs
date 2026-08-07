@@ -12,15 +12,20 @@ use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
-use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
-use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
-use crate::ports::inbound::ai::analyze_message::ContextMessageEntry;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use sentinel_core::ports::inbound::ai::analyze_message::ContextMessageEntry;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::enums::moderation::action::Action;
+use sentinel_core::ports::outbound::moderation::adaptive_slowmode_repository::AdaptiveSlowmodeRepository;
 pub struct AutomodGrpc {
     pub uc: Arc<dyn AnalyzeMessageUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,
+    /// Miroir de l'ensemble des salons en slowmode adaptatif. Le tracker du
+    /// bot est en memoire : sans cette persistance, un redemarrage laisserait
+    /// les salons bloques faute de savoir lesquels relacher.
+    pub adaptive_slowmode_repo: Arc<dyn AdaptiveSlowmodeRepository>,
 }
 
 #[tonic::async_trait]
@@ -165,6 +170,60 @@ impl AutomodService for AutomodGrpc {
             reason: decision.reason,
             score: decision.score,
             filename: decision.filename,
+        }))
+    }
+
+    // ── Slowmode adaptatif ──
+
+    async fn mark_adaptive_slowmode(
+        &self,
+        request: Request<proto::AdaptiveSlowmodeChannel>,
+    ) -> Result<Response<proto::AdaptiveSlowmodeAck>, Status> {
+        let req = request.into_inner();
+        if req.channel_id.is_empty() {
+            return Err(Status::invalid_argument("channel_id requis"));
+        }
+        self.adaptive_slowmode_repo
+            .mark(&req.guild_id, &req.channel_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::AdaptiveSlowmodeAck {}))
+    }
+
+    async fn unmark_adaptive_slowmode(
+        &self,
+        request: Request<proto::AdaptiveSlowmodeChannel>,
+    ) -> Result<Response<proto::AdaptiveSlowmodeAck>, Status> {
+        let req = request.into_inner();
+        if req.channel_id.is_empty() {
+            return Err(Status::invalid_argument("channel_id requis"));
+        }
+        // Cle par salon : `guild_id` n'est pas relu, la contrainte d'unicite
+        // porte sur le salon.
+        self.adaptive_slowmode_repo
+            .unmark(&req.channel_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::AdaptiveSlowmodeAck {}))
+    }
+
+    async fn list_adaptive_slowmode(
+        &self,
+        _request: Request<proto::ListAdaptiveSlowmodeRequest>,
+    ) -> Result<Response<proto::ListAdaptiveSlowmodeResponse>, Status> {
+        let rows = self
+            .adaptive_slowmode_repo
+            .list_all()
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::ListAdaptiveSlowmodeResponse {
+            channels: rows
+                .into_iter()
+                .map(|(guild_id, channel_id)| proto::AdaptiveSlowmodeChannel {
+                    guild_id,
+                    channel_id,
+                })
+                .collect(),
         }))
     }
 }

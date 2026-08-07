@@ -9,10 +9,10 @@ use sentinel_api::adapters::outbound::postgres::audit::user_activity_repository:
 use sentinel_api::adapters::outbound::postgres::community::discord_role_repository::PgDiscordRoleRepository;
 use sentinel_api::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
 use sentinel_api::adapters::outbound::postgres::system::log_repository::PgLogRepository;
-use sentinel_api::ports::outbound::audit::user_activity_repository::UserActivityRepository;
-use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
-use sentinel_api::ports::outbound::moderation::rule_repository::RuleRepository;
-use sentinel_api::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::ports::outbound::audit::user_activity_repository::UserActivityRepository;
+use sentinel_core::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use sentinel_core::ports::outbound::moderation::rule_repository::RuleRepository;
+use sentinel_core::ports::outbound::system::log_repository::LogRepository;
 use sentinel_core::domain::entities::audit::user_activity::UserActivity;
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;

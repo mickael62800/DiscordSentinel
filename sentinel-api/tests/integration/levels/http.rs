@@ -16,11 +16,11 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
-use sentinel_api::ports::inbound::community::manage_levels::AddXpResult;
-use sentinel_api::ports::inbound::community::manage_levels::ManageLevelsUseCase;
-use sentinel_api::ports::inbound::community::manage_levels::ResetTarget;
-use sentinel_api::ports::inbound::community::manage_levels::SetUserXpCommand;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpCommand;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpResult;
+use sentinel_core::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use sentinel_core::ports::inbound::community::manage_levels::ResetTarget;
+use sentinel_core::ports::inbound::community::manage_levels::SetUserXpCommand;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::errors::DomainError;
@@ -65,18 +65,18 @@ fn default_user(guild_id: &str, user_id: &str, xp: i64) -> UserLevel {
 impl ManageLevelsUseCase for MockLevelsUC {
     async fn record_text_activity(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_levels::RecordTextActivityCommand,
+        _: sentinel_core::ports::inbound::community::manage_levels::RecordTextActivityCommand,
     ) -> Result<
-        sentinel_api::ports::inbound::community::manage_levels::RecordActivityResult,
+        sentinel_core::ports::inbound::community::manage_levels::RecordActivityResult,
         DomainError,
     > {
         unimplemented!()
     }
     async fn record_voice_activity(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_levels::RecordVoiceActivityCommand,
+        _: sentinel_core::ports::inbound::community::manage_levels::RecordVoiceActivityCommand,
     ) -> Result<
-        sentinel_api::ports::inbound::community::manage_levels::RecordActivityResult,
+        sentinel_core::ports::inbound::community::manage_levels::RecordActivityResult,
         DomainError,
     > {
         unimplemented!()

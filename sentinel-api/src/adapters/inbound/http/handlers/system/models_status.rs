@@ -29,12 +29,12 @@ pub async fn get_models_status(State(state): State<AppState>) -> Json<ModelsStat
         ModelInfo {
             name: format_model_display_name("Vision", &vision_path),
             model_type: "vision".to_string(),
-            loaded: state.inference.vision_available(),
+            loaded: state.ai.inference.vision_available(),
         },
         ModelInfo {
             name: format_model_display_name("Text", &text_path),
             model_type: "text".to_string(),
-            loaded: state.inference.text_available(),
+            loaded: state.ai.inference.text_available(),
         },
     ];
 
@@ -58,7 +58,7 @@ pub async fn reload_model(
     Json(req): Json<ReloadRequest>,
 ) -> (StatusCode, Json<ReloadResponse>) {
     info!(model_type = %req.model_type, "Rechargement du modele demande");
-    match state.inference.reload(&req.model_type) {
+    match state.ai.inference.reload(&req.model_type) {
         Ok(msg) => {
             info!("{}", msg);
             (

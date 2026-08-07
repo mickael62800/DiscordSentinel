@@ -1,6 +1,6 @@
-use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
-use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
-use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelCoAdmin;

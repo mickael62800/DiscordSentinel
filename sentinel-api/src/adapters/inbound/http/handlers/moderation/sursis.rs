@@ -11,7 +11,7 @@ use sentinel_core::ports::inbound::moderation::manage_sursis::CreateSursisComman
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 /// Rapport de job renvoye au worker (observabilite). Copie locale de
 /// l'ancien `application::game::worker_jobs::JobReport` (module jeux retire).
 #[derive(Debug, serde::Serialize)]
@@ -67,7 +67,7 @@ pub struct CreateSursisDto {
 
 /// POST /api/moderation/{guild_id}/sursis
 pub async fn create_sursis(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<CreateSursisDto>,
 ) -> Result<Json<SursisDto>, ApiError> {
@@ -104,7 +104,7 @@ pub async fn create_sursis(
 
 /// GET /api/moderation/sursis/{id}
 pub async fn get_sursis(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<SursisDto>, ApiError> {
     let s = state
@@ -124,7 +124,7 @@ pub struct ResolveSursisDto {
 
 /// POST /api/moderation/sursis/{id}/resolve
 pub async fn resolve_sursis(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path(id): Path<Uuid>,
     Json(dto): Json<ResolveSursisDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -148,7 +148,7 @@ pub async fn resolve_sursis(
 /// Bannit definitivement les sursis echus : diffuse `sursis_ban` (le bot ban +
 /// nettoie le salon) et marque le sursis 'banni'.
 pub async fn job_sursis_expire(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
 ) -> Result<Json<JobReport>, ApiError> {
     let due = state.sursis_uc.list_due().await?;
     let mut processed = 0;

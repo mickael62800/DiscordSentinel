@@ -16,10 +16,10 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
-use sentinel_api::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
-use sentinel_api::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
-use sentinel_api::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
+use sentinel_core::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
+use sentinel_core::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
+use sentinel_core::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use sentinel_core::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
 use sentinel_core::domain::entities::community::role_panel::RolePanel;
 use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;

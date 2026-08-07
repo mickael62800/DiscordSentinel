@@ -18,7 +18,7 @@ use axum::extract::{Path, State};
 use axum::Json;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 use sentinel_core::domain::errors::DomainError;
 use serde::Serialize;
 
@@ -34,7 +34,7 @@ pub struct PublicGuildDto {
 
 /// GET /api/public/guilds/{guild_id}
 pub async fn public_guild(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<PublicGuildDto>, ApiError> {
     // Validation stricte : un identifiant non numerique n'atteint pas la base.

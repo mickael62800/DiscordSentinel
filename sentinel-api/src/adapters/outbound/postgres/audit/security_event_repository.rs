@@ -3,7 +3,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
+use sentinel_core::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
 use sentinel_core::domain::errors::DomainError;
 

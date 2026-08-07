@@ -1,4 +1,4 @@
-//! Handler HTTP du copilote de moderation (lecture seule, consultatif).
+﻿//! Handler HTTP du copilote de moderation (lecture seule, consultatif).
 //!
 //! `GET /api/moderation/{guild_id}/copilot/{user_id}?lookback_days=&min_precedents=`
 //! Renvoie l'historique de moderation du membre + une suggestion de sanction
@@ -14,7 +14,7 @@ use serde::Deserialize;
 use crate::adapters::inbound::http::dto::moderation::copilot::MemberModerationContextDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 
 #[derive(Debug, Deserialize)]
 pub struct CopilotQuery {
@@ -28,7 +28,7 @@ pub struct CopilotQuery {
 
 /// GET /api/moderation/{guild_id}/copilot/{user_id}
 pub async fn get_member_context(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Query(params): Query<CopilotQuery>,
 ) -> Result<Json<MemberModerationContextDto>, ApiError> {

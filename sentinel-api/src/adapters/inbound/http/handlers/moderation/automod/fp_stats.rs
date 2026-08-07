@@ -1,4 +1,4 @@
-//! Mesure des faux positifs de l'automod (lecture seule).
+﻿//! Mesure des faux positifs de l'automod (lecture seule).
 //!
 //! Le handler est mince : il parse la query, delegue l'agregation au use case
 //! (`ManageAutomodReviewsUseCase::fp_stats`, ou vit toute la regle metier + le
@@ -12,7 +12,7 @@ use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 use sentinel_core::domain::entities::moderation::review::automod::FpActionStat;
 use sentinel_core::domain::entities::moderation::review::automod::FpBucket;
 use sentinel_core::domain::entities::moderation::review::automod::FpFlagStat;
@@ -114,7 +114,7 @@ impl From<FpStats> for FpStatsDto {
 /// mesure le taux de faux positifs (over-block) global, par flag detecteur, et
 /// par action suggeree.
 pub async fn fp_stats(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<FpStatsQuery>,
 ) -> Result<Json<FpStatsDto>, ApiError> {

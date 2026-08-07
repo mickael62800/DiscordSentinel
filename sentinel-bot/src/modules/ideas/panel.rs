@@ -226,7 +226,9 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     };
 
-    let (base, cfg) = {
+    // `base` sert uniquement a lire la config guild (toujours en HTTP) ;
+    // les operations sur les idees passent par gRPC.
+    let (grpc, cfg) = {
         let data = ctx.data.read().await;
         let base = match data.get::<ApiClientKey>() {
             Some(b) => b.clone(),
@@ -236,13 +238,21 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
                 return;
             }
         };
+        let grpc = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
+            None => {
+                error!("GrpcClientKey introuvable : idee non enregistree");
+                reply(ctx, modal, "Service indisponible, reessaie plus tard.").await;
+                return;
+            }
+        };
         let cfg = base
             .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
             .await
             .unwrap_or_default();
-        (base, cfg)
+        (grpc, cfg)
     };
-    let api = ApiClient::new(base);
+    let api = ApiClient::new(grpc);
 
     // Quota d'idees ouvertes. En cas d'echec de lecture on laisse passer :
     // mieux vaut une idee de trop qu'un membre bloque par une panne API.

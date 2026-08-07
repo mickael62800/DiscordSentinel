@@ -7,7 +7,7 @@ use crate::{
     ports::{
         inbound::coussin_profile::{CoussinCombatUseCase, CoussinProfileUseCase},
         outbound::{
-            coussin_repository::{CoussinProfile, CoussinRepository},
+            coussin_repository::{CoussinProfile, CoussinProgress, CoussinRepository},
             system::bot_config_repository::BotConfigRepository,
         },
     },
@@ -54,6 +54,7 @@ impl CoussinService {
         Ok(cfg)
     }
 }
+
 #[async_trait]
 impl CoussinProfileUseCase for CoussinService {
     async fn combat_history(
@@ -136,10 +137,7 @@ impl CoussinProfileUseCase for CoussinService {
         let stats = cfg.classes.stats(class);
         let (atk, def) = (stats.atk, stats.def);
         let hp_max = crate::domain::entities::coussin::max_hp_with(def, class, &cfg.classes);
-        self.repo.update_class(guild_id, user_id, class, atk, def, hp_max).await?;
-        self.cooldowns
-            .arm(guild_id, user_id, "class", cfg.class_change_cooldown_minutes)
-            .await?;
+        self.repo.update_class(guild_id, user_id, class, atk, def, hp_max, cfg.class_change_cooldown_minutes).await?;
         profile.class = class;
         profile.atk = atk;
         profile.def = def;
@@ -189,12 +187,7 @@ impl CoussinCombatUseCase for CoussinService {
         }
         let combat = self
             .repo
-            .create_combat(guild_id, channel_id, &attacker, &defender, mise)
-            .await?;
-        // Arme apres creation : un defi refuse par la validation ne doit pas
-        // consommer le delai de l'attaquant.
-        self.cooldowns
-            .arm(guild_id, attacker_id, "combat", cfg.combat_cooldown_minutes)
+            .create_combat(guild_id, channel_id, &attacker, &defender, mise, cfg.combat_cooldown_minutes)
             .await?;
         Ok(combat)
     }
@@ -223,16 +216,28 @@ impl CoussinCombatUseCase for CoussinService {
             cfg.combat_rules(),
         ).map_err(|message| DomainError::Validation(message.into()))?;
         let winner = match result.attacker_won { Some(true) => Some(snapshot.attacker.user_id.as_str()), Some(false) => Some(snapshot.defender.user_id.as_str()), None => None };
-        let resolved = self.repo.resolve_combat(id, winner, rolls[0].0, rolls[0].1, if winner.is_some() { snapshot.combat.mise } else { 0 }, result.attacker_hp, result.defender_hp, cfg.bet_payout_pct).await?;
-        if resolved {
-            for (profile, won) in [(&snapshot.attacker, result.attacker_won == Some(true)), (&snapshot.defender, result.attacker_won == Some(false))] {
-                let xp = profile.xp + if won { cfg.xp_winner } else { cfg.xp_loser };
-                let level = crate::domain::entities::coussin::level_for_xp_capped(xp, cfg.max_level);
-                let points = profile.stat_points
-                    + (level - profile.level).max(0) * cfg.stat_points_per_level.max(0);
-                self.repo.set_progress(&snapshot.combat.guild_id, &profile.user_id, xp, level, points, crate::domain::entities::coussin::title_for_level(level)).await?;
-            }
-        }
+        let attacker_progress = if result.attacker_won.is_some() {
+            let won = result.attacker_won == Some(true);
+            let xp = snapshot.attacker.xp + if won { cfg.xp_winner } else { cfg.xp_loser };
+            let level = crate::domain::entities::coussin::level_for_xp_capped(xp, cfg.max_level);
+            let stat_points = snapshot.attacker.stat_points + (level - snapshot.attacker.level).max(0) * cfg.stat_points_per_level.max(0);
+            Some(CoussinProgress { xp, level, stat_points, title: crate::domain::entities::coussin::title_for_level(level).into() })
+        } else { None };
+
+        let defender_progress = if result.attacker_won.is_some() {
+            let won = result.attacker_won == Some(false);
+            let xp = snapshot.defender.xp + if won { cfg.xp_winner } else { cfg.xp_loser };
+            let level = crate::domain::entities::coussin::level_for_xp_capped(xp, cfg.max_level);
+            let stat_points = snapshot.defender.stat_points + (level - snapshot.defender.level).max(0) * cfg.stat_points_per_level.max(0);
+            Some(CoussinProgress { xp, level, stat_points, title: crate::domain::entities::coussin::title_for_level(level).into() })
+        } else { None };
+
+        let resolved = self.repo.resolve_combat(id, winner, rolls[0].0, rolls[0].1, if winner.is_some() { snapshot.combat.mise } else { 0 }, result.attacker_hp, result.defender_hp, cfg.bet_payout_pct, attacker_progress, defender_progress).await?;
+
         Ok(resolved)
     }
 }
+
+#[cfg(test)]
+#[path = "tests/coussin_service.rs"]
+mod tests;

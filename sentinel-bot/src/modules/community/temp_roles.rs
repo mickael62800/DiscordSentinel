@@ -40,15 +40,19 @@ impl TempRoleTracker {
     }
 
     /// Supprime un role du tracking.
+    /// Accesseur de test : la production n'interroge jamais le tracker, elle
+    /// ne fait qu'y ajouter et retirer. Il existe pour que les tests puissent
+    /// verifier `add`, `remove` et `add_with_expiry_timestamp` — sans lui,
+    /// ces trois methodes ne seraient plus couvertes.
+    #[cfg(test)]
+    pub fn is_temp(&self, guild_id: u64, user_id: u64, role_id: u64) -> bool {
+        self.roles.contains_key(&(guild_id, user_id, role_id))
+    }
+
     pub fn remove(&self, guild_id: u64, user_id: u64, role_id: u64) {
         self.roles.remove(&(guild_id, user_id, role_id));
     }
 
-    /// Verifie si un role est temporaire pour cet utilisateur.
-    #[allow(dead_code)]
-    pub fn is_temp(&self, guild_id: u64, user_id: u64, role_id: u64) -> bool {
-        self.roles.contains_key(&(guild_id, user_id, role_id))
-    }
 }
 
 /// Parse les roles temporaires depuis la config : "role_id:duration_secs" par ligne.

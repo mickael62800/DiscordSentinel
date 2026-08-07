@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package sentinel.purge.v1;
+
+// Purges administratives declenchees par les commandes `/cleanup` du bot.
+//
+// Trois portees distinctes, volontairement separees plutot qu'un seul RPC avec
+// un champ "type" : chacune a des regles de validation differentes
+// (`days = 0` autorise pour les infractions, interdit ailleurs) et une portee
+// differente (guild vs globale). Un RPC unique aurait masque ces differences.
+service PurgeService {
+  // Infractions d'une guild. `days = 0` = tout supprimer.
+  rpc PurgeInfractions(PurgeByDaysRequest) returns (PurgeResponse);
+  // Audit-logs d'une guild. `days` doit etre strictement positif.
+  rpc PurgeAuditLogs(PurgeByDaysRequest) returns (PurgeResponse);
+  // Logs applicatifs de TOUTES les guilds. `days` strictement positif.
+  rpc PurgeLogs(PurgeLogsRequest) returns (PurgeResponse);
+}
+
+message PurgeByDaysRequest {
+  string guild_id = 1;
+  int32 days = 2;
+}
+
+message PurgeLogsRequest {
+  int32 days = 1;
+}
+
+message PurgeResponse {
+  uint64 deleted = 1;
+}

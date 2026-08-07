@@ -35,6 +35,7 @@ pub struct JobContext {
     pub rcon_client: Arc<dyn RconClient>,
     pub port_allocator: Arc<dyn PortAllocator>,
     pub bot_config: Arc<dyn BotConfigRepository>,
+    pub events: Arc<dyn crate::ports::outbound::events::EventPublisher>,
 }
 
 /// Stats retournees par chaque job (pour observabilite worker -> log API).
@@ -678,4 +679,234 @@ pub async fn run_image_cleanup(ctx: &JobContext) -> Result<JobReport, DomainErro
         errors,
         details: serde_json::Value::Object(details),
     })
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// JOB 5 : REVEAL IP
+// ════════════════════════════════════════════════════════════════════════
+
+pub async fn run_reveal_ip(ctx: &JobContext) -> Result<JobReport, DomainError> {
+    use crate::ports::outbound::events::game_events::IP_REVEAL;
+
+    let due = ctx.server_repo.list_ip_reveal_due().await?;
+    let mut processed = 0usize;
+    let mut errors = 0usize;
+    let mut servers = Vec::new();
+
+    for s in &due {
+        if let Err(e) = ctx.server_repo.mark_ip_revealed(s.id).await {
+            warn!(error = %e, server_id = %s.id, "reveal_ip: mark echoue, skip");
+            errors += 1;
+            continue;
+        }
+        let payload = serde_json::json!({
+            "server_id": s.id.to_string(),
+            "guild_id": s.guild_id,
+        });
+        ctx.events.publish(IP_REVEAL, payload.clone()).await;
+        servers.push(payload);
+        processed += 1;
+    }
+
+    Ok(JobReport {
+        job: "reveal_ip",
+        processed,
+        errors,
+        details: serde_json::json!({ "servers": servers }),
+    })
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// JOB 6 : DAILY PING
+// ════════════════════════════════════════════════════════════════════════
+
+pub async fn run_daily_ping(ctx: &JobContext) -> Result<JobReport, DomainError> {
+    use chrono::Timelike;
+    use crate::domain::entities::system::bot_config::{cfg_bool, cfg_i64};
+    use crate::ports::outbound::events::game_events::DAILY_PING;
+
+    let now_hour = chrono::Utc::now().hour() as i64;
+    let awaiting = ctx
+        .server_repo
+        .list_awaiting_reveal_no_ping_today()
+        .await?;
+    let mut processed = 0usize;
+    let mut errors = 0usize;
+    let mut servers = Vec::new();
+
+    for s in &awaiting {
+        let cfg = ctx
+            .bot_config
+            .get_config(&s.guild_id, "game-portal")
+            .await
+            .unwrap_or_default();
+        let enabled = cfg_bool(&cfg, "session_daily_ping_enabled", false);
+        let hour = cfg_i64(&cfg, "session_daily_ping_hour", 18);
+
+        if enabled && now_hour >= hour {
+            if let Err(e) = ctx.server_repo.mark_daily_ping(s.id).await {
+                warn!(error = %e, server_id = %s.id, "daily_ping: mark echoue, skip");
+                errors += 1;
+                continue;
+            }
+            let payload = serde_json::json!({
+                "server_id": s.id.to_string(),
+                "guild_id": s.guild_id,
+            });
+            ctx.events.publish(DAILY_PING, payload.clone()).await;
+            servers.push(payload);
+            processed += 1;
+        }
+    }
+
+    Ok(JobReport {
+        job: "daily_ping",
+        processed,
+        errors,
+        details: serde_json::json!({ "servers": servers }),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_minecraft_list() {
+        let raw = "There are 2 of a max of 20 players online: Alice, Bob";
+        let (count, players) = parse_minecraft_list(raw);
+        assert_eq!(count, 2);
+        assert_eq!(players, vec!["Alice", "Bob"]);
+
+        let raw_empty = "There are 0 of a max of 20 players online:";
+        let (count2, players2) = parse_minecraft_list(raw_empty);
+        assert_eq!(count2, 0);
+        assert!(players2.is_empty());
+    }
+
+    struct DummyServerRepo;
+    #[async_trait::async_trait]
+    impl GameServerRepository for DummyServerRepo {
+        async fn create(&self, _: crate::ports::outbound::game::game_server_repository::NewGameServer) -> Result<crate::domain::entities::game::server::GameServer, DomainError> { todo!() }
+        async fn find_by_id(&self, _: Uuid) -> Result<Option<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(None) }
+        async fn list_by_guild(&self, _: &str) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
+        async fn list_running(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
+        async fn list_active_non_deleted(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
+        async fn update_runtime_state(&self, _: Uuid, _: GameServerRuntimeUpdate) -> Result<(), DomainError> { Ok(()) }
+        async fn update_player_activity(&self, _: Uuid, _: i32) -> Result<(), DomainError> { Ok(()) }
+        async fn delete(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
+        async fn list_ip_reveal_due(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
+        async fn mark_ip_revealed(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+        async fn set_ip_reveal_at(&self, _: Uuid, _: Option<chrono::DateTime<chrono::Utc>>) -> Result<(), DomainError> { Ok(()) }
+        async fn list_awaiting_reveal_no_ping_today(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
+        async fn mark_daily_ping(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+        async fn set_auto_restart(&self, _: Uuid, _: bool) -> Result<(), DomainError> { Ok(()) }
+        async fn list_public_active(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
+        async fn sum_active_memory_mb(&self, _: &str) -> Result<i32, DomainError> { Ok(0) }
+        async fn count_active_servers(&self, _: &str) -> Result<i32, DomainError> { Ok(0) }
+    }
+
+    struct DummyEventPublisher;
+    #[async_trait::async_trait]
+    impl crate::ports::outbound::events::EventPublisher for DummyEventPublisher {
+        async fn publish(&self, _: &str, _: serde_json::Value) {}
+    }
+
+    struct DummyBotConfig;
+    #[async_trait::async_trait]
+    impl BotConfigRepository for DummyBotConfig {
+        async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
+        async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
+        async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
+        async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    }
+
+    struct DummyTemplateRepo;
+    #[async_trait::async_trait]
+    impl crate::ports::outbound::game::game_template_repository::GameTemplateRepository for DummyTemplateRepo {
+        async fn list(&self) -> Result<Vec<crate::domain::entities::game::template::GameTemplate>, DomainError> { Ok(vec![]) }
+        async fn find_by_id(&self, _: Uuid) -> Result<Option<crate::domain::entities::game::template::GameTemplate>, DomainError> { Ok(None) }
+        async fn find_by_slug(&self, _: &str) -> Result<Option<crate::domain::entities::game::template::GameTemplate>, DomainError> { Ok(None) }
+    }
+
+    struct DummyAuditRepo;
+    #[async_trait::async_trait]
+    impl GameAuditRepository for DummyAuditRepo {
+        async fn log(&self, _: &str, _: Option<Uuid>, _: Option<String>, _: crate::domain::entities::game::audit::GameAuditAction, _: serde_json::Value) {}
+    }
+
+    struct DummySessionRepo;
+    #[async_trait::async_trait]
+    impl PlayerSessionRepository for DummySessionRepo {
+        async fn record_join(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn record_leave(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn list_active(&self, _: Uuid) -> Result<Vec<crate::domain::entities::game::player_session::PlayerSession>, DomainError> { Ok(vec![]) }
+        async fn list_history(&self, _: Uuid, _: i64, _: i64) -> Result<Vec<crate::domain::entities::game::player_session::PlayerSession>, DomainError> { Ok(vec![]) }
+    }
+
+    struct DummyRuntime;
+    #[async_trait::async_trait]
+    impl ContainerRuntime for DummyRuntime {
+        async fn create_container(&self, _: &ContainerSpec) -> Result<String, DomainError> { Ok("id".into()) }
+        async fn start_container(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn stop_container(&self, _: &str, _: u32) -> Result<(), DomainError> { Ok(()) }
+        async fn delete_container(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn inspect(&self, _: &str) -> Result<Option<crate::ports::outbound::game::container_runtime::ContainerStatus>, DomainError> { Ok(None) }
+        async fn logs(&self, _: &str, _: u32) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
+        async fn stats(&self, _: &str) -> Result<crate::ports::outbound::game::container_runtime::ContainerStats, DomainError> { todo!() }
+        async fn image_exists(&self, _: &str) -> Result<bool, DomainError> { Ok(true) }
+        async fn remove_image(&self, _: &str) -> Result<bool, DomainError> { Ok(true) }
+    }
+
+    struct DummyRcon;
+    #[async_trait::async_trait]
+    impl RconClient for DummyRcon {
+        async fn execute(&self, _: &RconConnectionParams, _: &str) -> Result<crate::ports::outbound::game::rcon_client::RconResponse, DomainError> { todo!() }
+    }
+
+    struct DummyPortAllocator;
+    #[async_trait::async_trait]
+    impl PortAllocator for DummyPortAllocator {
+        async fn allocate(&self, _: &str, _: PortKind, _: i32, _: i32) -> Result<i32, DomainError> { Ok(25565) }
+        async fn release(&self, _: &str, _: PortKind, _: i32) -> Result<(), DomainError> { Ok(()) }
+    }
+
+    #[tokio::test]
+    async fn test_run_reveal_ip_empty() {
+        let ctx = JobContext {
+            server_repo: Arc::new(DummyServerRepo),
+            template_repo: Arc::new(DummyTemplateRepo),
+            audit_repo: Arc::new(DummyAuditRepo),
+            session_repo: Arc::new(DummySessionRepo),
+            container_runtime: Arc::new(DummyRuntime),
+            rcon_client: Arc::new(DummyRcon),
+            port_allocator: Arc::new(DummyPortAllocator),
+            bot_config: Arc::new(DummyBotConfig),
+            events: Arc::new(DummyEventPublisher),
+        };
+        let report = run_reveal_ip(&ctx).await.unwrap();
+        assert_eq!(report.job, "reveal_ip");
+        assert_eq!(report.processed, 0);
+        assert_eq!(report.errors, 0);
+    }
+
+    #[tokio::test]
+    async fn test_run_daily_ping_empty() {
+        let ctx = JobContext {
+            server_repo: Arc::new(DummyServerRepo),
+            template_repo: Arc::new(DummyTemplateRepo),
+            audit_repo: Arc::new(DummyAuditRepo),
+            session_repo: Arc::new(DummySessionRepo),
+            container_runtime: Arc::new(DummyRuntime),
+            rcon_client: Arc::new(DummyRcon),
+            port_allocator: Arc::new(DummyPortAllocator),
+            bot_config: Arc::new(DummyBotConfig),
+            events: Arc::new(DummyEventPublisher),
+        };
+        let report = run_daily_ping(&ctx).await.unwrap();
+        assert_eq!(report.job, "daily_ping");
+        assert_eq!(report.processed, 0);
+        assert_eq!(report.errors, 0);
+    }
 }

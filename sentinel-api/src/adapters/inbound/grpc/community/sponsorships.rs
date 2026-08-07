@@ -10,6 +10,10 @@ use tonic::Request;
 use tonic::Response;
 use tonic::Status;
 
+use sentinel_core::ports::inbound::community::check_eligibility::{
+    CheckEligibilityUseCase, CheckRoleEligibilityCommand, ValidateSponsorshipCommand,
+};
+use sentinel_core::ports::inbound::community::manage_monthly_ranking::ManageMonthlyRankingUseCase;
 use sentinel_core::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase;
 use sentinel_proto::community::v1 as proto;
 use sentinel_proto::community::v1::community_service_server::CommunityService;
@@ -18,6 +22,10 @@ use crate::adapters::inbound::grpc::errors::domain_to_status;
 
 pub struct CommunityGrpc {
     pub uc: Arc<dyn ManageSponsorshipsUseCase>,
+    /// Prerequis de role et regles de parrainage : la DECISION vit ici, pas
+    /// dans le bot, qui ne fournit que les faits Discord.
+    pub eligibility_uc: Arc<dyn CheckEligibilityUseCase>,
+    pub monthly_ranking_uc: Arc<dyn ManageMonthlyRankingUseCase>,
 }
 
 #[tonic::async_trait]
@@ -110,4 +118,94 @@ impl CommunityService for CommunityGrpc {
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Empty {}))
     }
+
+    // ── Eligibilite ──
+
+    async fn check_role_eligibility(
+        &self,
+        request: Request<proto::CheckRoleEligibilityRequest>,
+    ) -> Result<Response<proto::EligibilityDecision>, Status> {
+        let req = request.into_inner();
+        if req.guild_id.is_empty() {
+            return Err(Status::invalid_argument("guild_id requis"));
+        }
+        let decision = self
+            .eligibility_uc
+            .check_role_eligibility(CheckRoleEligibilityCommand {
+                guild_id: req.guild_id,
+                role_id: req.role_id,
+                user_roles: req.user_roles,
+                joined_at_unix: req.joined_at_unix,
+            })
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::EligibilityDecision {
+            allowed: decision.allowed,
+            reason: decision.reason,
+        }))
+    }
+
+    async fn validate_sponsorship_eligibility(
+        &self,
+        request: Request<proto::ValidateSponsorshipRequest>,
+    ) -> Result<Response<proto::EligibilityDecision>, Status> {
+        let req = request.into_inner();
+        if req.guild_id.is_empty() {
+            return Err(Status::invalid_argument("guild_id requis"));
+        }
+        let decision = self
+            .eligibility_uc
+            .validate_sponsorship(ValidateSponsorshipCommand {
+                guild_id: req.guild_id,
+                sponsor_id: req.sponsor_id,
+                sponsored_id: req.sponsored_id,
+                sponsor_joined_at_unix: req.sponsor_joined_at_unix,
+                sponsored_joined_at_unix: req.sponsored_joined_at_unix,
+            })
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::EligibilityDecision {
+            allowed: decision.allowed,
+            reason: decision.reason,
+        }))
+    }
+
+    // ── Classement mensuel ──
+
+    async fn force_monthly_ranking(
+        &self,
+        request: Request<proto::ForceMonthlyRankingRequest>,
+    ) -> Result<Response<proto::MonthlyRanking>, Status> {
+        let req = request.into_inner();
+        if req.guild_id.is_empty() {
+            return Err(Status::invalid_argument("guild_id requis"));
+        }
+        // Chaine vide = periode par defaut ("actuel") : le bot n'a pas a
+        // connaitre le libelle par defaut du serveur.
+        let mois = Some(req.mois).filter(|m| !m.is_empty());
+        let data = self
+            .monthly_ranking_uc
+            .force_ranking(&req.guild_id, mois)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::MonthlyRanking {
+            period_label: data.period_label,
+            note: data.note,
+            text: ranking_entries_to_proto(data.text),
+            voice: ranking_entries_to_proto(data.voice),
+            global: ranking_entries_to_proto(data.global),
+        }))
+    }
+}
+
+fn ranking_entries_to_proto(
+    entries: Vec<sentinel_core::domain::entities::community::monthly_ranking::RankingEntry>,
+) -> Vec<proto::RankingEntry> {
+    entries
+        .into_iter()
+        .map(|e| proto::RankingEntry {
+            user_id: e.user_id,
+            xp: e.xp,
+        })
+        .collect()
 }

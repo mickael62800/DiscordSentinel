@@ -38,7 +38,6 @@ impl DiscordApiService {
         }
     }
 
-    #[allow(dead_code)]
     pub fn is_configured(&self) -> bool {
         !self.token.is_empty()
     }
@@ -50,6 +49,28 @@ impl DiscordApiService {
             ));
         }
         Ok(())
+    }
+}
+
+/// Refuse tout identifiant qui n'est pas un snowflake Discord.
+///
+/// Ces identifiants viennent de la configuration par serveur, donc de la base,
+/// donc indirectement de saisies utilisateur. Ils sont interpoles dans une URL
+/// appelee avec le token du bot : un `../` ou un `%2F` permettrait d'atteindre
+/// un tout autre endpoint de l'API Discord. La fenetre 17-20 chiffres ASCII
+/// ecarte aussi les uuid et les petits entiers.
+///
+/// Le controle vit ici et non chez l'appelant : c'est l'adaptateur qui
+/// construit l'URL, c'est donc a lui de garantir qu'elle est sure. Chaque
+/// appelant qui le refaisait pouvait l'oublier.
+fn ensure_snowflake(id: &str) -> Result<(), DomainError> {
+    let valide = (17..=20).contains(&id.len()) && id.chars().all(|c| c.is_ascii_digit());
+    if valide {
+        Ok(())
+    } else {
+        Err(DomainError::ValidationError(format!(
+            "identifiant Discord invalide : {id:?}"
+        )))
     }
 }
 
@@ -565,6 +586,36 @@ impl DiscordApi for DiscordApiService {
             tracing::warn!("Echec envoi DM a {user_id}: {body}");
         }
 
+        Ok(())
+    }
+
+    /// Poste un embed dans un salon.
+    async fn send_channel_embed(
+        &self,
+        channel_id: &str,
+        embed: serde_json::Value,
+    ) -> Result<(), DomainError> {
+        self.ensure_configured()?;
+        ensure_snowflake(channel_id)?;
+
+        let resp = self
+            .client
+            .post(format!(
+                "https://discord.com/api/v10/channels/{channel_id}/messages"
+            ))
+            .header("Authorization", format!("Bot {}", self.token))
+            .json(&serde_json::json!({ "embeds": [embed] }))
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord send embed error: {e}")))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!(
+                "Discord a refuse l'embed (HTTP {status}) : {body}"
+            )));
+        }
         Ok(())
     }
 

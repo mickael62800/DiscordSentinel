@@ -7,7 +7,6 @@
 
 use std::sync::Arc;
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
 use serde::{Deserialize, Serialize};
 
@@ -81,28 +80,21 @@ pub struct SavePresetRequest {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct VoicePresetResponse {
-    pub owner_id: String,
     pub channel_name: Option<String>,
     pub member_limit: Option<i32>,
     pub visibility: String,
     pub locked: bool,
-    pub queue_enabled: bool,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct WhitelistEntryResponse {
     pub target_id: String,
-    pub target_name: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct OwnerBanResponse {
     pub user_id: String,
-    pub user_name: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -130,52 +122,41 @@ pub struct LogModerationActionRequest {
 // ── Response DTOs (surface inchangee) ──
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct VoiceChannelResponse {
     pub id: String,
-    pub guild_id: String,
     pub owner_id: String,
-    pub owner_name: String,
     pub channel_id: String,
     pub text_channel_id: Option<String>,
     pub members_channel_id: Option<String>,
     pub queue_channel_id: Option<String>,
     pub category_id: Option<String>,
     pub channel_name: String,
-    pub kind: String,
     pub visibility: String,
     pub queue_enabled: bool,
     pub locked: bool,
     pub member_limit: Option<i32>,
-    pub status: Option<String>,
-    pub created_at: String,
 }
 
 // ── Client ──
 
 pub struct ApiClient {
-    #[allow(dead_code)]
-    pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
     /// Construction classique : prend le `BaseApiClient` HTTP (legacy, garde
     /// pour compat/heartbeat) et le `SentinelGrpcClient` (Phase 7A).
-    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
-        Self { base, grpc }
+    pub fn new(grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { grpc }
     }
 
     /// Helper : construit un `ApiClient` depuis le TypeMap Serenity. Renvoie
     /// `None` si l'un des deux clients n'a pas ete insere dans `main.rs`.
     pub fn from_data(data: &serenity::prelude::TypeMap) -> Option<Self> {
-        let base = data
-            .get::<crate::shared::heartbeat::ApiClientKey>()?
-            .clone();
         let grpc = data
             .get::<crate::shared::grpc_client::GrpcClientKey>()?
             .clone();
-        Some(Self::new(base, grpc))
+        Some(Self::new(grpc))
     }
 
     // ── Channels (gRPC) ──
@@ -312,12 +293,10 @@ impl ApiClient {
         };
         let resp = crate::grpc_call!(@raw self.grpc, voice_channels, get_preset, req).ok()?;
         resp.preset.map(|p| VoicePresetResponse {
-            owner_id: p.owner_id,
             channel_name: p.channel_name,
             member_limit: p.member_limit,
             visibility: p.visibility,
             locked: p.locked,
-            queue_enabled: p.queue_enabled,
         })
     }
 
@@ -353,7 +332,6 @@ impl ApiClient {
                 .into_iter()
                 .map(|e| WhitelistEntryResponse {
                     target_id: e.target_id,
-                    target_name: e.target_name,
                 })
                 .collect(),
             Err(_) => Vec::new(),
@@ -405,7 +383,6 @@ impl ApiClient {
                 .into_iter()
                 .map(|b| OwnerBanResponse {
                     user_id: b.user_id,
-                    user_name: b.user_name,
                 })
                 .collect(),
             Err(_) => Vec::new(),
@@ -488,22 +465,17 @@ pub struct VoiceThemeResponse {
 fn proto_to_response(c: proto::VoiceChannel) -> VoiceChannelResponse {
     VoiceChannelResponse {
         id: c.id,
-        guild_id: c.guild_id,
         owner_id: c.owner_id,
-        owner_name: c.owner_name,
         channel_id: c.channel_id,
         text_channel_id: c.text_channel_id,
         members_channel_id: c.members_channel_id,
         queue_channel_id: c.queue_channel_id,
         category_id: c.category_id,
         channel_name: c.channel_name,
-        kind: c.kind,
         visibility: c.visibility,
         queue_enabled: c.queue_enabled,
         locked: c.locked,
         member_limit: c.member_limit,
-        status: c.status,
-        created_at: c.created_at,
     }
 }
 

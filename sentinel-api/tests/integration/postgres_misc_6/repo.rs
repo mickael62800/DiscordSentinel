@@ -7,10 +7,10 @@ use sentinel_api::adapters::outbound::postgres::audit::modstats_repository::PgMo
 use sentinel_api::adapters::outbound::postgres::moderation::evidence_repository::PgEvidenceRepository;
 use sentinel_api::adapters::outbound::postgres::moderation::pending_action_repository::PgPendingActionRepository;
 use sentinel_api::adapters::outbound::postgres::moderation::review_repository::PgReviewRepository;
-use sentinel_api::ports::outbound::audit::modstats_repository::ModstatsRepository;
-use sentinel_api::ports::outbound::moderation::evidence_repository::EvidenceRepository;
-use sentinel_api::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
-use sentinel_api::ports::outbound::moderation::review_repository::ReviewRepository;
+use sentinel_core::ports::outbound::audit::modstats_repository::ModstatsRepository;
+use sentinel_core::ports::outbound::moderation::evidence_repository::EvidenceRepository;
+use sentinel_core::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
+use sentinel_core::ports::outbound::moderation::review_repository::ReviewRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()

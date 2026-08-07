@@ -119,7 +119,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
 /// Envoie un evenement d'audit a l'API.
 pub async fn send_event(ctx: &Context, event: AuditEvent) {
     let data = ctx.data.read().await;
-    if let Some(base) = data.get::<ApiClientKey>() {
+    if let Some(base) = data.get::<crate::shared::grpc_client::GrpcClientKey>() {
         let api = ApiClient::new(base.clone());
         if let Err(e) = api.send_audit_event(&event).await {
             warn!(error = %e, event_type = %event.event_type, "Erreur envoi audit event");
@@ -182,7 +182,7 @@ pub async fn detect_anomaly(
     let thresholds = anomaly_thresholds_for(ctx, guild_id).await;
     let (base, window_secs) = {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>()?.clone();
+        let base = data.get::<crate::shared::grpc_client::GrpcClientKey>()?.clone();
         let window_secs = data
             .get::<ConfigKey>()
             .map(|c| c.anomaly_window_secs)

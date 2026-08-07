@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package sentinel.ideas.v1;
+
+// Boite a idees : les 6 operations dont le bot a besoin.
+//
+// Le dashboard web dispose d'autres endpoints HTTP (liste filtree, detail avec
+// fil de messages, suppression) qui n'ont pas d'equivalent ici : ils ne sont
+// jamais appeles par le bot, et exposer une surface gRPC plus large que le
+// besoin reel serait du code a maintenir pour rien.
+service IdeasService {
+  // Cree l'idee apres la modale Discord.
+  rpc CreateIdea(CreateIdeaRequest) returns (Idea);
+  // Quota : nombre d'idees non tranchees de ce membre sur ce serveur.
+  rpc CountOpenByAuthor(CountOpenByAuthorRequest) returns (CountOpenByAuthorResponse);
+  // Retrouve l'idee attachee a un salon prive (routage des messages).
+  rpc GetIdeaByChannel(GetIdeaByChannelRequest) returns (Idea);
+  // Decision du staff (acceptee / refusee / ...).
+  rpc DecideIdea(DecideIdeaRequest) returns (Idea);
+  // Rattache le salon prive une fois cree cote Discord.
+  rpc SetIdeaChannel(SetIdeaChannelRequest) returns (Idea);
+  // Synchronise un message du salon vers l'API. Best-effort cote appelant.
+  rpc AddIdeaMessage(AddIdeaMessageRequest) returns (AddIdeaMessageResponse);
+}
+
+// Sous-ensemble des champs consommes par le bot. Les horodatages et les
+// identifiants de decision restent cote HTTP : seul le web les affiche.
+message Idea {
+  string id = 1;
+  string title = 2;
+  string description = 3;
+  string status = 4;
+  string category = 5;
+  string author_id = 6;
+  string author_name = 7;
+  optional string decided_by_name = 8;
+  optional string decision_reason = 9;
+}
+
+message CreateIdeaRequest {
+  string guild_id = 1;
+  string title = 2;
+  string description = 3;
+  string category = 4;
+  string author_id = 5;
+  string author_name = 6;
+  optional string channel_id = 7;
+}
+
+message CountOpenByAuthorRequest {
+  string guild_id = 1;
+  string author_id = 2;
+}
+
+message CountOpenByAuthorResponse {
+  int64 open_count = 1;
+}
+
+message GetIdeaByChannelRequest {
+  string channel_id = 1;
+}
+
+message DecideIdeaRequest {
+  string idea_id = 1;
+  string status = 2;
+  string decided_by = 3;
+  string decided_by_name = 4;
+  optional string reason = 5;
+}
+
+message SetIdeaChannelRequest {
+  string idea_id = 1;
+  // Absent = detache le salon.
+  optional string channel_id = 2;
+}
+
+message AddIdeaMessageRequest {
+  string idea_id = 1;
+  string author_name = 2;
+  string author_role = 3;
+  string content = 4;
+}
+
+message AddIdeaMessageResponse {
+  string message_id = 1;
+}

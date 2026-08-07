@@ -159,8 +159,10 @@ impl SlowmodeManager {
             .collect()
     }
 
-    /// Verifie si le slowmode est actif pour un serveur.
-    #[allow(dead_code)]
+    /// Accesseur de test : la production ne consulte pas cet etat, elle passe
+    /// par `expired_guilds`. Conserve pour que les tests puissent verifier
+    /// l'etat initial et les transitions.
+    #[cfg(test)]
     pub fn is_active(&self, guild_id: GuildId) -> bool {
         self.active.contains_key(&guild_id)
     }

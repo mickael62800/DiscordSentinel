@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::super::pg_err_ctx;
-use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
+use sentinel_core::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage;

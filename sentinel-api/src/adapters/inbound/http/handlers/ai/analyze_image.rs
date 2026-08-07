@@ -5,8 +5,8 @@ use base64::Engine;
 use crate::adapters::inbound::http::dto::ai::analyze_image::AnalyzeImageRequestDto;
 use crate::adapters::inbound::http::dto::ai::analyze_image::AnalyzeImageResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use crate::bootstrap::state::AiState;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 use sentinel_core::domain::errors::DomainError;
 
 // Limites et content-types autorises sont definis dans `domain/entities/image_analysis.rs`.
@@ -14,7 +14,7 @@ use sentinel_core::domain::entities::ai::image_analysis::is_allowed_image_conten
 use sentinel_core::domain::entities::ai::image_analysis::is_image_size_acceptable;
 use sentinel_core::domain::entities::ai::image_analysis::MAX_IMAGE_BASE64_LEN;
 pub async fn analyze_image(
-    State(state): State<AppState>,
+    State(state): State<AiState>,
     Json(dto): Json<AnalyzeImageRequestDto>,
 ) -> Result<Json<AnalyzeImageResponseDto>, ApiError> {
     // Validation taille — regle metier dans `domain/entities/image_analysis.rs`.

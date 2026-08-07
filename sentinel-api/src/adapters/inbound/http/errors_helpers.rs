@@ -20,13 +20,11 @@ pub fn sqlx_internal(ctx: &str) -> impl FnOnce(sqlx::Error) -> DomainError + '_ 
 }
 
 /// Wrap une erreur generique `Display` dans `DomainError::Internal` avec contexte.
-#[allow(dead_code)]
 pub fn internal_with<E: std::fmt::Display>(ctx: &str) -> impl FnOnce(E) -> DomainError + '_ {
     move |e| DomainError::Internal(format!("{ctx}: {e}"))
 }
 
 /// Wrap une erreur generique `Display` dans `DomainError::ValidationError` avec contexte.
-#[allow(dead_code)]
 pub fn validation_with<E: std::fmt::Display>(ctx: &str) -> impl FnOnce(E) -> DomainError + '_ {
     move |e| DomainError::ValidationError(format!("{ctx}: {e}"))
 }

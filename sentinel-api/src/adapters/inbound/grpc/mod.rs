@@ -11,6 +11,7 @@ pub mod ai;
 pub mod audit;
 pub mod community;
 pub mod errors;
+pub mod guild_backup;
 pub mod moderation;
 pub mod server;
 pub mod system;

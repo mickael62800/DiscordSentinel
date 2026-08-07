@@ -54,6 +54,7 @@ tonic-health = "0.13"
 prost = { workspace = true }
 sentinel-proto = { workspace = true }
 sentinel-core = { workspace = true }
+platform-common-api = { workspace = true }
 
 # Utils
 uuid = { workspace = true }

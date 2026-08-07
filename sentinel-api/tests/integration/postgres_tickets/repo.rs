@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::system::ticket_repository::PgTicketRepository;
-use sentinel_api::ports::outbound::system::ticket_repository::TicketRepository;
+use sentinel_core::ports::outbound::system::ticket_repository::TicketRepository;
 use sentinel_core::domain::entities::system::ticket::Ticket;
 use sentinel_core::domain::entities::system::ticket::TicketMessage;
 

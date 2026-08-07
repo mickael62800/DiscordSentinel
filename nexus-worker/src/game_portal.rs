@@ -20,10 +20,7 @@ use crate::common;
 const WORKER_NAME: &str = "game-portal";
 
 #[derive(Debug, Deserialize, Default)]
-#[allow(dead_code)]
 struct JobReport {
-    #[serde(default)]
-    job: String,
     #[serde(default)]
     processed: usize,
     #[serde(default)]

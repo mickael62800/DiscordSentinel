@@ -5,71 +5,60 @@
 //!   `record_voice`, `get_user_stats`, `get_guild_overview`, `get_leaderboard`)
 //!   passent par gRPC via `SentinelGrpcClient`. Depuis le refactor P0, le bot
 //!   n'envoie que des FAITS BRUTS : c'est l'API qui calcule tout l'XP.
-//! - Les endpoints sans equivalent proto (`force_monthly_ranking`,
-//!   `get_infractions`) restent sur `BaseApiClient` HTTP.
+//! - `force_monthly_ranking` et `count_user_infractions` passent aussi en
+//!   gRPC, mais sur les services de LEUR domaine (`CommunityService` et
+//!   `ModerationService`) : les greffer sur `ProgressionService` aurait fait
+//!   du service un fourre-tout.
 
 use std::sync::Arc;
 
 use serde::Deserialize;
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
 use sentinel_proto::common::v1 as proto_common;
+use sentinel_proto::community::v1 as proto_community;
+use sentinel_proto::moderation::v1 as proto_mod;
 use sentinel_proto::progression::v1 as proto_prog;
 use sentinel_proto::stats::v1 as proto_stats;
 
 // ── Response DTOs (surface publique inchangee) ──
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-pub struct Infraction {
-    pub id: String,
-    pub guild_id: String,
-    pub user_id: String,
-    pub username: String,
-    pub action: String,
-    pub reason: Option<String>,
-    pub score: f64,
-    pub created_at: String,
+/// Compteurs d'infractions d'un membre. `total` couvre toutes les natures,
+/// y compris celles sans compteur dedie ici.
+#[derive(Debug, Default)]
+pub struct InfractionCounts {
+    pub warns: u32,
+    pub deletes: u32,
+    pub mutes: u32,
+    pub bans: u32,
+    pub total: u32,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct UserStatsResponse {
-    pub guild_id: String,
-    pub user_id: String,
     pub username: String,
     pub message_count: u64,
     pub voice_seconds: u64,
-    pub voice_hours: f64,
-    pub updated_at: String,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct GuildOverviewResponse {
-    pub guild_id: String,
     pub total_messages: u64,
     pub total_voice_seconds: u64,
-    pub total_voice_hours: f64,
     pub active_members: u64,
     pub total_infractions: u64,
     pub total_warns: u64,
     pub total_mutes: u64,
     pub total_bans: u64,
-    pub top_members: Vec<UserStatsResponse>,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct UserLevelResponse {
     pub user_id: String,
     pub username: String,
     pub xp: i64,
     pub level: i32,
-    pub xp_current: i64,
-    pub xp_needed: i64,
     #[serde(default)]
     pub xp_text: i64,
     #[serde(default)]
@@ -86,14 +75,14 @@ pub struct UserLevelResponse {
     pub xp_voice_current: i64,
     #[serde(default)]
     pub xp_voice_needed: i64,
-    #[serde(default)]
-    pub streak_current: Option<i32>,
-    #[serde(default)]
-    pub streak_best: Option<i32>,
 }
 
 
 /// Reponse a un fait d'activite (texte/vocal) : l'API a calcule tout l'XP.
+///
+/// Le bot ne lit que `skipped` (anti-spam XP) ; `xp_gained` et
+/// `streak_current` sont renvoyes par l'API pour d'autres consommateurs et
+/// conserves ici pour refleter le contrat gRPC.
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct RecordActivityResponse {
@@ -105,16 +94,15 @@ pub struct RecordActivityResponse {
     pub streak_current: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct RankingEntry {
     pub user_id: String,
     pub xp: i64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct ForceRankingResponse {
     pub period_label: String,
-    #[serde(default)]
     pub note: Option<String>,
     pub text: Vec<RankingEntry>,
     pub voice: Vec<RankingEntry>,
@@ -124,13 +112,12 @@ pub struct ForceRankingResponse {
 // ── Client ──
 
 pub struct ApiClient {
-    base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
-        Self { base, grpc }
+    pub fn new(grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { grpc }
     }
 
     // ── Stats (gRPC) ──
@@ -193,20 +180,13 @@ impl ApiClient {
         };
         let overview = crate::grpc_call!(self.grpc, stats, get_guild_overview, req)?;
         Ok(GuildOverviewResponse {
-            guild_id: overview.guild_id,
             total_messages: overview.total_messages,
             total_voice_seconds: overview.total_voice_seconds,
-            total_voice_hours: overview.total_voice_seconds as f64 / 3600.0,
             active_members: overview.active_members,
             total_infractions: overview.total_infractions,
             total_warns: overview.total_warns,
             total_mutes: overview.total_mutes,
             total_bans: overview.total_bans,
-            top_members: overview
-                .top_members
-                .into_iter()
-                .map(proto_user_stats_to_response)
-                .collect(),
         })
     }
 
@@ -311,7 +291,11 @@ impl ApiClient {
             .collect())
     }
 
-    // ── HTTP legacy ──
+    // ── Services voisins (gRPC) ──
+    //
+    // Le classement mensuel appartient au domaine community, les infractions
+    // au domaine moderation : chacun est appele sur son propre service plutot
+    // que greffe sur `ProgressionService`.
 
     /// Force le calcul du classement mensuel cote API (bypass des gates).
     /// Renvoie les donnees ; le bot fait le rendu + le post Discord.
@@ -320,19 +304,51 @@ impl ApiClient {
         guild_id: &str,
         mois: &str,
     ) -> Result<ForceRankingResponse, String> {
-        self.base
-            .post_json(
-                "/api/analytics/force-monthly-ranking",
-                &serde_json::json!({ "guild_id": guild_id, "mois": mois }),
-            )
-            .await
+        let req = proto_community::ForceMonthlyRankingRequest {
+            guild_id: guild_id.to_string(),
+            mois: mois.to_string(),
+        };
+        let r = crate::grpc_call!(self.grpc, community, force_monthly_ranking, req)?;
+        Ok(ForceRankingResponse {
+            period_label: r.period_label,
+            note: r.note,
+            text: ranking_entries(r.text),
+            voice: ranking_entries(r.voice),
+            global: ranking_entries(r.global),
+        })
     }
 
-    pub async fn get_infractions(&self, guild_id: &str) -> Result<Vec<Infraction>, String> {
-        self.base
-            .get_json(&format!("/infractions/{guild_id}"))
-            .await
+    /// Compteurs d'infractions d'un membre, agreges cote serveur.
+    ///
+    /// L'ancienne route HTTP renvoyait le journal complet du serveur, que le
+    /// bot filtrait ensuite en memoire pour afficher quatre nombres.
+    pub async fn count_user_infractions(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<InfractionCounts, String> {
+        let req = proto_mod::CountUserInfractionsRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let c = crate::grpc_call!(self.grpc, moderation, count_user_infractions, req)?;
+        Ok(InfractionCounts {
+            warns: c.warns,
+            deletes: c.deletes,
+            mutes: c.mutes,
+            bans: c.bans,
+            total: c.total,
+        })
     }
+}
+
+fn ranking_entries(v: Vec<proto_community::RankingEntry>) -> Vec<RankingEntry> {
+    v.into_iter()
+        .map(|e| RankingEntry {
+            user_id: e.user_id,
+            xp: e.xp,
+        })
+        .collect()
 }
 
 // ── Helpers de conversion proto -> DTOs locaux ──
@@ -350,8 +366,6 @@ fn proto_user_level_to_response(u: proto_prog::UserLevel) -> UserLevelResponse {
         username: u.username,
         xp: u.xp,
         level: u.level,
-        xp_current: u.xp_current,
-        xp_needed: u.xp_needed,
         xp_text: u.xp_text,
         level_text: u.level_text,
         xp_text_current: u.xp_text_current,
@@ -360,8 +374,6 @@ fn proto_user_level_to_response(u: proto_prog::UserLevel) -> UserLevelResponse {
         level_voice: u.level_voice,
         xp_voice_current: u.xp_voice_current,
         xp_voice_needed: u.xp_voice_needed,
-        streak_current: None,
-        streak_best: None,
     }
 }
 
@@ -377,8 +389,6 @@ fn proto_record_activity_to_response(
                 username: String::new(),
                 xp: 0,
                 level: 0,
-                xp_current: 0,
-                xp_needed: 0,
                 xp_text: 0,
                 level_text: 0,
                 xp_text_current: 0,
@@ -387,8 +397,6 @@ fn proto_record_activity_to_response(
                 level_voice: 0,
                 xp_voice_current: 0,
                 xp_voice_needed: 0,
-                streak_current: None,
-                streak_best: None,
             }),
         leveled_up: r.leveled_up,
         old_level_global: r.old_level_global,
@@ -400,13 +408,9 @@ fn proto_record_activity_to_response(
 
 fn proto_user_stats_to_response(u: proto_stats::UserStats) -> UserStatsResponse {
     UserStatsResponse {
-        guild_id: u.guild_id,
-        user_id: u.user_id,
         username: u.username,
         message_count: u.message_count,
         voice_seconds: u.voice_seconds,
-        voice_hours: u.voice_seconds as f64 / 3600.0,
-        updated_at: u.updated_at,
     }
 }
 

@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use crate::ports::outbound::community::announcement_repository::AnnouncementRepository;
+use sentinel_core::ports::outbound::community::announcement_repository::AnnouncementRepository;
 use sentinel_core::domain::entities::community::announcement::{
     AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType, RecurrenceType, RunStatus,
     ScheduledAnnouncement,

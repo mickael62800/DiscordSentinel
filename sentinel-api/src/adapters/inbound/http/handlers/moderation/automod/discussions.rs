@@ -8,7 +8,7 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 use crate::adapters::inbound::http::validation;
 
 use super::dto::DiscussionChannelDto;
@@ -17,7 +17,7 @@ use super::dto::DiscussionMessageDto;
 /// GET /api/automod/reviews/{review_id}/discussion
 /// Retourne le salon de discussion existant (ou `null`).
 pub async fn get_discussion(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path(review_id): Path<String>,
 ) -> Result<Json<Option<DiscussionChannelDto>>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -31,7 +31,7 @@ pub async fn get_discussion(
 /// Purge l'enregistrement du salon (le salon Discord a ete supprime a la
 /// main) afin de pouvoir en rouvrir un neuf. Idempotent.
 pub async fn delete_discussion(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path(review_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -60,11 +60,11 @@ pub struct OpenDiscussionBody {
 /// Enregistre (idempotent) un salon de discussion apres application de la
 /// regle d'acces (`can_open_discussion`). `403` si non autorise.
 pub async fn open_discussion(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path(review_id): Path<String>,
     Json(body): Json<OpenDiscussionBody>,
 ) -> Result<Json<DiscussionChannelDto>, ApiError> {
-    use crate::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand;
+    use sentinel_core::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand;
     use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
 
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
@@ -126,7 +126,7 @@ pub struct AppendDiscussionMessagesBody {
 /// POST /api/automod/reviews/{review_id}/discussion/messages
 /// Persiste un lot de messages du salon (appele par le bot a l'archivage).
 pub async fn append_discussion_messages(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path(review_id): Path<String>,
     Json(body): Json<AppendDiscussionMessagesBody>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -171,7 +171,7 @@ pub struct CleanupCardsQuery {
 /// `automod_card_expired` (le bot supprime le message) et retire le mapping.
 /// La review + le transcript restent en DB (trace web conservee).
 pub async fn cleanup_expired_cards(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Query(q): Query<CleanupCardsQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Le use case trouve les cartes expirees et retire leur mapping ; le
@@ -208,7 +208,7 @@ pub async fn cleanup_expired_cards(
 /// GET /api/automod/reviews/{review_id}/discussion/messages
 /// Liste le transcript (trace) pour affichage web.
 pub async fn list_discussion_messages(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path(review_id): Path<String>,
 ) -> Result<Json<Vec<DiscussionMessageDto>>, ApiError> {
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;

@@ -102,6 +102,8 @@ const SELECT_COLS: &str = "id, guild_id, template_id, name, status, container_id
 #[async_trait]
 impl GameServerRepository for PgGameServerRepository {
     async fn create(&self, new: NewGameServer) -> Result<GameServer, DomainError> {
+        let mut tx = self.pool.begin().await.map_err(pg_ctx("tx begin"))?;
+        
         let row: ServerRow = sqlx::query_as(&format!(
             "INSERT INTO game_servers \
                  (guild_id, template_id, name, allocated_memory_mb, cpu_limit, owner_user_id, idle_shutdown_days) \
@@ -115,15 +117,31 @@ impl GameServerRepository for PgGameServerRepository {
         .bind(new.cpu_limit)
         .bind(&new.owner_user_id)
         .bind(new.idle_shutdown_days)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await
         .map_err(pg_ctx("create game_server"))?;
+        
+        for (key, value) in &new.initial_config {
+            sqlx::query(
+                "INSERT INTO game_server_configs (server_id, config_key, config_value, updated_by) \
+                 VALUES ($1, $2, $3, $4)",
+            )
+            .bind(row.id)
+            .bind(key)
+            .bind(value)
+            .bind(&new.owner_user_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(pg_ctx("create game_server_configs"))?;
+        }
+        
+        tx.commit().await.map_err(pg_ctx("tx commit"))?;
         GameServer::try_from(row)
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<Option<GameServer>, DomainError> {
         let row: Option<ServerRow> = sqlx::query_as(&format!(
-            "SELECT {SELECT_COLS} FROM game_servers WHERE id = $1 AND deleted_at IS NULL"
+            "SELECT {SELECT_COLS} FROM game_servers WHERE id = $1 AND deleted_at IS NULL AND status != 'deleted'"
         ))
         .bind(id)
         .fetch_optional(&self.pool)
@@ -135,7 +153,7 @@ impl GameServerRepository for PgGameServerRepository {
     async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<GameServer>, DomainError> {
         let rows: Vec<ServerRow> = sqlx::query_as(&format!(
             "SELECT {SELECT_COLS} FROM game_servers \
-             WHERE guild_id = $1 AND deleted_at IS NULL ORDER BY created_at DESC"
+             WHERE guild_id = $1 AND deleted_at IS NULL AND status != 'deleted' ORDER BY created_at DESC"
         ))
         .bind(guild_id)
         .fetch_all(&self.pool)

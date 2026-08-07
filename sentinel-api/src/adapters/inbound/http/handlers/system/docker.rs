@@ -22,7 +22,7 @@ use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 use sentinel_core::domain::entities::system::docker_host::compute_overview;
 
 /// Helper d'audit log pour les actions Docker destructives.
@@ -32,7 +32,7 @@ use sentinel_core::domain::entities::system::docker_host::compute_overview;
 /// Logue en `tracing::info` ET en BDD `server_events` pour qu'il soit visible
 /// sur la page Securite serveur.
 fn audit_docker(
-    state: &AppState,
+    state: &SystemState,
     user: &Option<Extension<WebUser>>,
     action: &str,
     target: &str,
@@ -154,7 +154,7 @@ pub struct PruneResultDto {
 
 // ── Overview (df + version) ───────────────────────────────────────────────
 
-pub async fn get_overview(State(state): State<AppState>) -> Result<Json<OverviewDto>, ApiError> {
+pub async fn get_overview(State(state): State<SystemState>) -> Result<Json<OverviewDto>, ApiError> {
     let info = state.docker_host.version_info().await?;
     let usage = state.docker_host.disk_usage().await?;
     let agg = compute_overview(&usage);
@@ -192,7 +192,7 @@ pub struct ListContainersQuery {
 }
 
 pub async fn list_containers(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Query(q): Query<ListContainersQuery>,
 ) -> Result<Json<Vec<ContainerDto>>, ApiError> {
@@ -226,7 +226,7 @@ pub async fn list_containers(
 }
 
 pub async fn start_container(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -242,7 +242,7 @@ pub struct StopQuery {
 }
 
 pub async fn stop_container(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<StopQuery>,
@@ -256,7 +256,7 @@ pub async fn stop_container(
 }
 
 pub async fn restart_container(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<StopQuery>,
@@ -278,7 +278,7 @@ pub struct RemoveContainerQuery {
 }
 
 pub async fn remove_container(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<RemoveContainerQuery>,
@@ -305,7 +305,7 @@ pub struct LogsDto {
 }
 
 pub async fn container_logs(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<LogsQuery>,
@@ -320,7 +320,7 @@ pub async fn container_logs(
 
 // ── Images ────────────────────────────────────────────────────────────────
 
-pub async fn list_images(State(state): State<AppState>) -> Result<Json<Vec<ImageDto>>, ApiError> {
+pub async fn list_images(State(state): State<SystemState>) -> Result<Json<Vec<ImageDto>>, ApiError> {
     let list = state.docker_host.list_images().await?;
     let out: Vec<ImageDto> = list
         .into_iter()
@@ -352,7 +352,7 @@ pub struct RemoveImageQuery {
 }
 
 pub async fn remove_image(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<String>,
     Query(q): Query<RemoveImageQuery>,
@@ -367,7 +367,7 @@ pub async fn remove_image(
 
 // ── Volumes ───────────────────────────────────────────────────────────────
 
-pub async fn list_volumes(State(state): State<AppState>) -> Result<Json<Vec<VolumeDto>>, ApiError> {
+pub async fn list_volumes(State(state): State<SystemState>) -> Result<Json<Vec<VolumeDto>>, ApiError> {
     let list = state.docker_host.list_volumes().await?;
     let out: Vec<VolumeDto> = list
         .into_iter()
@@ -385,7 +385,7 @@ pub async fn list_volumes(State(state): State<AppState>) -> Result<Json<Vec<Volu
 }
 
 pub async fn remove_volume(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Path(name): Path<String>,
     Query(q): Query<RemoveImageQuery>,
@@ -401,7 +401,7 @@ pub async fn remove_volume(
 // ── Networks ──────────────────────────────────────────────────────────────
 
 pub async fn list_networks(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<Vec<NetworkDto>>, ApiError> {
     let list = state.docker_host.list_networks().await?;
@@ -431,7 +431,7 @@ fn prune_dto(
 }
 
 pub async fn prune_containers(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
     audit_docker(&state, &user, "prune.containers", "*");
@@ -448,7 +448,7 @@ pub struct PruneImagesQuery {
 }
 
 pub async fn prune_images(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Query(q): Query<PruneImagesQuery>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
@@ -470,7 +470,7 @@ pub async fn prune_images(
 }
 
 pub async fn prune_volumes(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
     audit_docker(&state, &user, "prune.volumes", "*");
@@ -479,7 +479,7 @@ pub async fn prune_volumes(
 }
 
 pub async fn prune_networks(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
     audit_docker(&state, &user, "prune.networks", "*");
@@ -507,7 +507,7 @@ pub struct PruneSystemQuery {
 /// POST /api/docker/prune/system — prune complet (containers + images + networks
 /// + volumes optionnels). Equivalent `docker system prune` cote CLI.
 pub async fn prune_system(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Query(q): Query<PruneSystemQuery>,
 ) -> Result<Json<PruneSystemDto>, ApiError> {
@@ -557,7 +557,7 @@ pub struct PruneBuildCacheQuery {
 
 /// POST /api/docker/prune/build-cache — purge le build cache Docker (buildkit).
 pub async fn prune_build_cache(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     user: Option<Extension<WebUser>>,
     Query(q): Query<PruneBuildCacheQuery>,
 ) -> Result<Json<PruneResultDto>, ApiError> {

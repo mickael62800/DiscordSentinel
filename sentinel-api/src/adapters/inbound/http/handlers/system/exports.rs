@@ -17,7 +17,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 use crate::adapters::inbound::http::validation;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::errors::DomainError;
@@ -83,7 +83,7 @@ impl From<ExportJobRecord> for ExportJobStatusDto {
 /// Gated `Moderator+` via `require_role_for_guild` (body-based : le guild_id
 /// n'est pas dans l'URL).
 pub async fn create_export_job(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     Json(dto): Json<CreateExportJobDto>,
 ) -> Result<(StatusCode, Json<ExportJobCreatedDto>), ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
@@ -129,7 +129,7 @@ pub async fn create_export_job(
 
 /// GET /api/exports/jobs/{id} — statut + resultat (si done).
 pub async fn get_export_job(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     Path(id): Path<String>,
 ) -> Result<Json<ExportJobStatusDto>, ApiError> {
     let uuid = validation::parse_uuid("job_id", &id).map_err(ApiError)?;

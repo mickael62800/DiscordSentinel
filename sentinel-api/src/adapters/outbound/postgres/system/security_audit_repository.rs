@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 use super::super::pg_err_ctx;
-use crate::ports::outbound::system::security_audit_repository::SecurityAuditRepository;
+use sentinel_core::ports::outbound::system::security_audit_repository::SecurityAuditRepository;
 use sentinel_core::domain::entities::system::security_audit::{
     AuditLogEntry, AuditLogFilter, CleanupOptions, CleanupReport, SuccessfulLogin,
 };

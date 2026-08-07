@@ -43,12 +43,6 @@ pub fn handles_modal(cid: &str) -> bool {
         || cid.starts_with(CID_REPORT_MODAL_PREFIX)
 }
 
-#[allow(dead_code)]
-pub fn handles_command(name: &str) -> bool {
-    matches!(name, "confess" | "confess-admin")
-}
-
-#[allow(dead_code)]
 pub fn register_commands() -> Vec<CreateCommand> {
     vec![
         CreateCommand::new("confess")

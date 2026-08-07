@@ -10,9 +10,9 @@ use tonic::Response;
 use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
-use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
-use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use sentinel_core::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
+use sentinel_core::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use sentinel_core::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
 use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
 use sentinel_core::domain::services::audit::security_analyzer::JoinInfo;
 pub struct SecurityGrpc {

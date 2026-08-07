@@ -113,6 +113,7 @@ pub struct NewGameServer {
     pub cpu_limit: Option<f64>,
     pub owner_user_id: String,
     pub idle_shutdown_days: Option<i32>,
+    pub initial_config: std::collections::HashMap<String, String>,
 }
 
 /// Maj des champs runtime (apres allocation Docker).

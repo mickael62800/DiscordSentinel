@@ -68,7 +68,6 @@ pub struct BumpProvider {
     /// Action recompensee (bump ou vote) pour les annonces/rappels.
     pub action: BumpAction,
     /// Cooldown par defaut en minutes (indicatif ; l'API tranche).
-    #[allow(dead_code)]
     pub default_cooldown_min: i64,
     /// Discrimine l'ACTION : ce message correspond-il a ce provider ?
     /// (le meme bot DiscordL poste bump ET vote — on tranche sur le titre).

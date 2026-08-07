@@ -7,13 +7,19 @@
 
 use std::sync::Arc;
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
 use sentinel_proto::members::v1 as proto_members;
 use sentinel_proto::welcome::v1 as proto_welcome;
 
 #[derive(Debug)]
+/// Miroir de la config welcome renvoyee par l'API.
+///
+/// TODO(mort) : les 6 champs `anniversary_*` ne sont lus par AUCUN handler du
+/// bot — la fonctionnalite `anniversaire d'arrivee` est configurable cote web
+/// mais n'est jamais rendue sur Discord. Meme classe de probleme que la
+/// sauvegarde automatique de `guild_backup`. Champs conserves : ils
+/// documentent le contrat de l'API.
 #[allow(dead_code)]
 pub struct WelcomeConfig {
     pub guild_id: String,
@@ -111,14 +117,12 @@ impl From<proto_welcome::WelcomeConfig> for WelcomeConfig {
 
 pub struct WelcomeApiClient {
     // Conserve pour compat TypeMap (heartbeat reste HTTP).
-    #[allow(dead_code)]
-    pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
 
 impl WelcomeApiClient {
-    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
-        Self { base, grpc }
+    pub fn new(grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { grpc }
     }
 
     /// gRPC `WelcomeService.GetConfig` (Phase 7A.opt F.4).

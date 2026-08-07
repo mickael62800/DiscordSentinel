@@ -46,39 +46,39 @@ use sentinel_api::adapters::inbound::grpc::community::roles::RolePanelsGrpc;
 use sentinel_api::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
 use sentinel_api::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
 use sentinel_api::adapters::outbound::ws::broadcaster::EventBroadcaster;
-use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
-use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
-use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
-use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
-use sentinel_api::ports::inbound::audit::manage_security::ManageSecurityUseCase;
-use sentinel_api::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
-use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
-use sentinel_api::ports::inbound::audit::manage_stats::RecordMessagesCommand;
-use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
-use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
-use sentinel_api::ports::inbound::community::manage_levels::AddXpResult;
-use sentinel_api::ports::inbound::community::manage_levels::ManageLevelsUseCase;
-use sentinel_api::ports::inbound::community::manage_members::ManageMembersUseCase;
-use sentinel_api::ports::inbound::community::manage_members::RegisterMemberCommand;
-use sentinel_api::ports::inbound::community::manage_members::SyncMembersCommand;
-use sentinel_api::ports::inbound::community::manage_members::UpdateMemberCommand;
-use sentinel_api::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
-use sentinel_api::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
-use sentinel_api::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
-use sentinel_api::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
-use sentinel_api::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
-use sentinel_api::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
-use sentinel_api::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
-use sentinel_api::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
-use sentinel_api::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
-use sentinel_api::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
-use sentinel_api::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
-use sentinel_api::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
-use sentinel_api::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
-use sentinel_api::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
-use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
-use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use sentinel_core::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use sentinel_core::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use sentinel_core::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use sentinel_core::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpCommand;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpResult;
+use sentinel_core::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use sentinel_core::ports::inbound::community::manage_members::ManageMembersUseCase;
+use sentinel_core::ports::inbound::community::manage_members::RegisterMemberCommand;
+use sentinel_core::ports::inbound::community::manage_members::SyncMembersCommand;
+use sentinel_core::ports::inbound::community::manage_members::UpdateMemberCommand;
+use sentinel_core::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
+use sentinel_core::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
+use sentinel_core::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use sentinel_core::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
+use sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use sentinel_core::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use sentinel_core::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
@@ -193,21 +193,21 @@ impl AnalyzeMessageUseCase for MockAnalyzeMessage {
         &self,
         _: &str,
         _: i32,
-    ) -> Result<sentinel_api::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
         unimplemented!()
     }
     async fn evaluate_attachments(
         &self,
         _: &str,
         _: Vec<String>,
-    ) -> Result<sentinel_api::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError>
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError>
     {
         unimplemented!()
     }
     async fn evaluate_caps(
         &self,
         _: &str,
-    ) -> Result<sentinel_api::ports::inbound::ai::analyze_message::CapsDecision, DomainError> {
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::CapsDecision, DomainError> {
         unimplemented!()
     }
 }
@@ -217,6 +217,9 @@ async fn automod_analyze_returns_action_for_flagged_message() {
     let svc = AutomodServiceServer::new(AutomodGrpc {
         uc: Arc::new(MockAnalyzeMessage),
         broadcaster: Arc::new(EventBroadcaster::new()),
+        // Ce test e2e couvre `AnalyzeMessage` ; la persistance du slowmode
+        // adaptatif est testee au niveau du handler.
+        adaptive_slowmode_repo: Arc::new(StubSlowmodeRepo),
     });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = AutomodServiceClient::connect(Endpoint::from_shared(url).unwrap())
@@ -369,8 +372,8 @@ impl ManageSecurityUseCase for MockSecurityUc {
     }
     async fn analyze_new_member(
         &self,
-        _: sentinel_api::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand,
-    ) -> Result<sentinel_api::ports::inbound::audit::manage_security::SecurityDecision, DomainError>
+        _: sentinel_core::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand,
+    ) -> Result<sentinel_core::ports::inbound::audit::manage_security::SecurityDecision, DomainError>
     {
         unimplemented!()
     }
@@ -624,8 +627,26 @@ impl ManageModerationUseCase for MockModerationUc {
 
 struct MockCopilotUc;
 
+/// Stub d'annulation : ce fichier e2e ne couvre pas cancel_action.
+struct MockCancelUc;
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::cancel_action::CancelModerationActionUseCase
+    for MockCancelUc
+{
+    async fn cancel(
+        &self,
+        _action_id: uuid::Uuid,
+    ) -> Result<
+        sentinel_core::ports::inbound::moderation::cancel_action::CancelOutcome,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        Ok(sentinel_core::ports::inbound::moderation::cancel_action::CancelOutcome::NotFound)
+    }
+}
+
 #[async_trait]
-impl sentinel_api::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase
+impl sentinel_core::ports::inbound::moderation::moderation_copilot::ModerationCopilotUseCase
     for MockCopilotUc
 {
     async fn get_member_context(
@@ -661,12 +682,12 @@ impl sentinel_api::ports::inbound::moderation::moderation_copilot::ModerationCop
 struct MockRemindersUc;
 
 #[async_trait]
-impl sentinel_api::ports::inbound::moderation::manage_reminders::ManageRemindersUseCase
+impl sentinel_core::ports::inbound::moderation::manage_reminders::ManageRemindersUseCase
     for MockRemindersUc
 {
     async fn create_reminder(
         &self,
-        _: sentinel_api::ports::inbound::moderation::manage_reminders::CreateReminderCommand,
+        _: sentinel_core::ports::inbound::moderation::manage_reminders::CreateReminderCommand,
     ) -> Result<
         sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder,
         DomainError,
@@ -702,7 +723,16 @@ impl sentinel_api::ports::inbound::moderation::manage_reminders::ManageReminders
 async fn moderation_log_action_and_get_history() {
     let svc = ModerationServiceServer::new(ModerationGrpc {
         moderation_uc: Arc::new(MockModerationUc),
-        reminders_uc: Arc::new(MockRemindersUc),
+        // Ce test e2e couvre `log_action` et `get_history` ; l'annulation est
+        // testee au niveau du service qui la porte.
+        cancel_action_uc: Arc::new(MockCancelUc),
+        assess_target_risk_uc: Arc::new(MockAssessRiskUc),
+        modstats_uc: Arc::new(MockModstatsUc),
+        notes_uc: Arc::new(MockNotesUc),
+        evidence_repo: Arc::new(MockEvidenceRepo),
+        review_repo: Arc::new(MockReviewRepo),
+        pending_action_repo: Arc::new(MockPendingActionRepo),
+        infractions_uc: Arc::new(MockInfractionsUc),        reminders_uc: Arc::new(MockRemindersUc),
         moderation_copilot_uc: Arc::new(MockCopilotUc),
     });
     let (url, shutdown) = spawn_one_service!(svc);
@@ -854,18 +884,18 @@ struct MockLevelsUc;
 impl ManageLevelsUseCase for MockLevelsUc {
     async fn record_text_activity(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_levels::RecordTextActivityCommand,
+        _: sentinel_core::ports::inbound::community::manage_levels::RecordTextActivityCommand,
     ) -> Result<
-        sentinel_api::ports::inbound::community::manage_levels::RecordActivityResult,
+        sentinel_core::ports::inbound::community::manage_levels::RecordActivityResult,
         DomainError,
     > {
         unimplemented!()
     }
     async fn record_voice_activity(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_levels::RecordVoiceActivityCommand,
+        _: sentinel_core::ports::inbound::community::manage_levels::RecordVoiceActivityCommand,
     ) -> Result<
-        sentinel_api::ports::inbound::community::manage_levels::RecordActivityResult,
+        sentinel_core::ports::inbound::community::manage_levels::RecordActivityResult,
         DomainError,
     > {
         unimplemented!()
@@ -909,7 +939,7 @@ impl ManageLevelsUseCase for MockLevelsUc {
     }
     async fn set_user_xp(
         &self,
-        _: sentinel_api::ports::inbound::community::manage_levels::SetUserXpCommand,
+        _: sentinel_core::ports::inbound::community::manage_levels::SetUserXpCommand,
     ) -> Result<UserLevel, DomainError> {
         unimplemented!()
     }
@@ -917,7 +947,7 @@ impl ManageLevelsUseCase for MockLevelsUc {
         &self,
         _: &str,
         _: &str,
-        _: sentinel_api::ports::inbound::community::manage_levels::ResetTarget,
+        _: sentinel_core::ports::inbound::community::manage_levels::ResetTarget,
     ) -> Result<UserLevel, DomainError> {
         unimplemented!()
     }
@@ -1375,4 +1405,296 @@ async fn voice_channels_list_and_create_round_trip() {
     assert_eq!(created.visibility, "public");
 
     let _ = shutdown.send(());
+}
+
+// ── Doubles pour les ports non exerces par ce test e2e ──
+//
+// ModerationGrpc porte desormais dix ports (annulation, risque, statistiques,
+// notes, preuves, relecture, actions en attente). Ce test ne couvre que
+// log_action / get_history ; les autres ports sont cables sur des doubles
+// qui echouent bruyamment si un test venait a les emprunter sans etre ecrit
+// pour.
+#[derive(Default)]
+struct MockAssessRiskUc;
+#[derive(Default)]
+struct MockModstatsUc;
+#[derive(Default)]
+struct MockNotesUc;
+#[derive(Default)]
+struct MockEvidenceRepo;
+#[derive(Default)]
+struct MockReviewRepo;
+#[derive(Default)]
+struct MockPendingActionRepo;
+#[derive(Default)]
+struct MockInfractionsUc;
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::assess_target_risk::AssessTargetRiskUseCase
+    for MockAssessRiskUc
+{
+    async fn assess(
+        &self,
+        _cmd: sentinel_core::ports::inbound::moderation::assess_target_risk::AssessTargetRiskCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::moderation::target_risk::TargetRiskDecision,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("assess_target_risk non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::read_modstats::ReadModstatsUseCase
+    for MockModstatsUc
+{
+    async fn modstats(
+        &self,
+        _guild_id: &str,
+        _days: i32,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::modstats::ModeratorBreakdown>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("modstats non exerce par ces tests")
+    }
+    async fn modstats_trend(
+        &self,
+        _guild_id: &str,
+        _days: i32,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::modstats::ModstatsTrendDay>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("modstats_trend non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::manage_notes::ManageNotesUseCase for MockNotesUc {
+    async fn add_note(
+        &self,
+        _cmd: sentinel_core::ports::inbound::moderation::manage_notes::AddNoteCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::moderation::user_note::UserNote,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("add_note non exerce par ces tests")
+    }
+    async fn get_notes(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::user_note::UserNote>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("get_notes non exerce par ces tests")
+    }
+    async fn delete_note(
+        &self,
+        _note_id: &str,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
+        unimplemented!("delete_note non exerce par ces tests")
+    }
+    async fn note_guild_id(
+        &self,
+        _note_id: &str,
+    ) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("note_guild_id non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::outbound::moderation::evidence_repository::EvidenceRepository
+    for MockEvidenceRepo
+{
+    async fn add(
+        &self,
+        _action_id: uuid::Uuid,
+        _url: &str,
+        _description: Option<&str>,
+        _uploaded_by: &str,
+        _uploaded_by_name: &str,
+    ) -> Result<
+        sentinel_core::ports::outbound::moderation::evidence_repository::EvidenceEntry,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("evidence add non exerce par ces tests")
+    }
+    async fn list(
+        &self,
+        _action_id: uuid::Uuid,
+    ) -> Result<
+        Vec<sentinel_core::ports::outbound::moderation::evidence_repository::EvidenceEntry>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("evidence list non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::outbound::moderation::review_repository::ReviewRepository
+    for MockReviewRepo
+{
+    async fn add(
+        &self,
+        _action_id: uuid::Uuid,
+        _guild_id: &str,
+        _added_by: &str,
+        _added_by_name: &str,
+        _reason: Option<&str>,
+    ) -> Result<
+        sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("review add non exerce par ces tests")
+    }
+    async fn list_pending(
+        &self,
+        _guild_id: &str,
+    ) -> Result<
+        Vec<sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("review list_pending non exerce par ces tests")
+    }
+    async fn resolve(
+        &self,
+        _review_id: uuid::Uuid,
+        _reviewer_id: &str,
+        _reviewer_name: &str,
+        _notes: Option<&str>,
+        _status: &str,
+    ) -> Result<bool, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("review resolve non exerce par ces tests")
+    }
+    async fn get_guild_id(
+        &self,
+        _review_id: uuid::Uuid,
+    ) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("review get_guild_id non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::outbound::moderation::pending_action_repository::PendingActionRepository
+    for MockPendingActionRepo
+{
+    #[allow(clippy::too_many_arguments)]
+    async fn create(
+        &self,
+        _guild_id: &str,
+        _moderator_id: &str,
+        _moderator_name: &str,
+        _target_id: &str,
+        _target_name: &str,
+        _action_type: &str,
+        _reason: &str,
+        _gravity: Option<&str>,
+        _duration: Option<i64>,
+    ) -> Result<uuid::Uuid, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("pending create non exerce par ces tests")
+    }
+    async fn list_pending(
+        &self,
+        _guild_id: &str,
+    ) -> Result<
+        Vec<sentinel_core::ports::outbound::moderation::pending_action_repository::PendingAction>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("pending list non exerce par ces tests")
+    }
+    async fn get_guild_id(
+        &self,
+        _id: uuid::Uuid,
+    ) -> Result<Option<String>, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("pending get_guild_id non exerce par ces tests")
+    }
+    async fn resolve(
+        &self,
+        _id: uuid::Uuid,
+        _status: &str,
+        _reviewed_by: &str,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
+        unimplemented!("pending resolve non exerce par ces tests")
+    }
+}
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase
+    for MockInfractionsUc
+{
+    async fn count_user_infractions(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<
+        sentinel_core::ports::inbound::moderation::manage_infractions::UserInfractionCounts,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("count_user_infractions non exerce par ces tests")
+    }
+    async fn list_infractions(
+        &self,
+        _guild_id: &str,
+        _filters: sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::infraction::Infraction>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("list_infractions non exerce par ces tests")
+    }
+    async fn list_all_infractions(
+        &self,
+        _limit: i64,
+        _offset: i64,
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::moderation::infraction::Infraction>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("list_all_infractions non exerce par ces tests")
+    }
+    async fn count_today(&self) -> Result<u64, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("count_today non exerce par ces tests")
+    }
+    async fn find_by_id(
+        &self,
+        _id: &str,
+    ) -> Result<
+        Option<sentinel_core::domain::entities::moderation::infraction::Infraction>,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("find_by_id non exerce par ces tests")
+    }
+    async fn delete_infraction(
+        &self,
+        _id: &str,
+    ) -> Result<bool, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("delete_infraction non exerce par ces tests")
+    }
+    async fn delete_older_than_days(
+        &self,
+        _guild_id: &str,
+        _days: i32,
+    ) -> Result<u64, sentinel_core::domain::errors::DomainError> {
+        unimplemented!("delete_older_than_days non exerce par ces tests")
+    }
+}
+
+struct StubSlowmodeRepo;
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::outbound::moderation::adaptive_slowmode_repository::AdaptiveSlowmodeRepository
+    for StubSlowmodeRepo
+{
+    async fn mark(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        unimplemented!("slowmode adaptatif non exerce par ce test e2e")
+    }
+    async fn unmark(&self, _: &str) -> Result<(), DomainError> {
+        unimplemented!("slowmode adaptatif non exerce par ce test e2e")
+    }
+    async fn list_all(&self) -> Result<Vec<(String, String)>, DomainError> {
+        unimplemented!("slowmode adaptatif non exerce par ce test e2e")
+    }
 }

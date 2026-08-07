@@ -164,7 +164,6 @@ impl LockdownManager {
     }
 
     /// Desactive le lockdown en restaurant les permissions.
-    #[allow(dead_code)]
     pub async fn deactivate(&self, ctx: &Context, guild_id: GuildId) {
         self.deactivate_with_http(&ctx.http, guild_id).await;
     }
@@ -217,7 +216,6 @@ impl LockdownManager {
     }
 
     /// Verifie si le lockdown est actif pour un serveur.
-    #[allow(dead_code)]
     pub fn is_active(&self, guild_id: GuildId) -> bool {
         self.active.contains_key(&guild_id)
     }

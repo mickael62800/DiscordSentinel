@@ -103,10 +103,10 @@ fn parse_rfc3339_invalid_returns_invalid_argument() {
 
 // ── RPC tests avec mock ──
 
-use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
-use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
-use crate::ports::inbound::community::manage_members::SyncMembersCommand;
-use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
+use sentinel_core::ports::inbound::community::manage_members::ManageMembersUseCase;
+use sentinel_core::ports::inbound::community::manage_members::RegisterMemberCommand;
+use sentinel_core::ports::inbound::community::manage_members::SyncMembersCommand;
+use sentinel_core::ports::inbound::community::manage_members::UpdateMemberCommand;
 use async_trait::async_trait;
 use sentinel_core::domain::entities::community::guild_member::MemberSummary;
 use sentinel_core::domain::errors::DomainError;

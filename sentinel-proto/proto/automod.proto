@@ -20,6 +20,15 @@ service AutomodService {
   // La detection reste locale (rate/forme) mais le SCORE affiche est fabrique
   // cote serveur : le bot ne l'invente plus (avant : 0.8 code en dur).
   rpc EvaluateCaps(EvaluateCapsRequest) returns (EvaluateCapsResponse);
+
+  // ── Slowmode adaptatif : persistance de l'ensemble actif ──
+  //
+  // Le tracker du bot est en memoire. Sans ce miroir cote API, un redemarrage
+  // laisserait les salons bloques en slowmode a vie : personne ne saurait
+  // plus lesquels doivent etre relaches.
+  rpc MarkAdaptiveSlowmode(AdaptiveSlowmodeChannel) returns (AdaptiveSlowmodeAck);
+  rpc UnmarkAdaptiveSlowmode(AdaptiveSlowmodeChannel) returns (AdaptiveSlowmodeAck);
+  rpc ListAdaptiveSlowmode(ListAdaptiveSlowmodeRequest) returns (ListAdaptiveSlowmodeResponse);
 }
 
 message EvaluateCapsRequest {
@@ -125,4 +134,20 @@ message AnalyzeMessageResponse {
   bool severe = 6;
   // Lien non autorise HORS image : suppression automatique immediate.
   bool auto_delete_link = 7;
+}
+
+// ── Slowmode adaptatif ──
+
+message AdaptiveSlowmodeChannel {
+  // Vide au retrait : la cle de suppression est le salon, unique en base.
+  string guild_id = 1;
+  string channel_id = 2;
+}
+
+message AdaptiveSlowmodeAck {}
+
+message ListAdaptiveSlowmodeRequest {}
+
+message ListAdaptiveSlowmodeResponse {
+  repeated AdaptiveSlowmodeChannel channels = 1;
 }

@@ -67,12 +67,12 @@ impl PlayWheelUseCase for PlayWheelService {
             ));
         }
 
-        // 1. Reservation atomique du tirage, selon le delai configure.
-        let claimed = self
+        // 1. Verification of cooldown BEFORE spinning (read-only)
+        if self
             .wheel_repo
-            .try_claim(&cmd.guild_id, &cmd.user_id, cfg.wheel_cooldown_hours)
-            .await?;
-        if !claimed {
+            .has_claimed_recently(&cmd.guild_id, &cmd.user_id, cfg.wheel_cooldown_hours)
+            .await?
+        {
             // Le message suit le delai reel : annoncer « aujourd'hui » alors
             // que le delai est de six heures serait faux.
             return Err(DomainError::Validation(if cfg.wheel_cooldown_hours >= 24 {
@@ -86,10 +86,6 @@ impl PlayWheelUseCase for PlayWheelService {
         }
 
         // 2. Spin RNG (entropie OS) sur les cases DU SERVEUR.
-        //
-        // Aucune case enregistree = roue historique. C'est ce qui permet a un
-        // serveur qui n'a jamais ouvert l'editeur de continuer a jouer
-        // exactement la meme roue qu'avant.
         let cases = {
             let personnalisees = self.wheel_repo.list_cases(&cmd.guild_id).await?;
             if personnalisees.is_empty() {
@@ -100,17 +96,11 @@ impl PlayWheelUseCase for PlayWheelService {
         };
         let mut rng = rand::rngs::StdRng::from_entropy();
         let outcome = spin_cases_with_rng(&cases, &mut rng).map_err(|e| {
-            // La roue du serveur est cassee : on le DIT, plutot que de tirer
-            // en douce sur la roue par defaut. Un tirage sur des cases que
-            // personne n'a choisies serait pire qu'une erreur.
             DomainError::Validation(format!("La roue de ce serveur est mal reglee : {e}"))
         })?;
-        // Le multiplicateur s'applique aux gains COMME aux pertes : ne
-        // multiplier que les gains transformerait la roue en distributeur.
         let payout = cfg.apply_payout(outcome.case.payout);
 
-        // 3. Wallet : regles pures de credit/debit (creation via le socle
-        // partage : solde de depart credite pour un nouveau joueur).
+        // 3. Wallet : regles pures de credit/debit en memoire.
         let mut wallet = get_or_create_wallet(
             self.wallet_repo.as_ref(),
             &cmd.guild_id,
@@ -119,35 +109,33 @@ impl PlayWheelUseCase for PlayWheelService {
         )
         .await?;
         wallet.username = cmd.username.clone();
-        if payout > 0 {
+
+        let mutation = if payout > 0 {
             wallet.credit(payout)?;
-            let mutation = WalletMutation {
+            Some(WalletMutation {
                 amount: payout,
                 balance_after: wallet.coins,
                 source: "wheel_payout".into(),
                 description: format!("Roue du Destin : {}", outcome.case.label),
                 reason: None,
-            };
-            self.wallet_repo
-                .save_with_transaction(&wallet, &mutation)
-                .await?;
+            })
         } else if payout < 0 {
             let actual = wallet.debit_clamped(-payout)?;
             if actual > 0 {
-                let mutation = WalletMutation {
+                Some(WalletMutation {
                     amount: -actual,
                     balance_after: wallet.coins,
                     source: "wheel_loss".into(),
                     description: format!("Roue du Destin : {}", outcome.case.label),
                     reason: None,
-                };
-                self.wallet_repo
-                    .save_with_transaction(&wallet, &mutation)
-                    .await?;
+                })
+            } else {
+                None
             }
-        }
+        } else {
+            None
+        };
 
-        // 4. Log du spin.
         let spin = WheelSpin {
             id: Uuid::new_v4(),
             guild_id: cmd.guild_id.clone(),
@@ -158,7 +146,30 @@ impl PlayWheelUseCase for PlayWheelService {
             payout,
             created_at: Utc::now(),
         };
-        self.wheel_repo.log_spin(&spin).await?;
+
+        // 4. Executer la transaction globale
+        let claimed = self
+            .wheel_repo
+            .execute_spin_transaction(
+                &cmd.guild_id,
+                &cmd.user_id,
+                cfg.wheel_cooldown_hours,
+                &spin,
+                &wallet,
+                mutation.as_ref(),
+            )
+            .await?;
+
+        if !claimed {
+            return Err(DomainError::Validation(if cfg.wheel_cooldown_hours >= 24 {
+                "Tu as deja tire la Roue du Destin aujourd'hui.".into()
+            } else {
+                format!(
+                    "Tu as deja tire la Roue. Reviens dans moins de {} h.",
+                    cfg.wheel_cooldown_hours
+                )
+            }));
+        }
 
         Ok(PlayWheelResult {
             is_memorable: is_memorable_case(&spin.case_key),

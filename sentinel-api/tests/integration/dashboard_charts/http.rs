@@ -16,7 +16,7 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
+use sentinel_core::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 use sentinel_core::domain::entities::community::daily_activity::DailyActivity;
 use sentinel_core::domain::errors::DomainError;
 

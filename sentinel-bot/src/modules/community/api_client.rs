@@ -11,7 +11,6 @@
 
 use std::sync::Arc;
 
-use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
 use serde::{Deserialize, Serialize};
 
@@ -21,26 +20,10 @@ use sentinel_proto::roles::v1 as proto;
 // ── DTOs (surface inchangee) ──
 
 /// Decision d'eligibilite renvoyee par l'API (role ou parrainage).
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct EligibilityDecision {
     pub allowed: bool,
-    #[serde(default)]
     pub reason: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct RoleEligibilityBody {
-    role_id: u64,
-    user_roles: Vec<u64>,
-    joined_at_unix: Option<i64>,
-}
-
-#[derive(Debug, Serialize)]
-struct SponsorshipEligibilityBody {
-    sponsor_id: u64,
-    sponsored_id: u64,
-    sponsor_joined_at_unix: Option<i64>,
-    sponsored_joined_at_unix: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -58,36 +41,24 @@ pub struct RolePanelDetail {
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct RolePanel {
     pub id: String,
-    pub guild_id: String,
-    pub channel_id: String,
     pub message_id: Option<String>,
     pub title: String,
     pub description: String,
-    pub mode: String,
-    pub max_roles: Option<i32>,
-    pub enabled: bool,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct RolePanelEntry {
-    pub id: String,
     pub role_id: String,
-    pub role_name: String,
     pub emoji: Option<String>,
     pub label: String,
     pub style: String,
-    pub position: i32,
 }
 
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct AutoRole {
     pub role_id: String,
-    pub role_name: String,
     pub delay_secs: i32,
     pub enabled: bool,
 }
@@ -106,21 +77,18 @@ pub struct SyncRole {
 }
 
 pub struct ApiClient {
-    // gRPC pour les appels metier (role panels + sponsorships + temp roles) ;
-    // HTTP (`base`) pour les DECISIONS d'eligibilite server-side + heartbeat.
-    pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
-        Self { base, grpc }
+    pub fn new(grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { grpc }
     }
 
-    // ── Eligibilite (HTTP) — DECISION server-side ──
+    // ── Eligibilite (gRPC) — DECISION server-side ──
 
-    /// POST /api/community/eligibility/{guild}/role — decide de l'eligibilite
-    /// au role. Le bot fournit les donnees Discord (roles actuels + join).
+    /// Decide de l'eligibilite au role. Le bot fournit les donnees Discord
+    /// (roles actuels + date de join) ; les prerequis vivent cote serveur.
     pub async fn check_role_eligibility(
         &self,
         guild_id: &str,
@@ -128,20 +96,21 @@ impl ApiClient {
         user_roles: Vec<u64>,
         joined_at_unix: Option<i64>,
     ) -> Result<EligibilityDecision, String> {
-        self.base
-            .post_json(
-                &format!("/api/community/eligibility/{guild_id}/role"),
-                &RoleEligibilityBody {
-                    role_id,
-                    user_roles,
-                    joined_at_unix,
-                },
-            )
-            .await
+        let req = proto_community::CheckRoleEligibilityRequest {
+            guild_id: guild_id.to_string(),
+            role_id,
+            user_roles,
+            joined_at_unix,
+        };
+        let d = crate::grpc_call!(self.grpc, community, check_role_eligibility, req)?;
+        Ok(EligibilityDecision {
+            allowed: d.allowed,
+            reason: d.reason,
+        })
     }
 
-    /// POST /api/community/eligibility/{guild}/sponsorship — valide un
-    /// parrainage (anti-self + seuils). Le bot fournit les `joined_at` Discord.
+    /// Valide un parrainage (anti-self + seuils). Le bot fournit les
+    /// `joined_at` Discord ; la regle et les seuils vivent cote serveur.
     pub async fn validate_sponsorship_eligibility(
         &self,
         guild_id: &str,
@@ -150,17 +119,18 @@ impl ApiClient {
         sponsor_joined_at_unix: Option<i64>,
         sponsored_joined_at_unix: Option<i64>,
     ) -> Result<EligibilityDecision, String> {
-        self.base
-            .post_json(
-                &format!("/api/community/eligibility/{guild_id}/sponsorship"),
-                &SponsorshipEligibilityBody {
-                    sponsor_id,
-                    sponsored_id,
-                    sponsor_joined_at_unix,
-                    sponsored_joined_at_unix,
-                },
-            )
-            .await
+        let req = proto_community::ValidateSponsorshipRequest {
+            guild_id: guild_id.to_string(),
+            sponsor_id,
+            sponsored_id,
+            sponsor_joined_at_unix,
+            sponsored_joined_at_unix,
+        };
+        let d = crate::grpc_call!(self.grpc, community, validate_sponsorship_eligibility, req)?;
+        Ok(EligibilityDecision {
+            allowed: d.allowed,
+            reason: d.reason,
+        })
     }
 
     // ── Role panels (gRPC) ──
@@ -310,26 +280,18 @@ impl ApiClient {
 fn proto_panel_to_dto(p: proto::RolePanel) -> RolePanel {
     RolePanel {
         id: p.id,
-        guild_id: p.guild_id,
-        channel_id: p.channel_id,
         message_id: p.message_id,
         title: p.title,
         description: p.description,
-        mode: p.mode,
-        max_roles: p.max_roles,
-        enabled: p.enabled,
     }
 }
 
 fn proto_entry_to_dto(e: proto::RolePanelEntry) -> RolePanelEntry {
     RolePanelEntry {
-        id: e.id,
         role_id: e.role_id,
-        role_name: e.role_name,
         emoji: e.emoji,
         label: e.label,
         style: e.style,
-        position: e.position,
     }
 }
 
@@ -337,14 +299,9 @@ fn proto_detail_to_dto(d: proto::RolePanelDetail) -> RolePanelDetail {
     RolePanelDetail {
         panel: d.panel.map(proto_panel_to_dto).unwrap_or(RolePanel {
             id: String::new(),
-            guild_id: String::new(),
-            channel_id: String::new(),
             message_id: None,
             title: String::new(),
             description: String::new(),
-            mode: String::new(),
-            max_roles: None,
-            enabled: false,
         }),
         entries: d.entries.into_iter().map(proto_entry_to_dto).collect(),
     }
@@ -353,7 +310,6 @@ fn proto_detail_to_dto(d: proto::RolePanelDetail) -> RolePanelDetail {
 fn proto_auto_role_to_dto(r: proto::AutoRole) -> AutoRole {
     AutoRole {
         role_id: r.role_id,
-        role_name: r.role_name,
         delay_secs: r.delay_secs,
         enabled: r.enabled,
     }

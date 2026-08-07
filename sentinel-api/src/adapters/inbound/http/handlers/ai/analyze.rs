@@ -4,11 +4,11 @@ use axum::Json;
 use crate::adapters::inbound::http::dto::ai::analyze::AnalyzeRequestDto;
 use crate::adapters::inbound::http::dto::ai::analyze::AnalyzeResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::AiState;
 use crate::adapters::inbound::http::validation;
 
 pub async fn analyze(
-    State(state): State<AppState>,
+    State(state): State<AiState>,
     Json(dto): Json<AnalyzeRequestDto>,
 ) -> Result<Json<AnalyzeResponseDto>, ApiError> {
     // Validation

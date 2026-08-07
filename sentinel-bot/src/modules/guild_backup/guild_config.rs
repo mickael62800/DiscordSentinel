@@ -5,7 +5,6 @@
 //! Consommee surtout par le chemin EVENT (pilotage web) pour decider si le
 //! composant est actif et appliquer le quota de snapshots.
 
-#![allow(dead_code)]
 
 use std::collections::HashMap;
 
@@ -44,22 +43,25 @@ impl Config {
         BaseApiClient::config_u64(&self.raw, "snapshot_quota", 10)
     }
 
-    /// Backups automatiques actives ? (defaut: false)
-    pub fn auto_backup_enabled(&self) -> bool {
-        BaseApiClient::config_bool(&self.raw, "auto_backup_enabled", false)
-    }
-
-    /// Intervalle (heures) entre deux backups automatiques (defaut: 24).
-    pub fn auto_backup_interval_hours(&self) -> u64 {
-        BaseApiClient::config_u64(&self.raw, "auto_backup_interval_hours", 24)
-    }
-
-    /// Roles autorises a declencher une restauration (CSV de role_id). Vide =>
-    /// owner uniquement.
-    pub fn restore_role_ids(&self) -> Vec<String> {
-        let raw = BaseApiClient::config_or(&self.raw, "restore_role_ids", "");
-        crate::shared::parsers::split_csv(&raw)
-    }
+    // ─────────────────────────────────────────────────────────────────────
+    // FONCTIONNALITES ANNONCEES MAIS NON IMPLEMENTEES
+    //
+    // Trois accesseurs vivaient ici derriere un `#![allow(dead_code)]` :
+    // `auto_backup_enabled`, `auto_backup_interval_hours` et
+    // `restore_role_ids`. Aucun n'etait appele. Ils ont ete supprimes, mais
+    // les trois REGLAGES correspondants sont toujours exposes aux
+    // administrateurs par `bot_definitions` (cf. migration 001_init.sql,
+    // module `guild-backup-bot`) :
+    //
+    // - « Sauvegarde automatique » + « Intervalle de sauvegarde auto » :
+    //   activables dans l'interface, mais aucune capture periodique n'existe.
+    // - « Roles autorises a restaurer » : presente comme un controle d'acces,
+    //   jamais verifie. `events.rs` le dit explicitement dans un commentaire.
+    //   Seule la gate Owner cote API/web protege reellement la restauration.
+    //
+    // A trancher : implementer, ou retirer ces cles du schema de config pour
+    // ne plus promettre ce que le code ne fait pas.
+    // ─────────────────────────────────────────────────────────────────────
 }
 
 #[cfg(test)]
@@ -80,20 +82,12 @@ mod tests {
         let c = cfg(&[]);
         assert!(c.enabled());
         assert_eq!(c.snapshot_quota(), 10);
-        assert!(!c.auto_backup_enabled());
-        assert_eq!(c.auto_backup_interval_hours(), 24);
-        assert!(c.restore_role_ids().is_empty());
     }
 
     #[test]
     fn parses_overrides() {
-        let c = cfg(&[
-            ("enabled", "false"),
-            ("snapshot_quota", "3"),
-            ("restore_role_ids", " 111 , 222 ,,333 "),
-        ]);
+        let c = cfg(&[("enabled", "false"), ("snapshot_quota", "3")]);
         assert!(!c.enabled());
         assert_eq!(c.snapshot_quota(), 3);
-        assert_eq!(c.restore_role_ids(), vec!["111", "222", "333"]);
     }
 }

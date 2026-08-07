@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 use super::super::pg_err_ctx;
-use crate::ports::outbound::system::admin_rotation_repository::AdminRotationRepository;
+use sentinel_core::ports::outbound::system::admin_rotation_repository::AdminRotationRepository;
 use sentinel_core::domain::entities::system::admin_rotation::{RotationState, ServedEntry};
 use sentinel_core::domain::errors::DomainError;
 

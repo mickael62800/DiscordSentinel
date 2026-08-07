@@ -5,7 +5,6 @@ use serenity::all::{
 
 use crate::shared::discord_helpers::reply_ephemeral_embed;
 use crate::shared::embeds::info_embed;
-use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::ApiClient;
 
@@ -124,7 +123,7 @@ async fn handle_search(ctx: &Context, command: &CommandInteraction) {
         .unwrap_or(10) as u32;
 
     let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
+    let base = match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
         Some(a) => a,
         None => return,
     };
@@ -146,13 +145,9 @@ async fn handle_search(ctx: &Context, command: &CommandInteraction) {
                 logs.iter()
                     .enumerate()
                     .map(|(i, e)| {
-                        let etype = e
-                            .get("event_type")
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("inconnu");
-                        let actor = e.get("actor_name").and_then(|v| v.as_str()).unwrap_or("?");
-                        let target = e.get("target_name").and_then(|v| v.as_str()).unwrap_or("?");
-                        format!("{}. **{}** par {} sur {}", i + 1, etype, actor, target)
+                        let actor = e.actor_name.as_deref().unwrap_or("?");
+                        let target = e.target_name.as_deref().unwrap_or("?");
+                        format!("{}. **{}** par {} sur {}", i + 1, e.event_type, actor, target)
                     })
                     .collect::<Vec<_>>()
                     .join("\n")
@@ -194,7 +189,7 @@ async fn handle_stats(ctx: &Context, command: &CommandInteraction) {
     // 7 jours. Le bot ne fait que rendre l'embed a partir de ces compteurs.
     let base = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
+        match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
             Some(a) => a.clone(),
             None => return,
         }

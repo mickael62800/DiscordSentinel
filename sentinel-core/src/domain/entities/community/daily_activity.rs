@@ -3,7 +3,6 @@ use chrono::NaiveDate;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct DailyActivity {
     pub id: Uuid,
     pub guild_id: GuildId,

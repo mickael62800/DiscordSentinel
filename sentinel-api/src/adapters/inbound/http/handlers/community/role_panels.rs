@@ -4,14 +4,14 @@ use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::Extension;
 use axum::Json;
 
 pub async fn create_panel(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateRolePanelDto>,
 ) -> Result<Json<RolePanelDetailDto>, ApiError> {
@@ -20,7 +20,7 @@ pub async fn create_panel(
 }
 
 pub async fn get_panel(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(panel_id): Path<String>,
 ) -> Result<Json<RolePanelDetailDto>, ApiError> {
@@ -29,7 +29,7 @@ pub async fn get_panel(
 }
 
 pub async fn get_panel_by_message(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(message_id): Path<String>,
 ) -> Result<Json<Option<RolePanelDetailDto>>, ApiError> {
@@ -41,7 +41,7 @@ pub async fn get_panel_by_message(
 }
 
 pub async fn list_panels(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<RolePanelDto>>, ApiError> {
@@ -50,7 +50,7 @@ pub async fn list_panels(
 }
 
 pub async fn set_message_id(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Json(dto): Json<SetMessageIdDto>,
 ) -> Result<Json<()>, ApiError> {
@@ -62,20 +62,19 @@ pub async fn set_message_id(
 }
 
 pub async fn delete_panel(
-    State(state): State<AppState>,
-    user: Option<Extension<WebUser>>,
+    State(state): State<CommunityState>,
+    // TODO(secu) : le gate « admin+ sur la guilde du panel » n'est PAS
+    // implemente. Seuls les middlewares du routeur protegent cette route.
+    // L'ancien `if user.is_some() {}` ne verifiait rien.
+    _user: Option<Extension<WebUser>>,
     Path(panel_id): Path<String>,
 ) -> Result<Json<()>, ApiError> {
-    // Gate user : admin+ pour supprimer un panel. On passe par le use case
-    // pour recuperer le guild_id (plus de SQL direct dans le handler).
-    if user.is_some() {
-    }
     state.role_panels_uc.delete_panel(&panel_id).await?;
     Ok(Json(()))
 }
 
 pub async fn list_auto_roles(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<AutoRoleDto>>, ApiError> {
@@ -84,7 +83,7 @@ pub async fn list_auto_roles(
 }
 
 pub async fn add_auto_role(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateAutoRoleDto>,
 ) -> Result<Json<AutoRoleDto>, ApiError> {
@@ -93,7 +92,7 @@ pub async fn add_auto_role(
 }
 
 pub async fn delete_auto_role(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path((guild_id, role_id)): Path<(String, String)>,
 ) -> Result<Json<()>, ApiError> {

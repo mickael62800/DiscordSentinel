@@ -106,6 +106,13 @@ struct MockInfractionRepo;
 
 #[async_trait]
 impl InfractionRepository for MockInfractionRepo {
+    async fn count_by_action_for_user(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<Vec<(String, u64)>, crate::domain::errors::DomainError> {
+        Ok(vec![])
+    }
     async fn save(
         &self,
         _: &crate::domain::entities::moderation::infraction::Infraction,

@@ -1,7 +1,21 @@
-//! Couche HTTP axum : router, auth Bearer, handlers.
+//! Couche HTTP axum : router, pile de middlewares, auth Bearer, handlers.
+//!
+//! La pile est alignee sur `sentinel-api` (meme ordre, memes garanties). Nexus
+//! expose sa propre surface reseau et pilote Docker : il ne peut pas etre moins
+//! protege que l'API de moderation.
+//!
+//! Ordre de traversee d'une requete :
+//!
+//! ```text
+//! CORS → en-tetes de securite → trace → limite de corps → request-id
+//!      → compression → metriques → verrou mono-serveur
+//!      → [routes /api] rate limit → Bearer → (rate limit strict si lifecycle)
+//!      → handler
+//! ```
 
 pub mod dto;
 pub mod handlers;
+pub mod metrics;
 
 use axum::extract::Request;
 use axum::extract::State;
@@ -11,11 +25,133 @@ use axum::middleware::Next;
 use axum::response::Response;
 use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
+use tower_http::compression::CompressionLayer;
+use tower_http::limit::RequestBodyLimitLayer;
+use tower_http::request_id::MakeRequestUuid;
+use tower_http::request_id::PropagateRequestIdLayer;
+use tower_http::request_id::SetRequestIdLayer;
+use tower_http::trace::TraceLayer;
 
 use crate::bootstrap::AppState;
+use platform_common_api::rate_limit_middleware;
+use platform_common_api::RateLimiter;
 
-/// Construit le router complet (routes + auth Bearer NEXUS_API_KEY).
+/// Reglages de la couche HTTP, lus une fois au demarrage.
+#[derive(Clone, Debug)]
+pub struct HttpConfig {
+    /// Taille maximale du corps d'une requete, en octets.
+    pub max_body_size: usize,
+    /// Debit soutenu autorise par IP sur les routes de lecture.
+    pub rate_limit_per_sec: u64,
+    /// Debit soutenu par IP sur les routes qui pilotent des conteneurs.
+    pub heavy_rate_limit_per_sec: u64,
+    /// Origines CORS autorisees : `*`, liste separee par virgules, ou vide.
+    pub allowed_origins: String,
+}
+
+impl HttpConfig {
+    /// Valeurs par defaut prudentes, surchargeables par variables d'env.
+    ///
+    /// Le debit strict est bas (2 req/s) volontairement : derriere ces routes
+    /// il y a un `docker run`. Un humain qui clique n'atteint jamais cette
+    /// limite ; une boucle, si.
+    pub fn from_env() -> Self {
+        fn var_parse<T: std::str::FromStr>(nom: &str, defaut: T) -> T {
+            std::env::var(nom)
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(defaut)
+        }
+
+        Self {
+            max_body_size: var_parse("NEXUS_MAX_BODY_SIZE", 10 * 1024 * 1024),
+            rate_limit_per_sec: var_parse("NEXUS_RATE_LIMIT_PER_SEC", 50),
+            heavy_rate_limit_per_sec: var_parse("NEXUS_HEAVY_RATE_LIMIT_PER_SEC", 2),
+            allowed_origins: std::env::var("NEXUS_ALLOWED_ORIGINS")
+                .or_else(|_| std::env::var("ALLOWED_ORIGINS"))
+                .unwrap_or_default(),
+        }
+    }
+}
+
+/// Origines CORS acceptees quand la configuration est vide (developpement).
+const ORIGINES_DEV: &[&str] = &[
+    "http://localhost:1420",
+    "http://localhost:3000",
+    "http://localhost:5173",
+];
+
+/// Routes qui declenchent une operation Docker (creation, cycle de vie, RCON).
+///
+/// Isolees pour porter un rate limit strict : une requete ici peut lancer un
+/// conteneur, allouer un port et reserver plusieurs Go de RAM. Elles restent
+/// protegees par le Bearer et le verrou mono-serveur comme les autres.
+fn container_lifecycle_routes() -> Router<AppState> {
+    Router::new()
+        .route(
+            "/api/games/{guild_id}/servers",
+            post(handlers::game::servers::create_server),
+        )
+        .route(
+            "/api/games/servers/{server_id}/start",
+            post(handlers::game::servers::start_server),
+        )
+        .route(
+            "/api/games/servers/{server_id}/stop",
+            post(handlers::game::servers::stop_server),
+        )
+        .route(
+            "/api/games/servers/{server_id}/restart",
+            post(handlers::game::servers::restart_server),
+        )
+        .route(
+            "/api/games/servers/{server_id}/command",
+            post(handlers::game::servers::execute_rcon),
+        )
+        .route(
+            "/api/games/servers/{server_id}",
+            delete(handlers::game::servers::delete_server),
+        )
+}
+
+/// Construit le router complet.
 pub fn build_router(state: AppState) -> Router {
+    build_router_with(state, HttpConfig::from_env())
+}
+
+/// Variante explicite, utilisable en test sans toucher aux variables d'env.
+pub fn build_router_with(state: AppState, config: HttpConfig) -> Router {
+    let limiter = RateLimiter::new(config.rate_limit_per_sec);
+    let heavy_limiter = RateLimiter::new(config.heavy_rate_limit_per_sec);
+    // Bucket distinct pour la vitrine publique : elle n'est pas authentifiee,
+    // son trafic ne doit donc ni consommer ni etre gene par le quota des
+    // appels internes.
+    let public_limiter = RateLimiter::new(config.rate_limit_per_sec);
+
+    // Purge periodique des buckets inactifs. Sans elle la table grossit avec
+    // chaque IP vue, meme celles qui ne reviennent jamais — et c'est justement
+    // sur le limiteur public que ca compte le plus.
+    {
+        let limiters = [
+            limiter.clone(),
+            heavy_limiter.clone(),
+            public_limiter.clone(),
+        ];
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                for l in &limiters {
+                    l.cleanup().await;
+                }
+            }
+        });
+    }
+
+    let heavy = container_lifecycle_routes().route_layer(middleware::from_fn_with_state(
+        heavy_limiter,
+        rate_limit_middleware,
+    ));
+
     let api = Router::new()
         .route(
             "/api/wheel/{guild_id}/{user_id}/spin",
@@ -45,6 +181,10 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/games/{guild_id}",
             get(handlers::casino::games::list_games),
+        )
+        .route(
+            "/api/games/{guild_id}/detect-mentions",
+            post(handlers::casino::games::detect_mentions),
         )
         .route("/api/games", post(handlers::casino::games::create_game))
         .route(
@@ -110,9 +250,11 @@ pub fn build_router(state: AppState) -> Router {
             post(handlers::casino::games::upload_emoji),
         )
         // ── Game Portal : serveurs, templates et inscriptions ──
+        // Le POST (creation) vit dans `container_lifecycle_routes` : rate limit
+        // strict. Seule la lecture reste ici.
         .route(
             "/api/games/{guild_id}/servers",
-            post(handlers::game::servers::create_server).get(handlers::game::servers::list_servers),
+            get(handlers::game::servers::list_servers),
         )
         .route(
             "/api/games/{guild_id}/templates",
@@ -130,21 +272,11 @@ pub fn build_router(state: AppState) -> Router {
             "/api/games/templates/{id}",
             get(handlers::game::templates::get_template),
         )
+        // DELETE, start, stop, restart et command sont dans
+        // `container_lifecycle_routes` (rate limit strict).
         .route(
             "/api/games/servers/{server_id}",
-            get(handlers::game::servers::get_server).delete(handlers::game::servers::delete_server),
-        )
-        .route(
-            "/api/games/servers/{server_id}/start",
-            post(handlers::game::servers::start_server),
-        )
-        .route(
-            "/api/games/servers/{server_id}/stop",
-            post(handlers::game::servers::stop_server),
-        )
-        .route(
-            "/api/games/servers/{server_id}/restart",
-            post(handlers::game::servers::restart_server),
+            get(handlers::game::servers::get_server),
         )
         .route(
             "/api/games/servers/{server_id}/logs",
@@ -157,10 +289,6 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/api/games/servers/{server_id}/config",
             put(handlers::game::servers::update_config),
-        )
-        .route(
-            "/api/games/servers/{server_id}/command",
-            post(handlers::game::servers::execute_rcon),
         )
         .route(
             "/api/games/servers/{server_id}/sessions",
@@ -204,28 +332,89 @@ pub fn build_router(state: AppState) -> Router {
             "/api/games/internal/jobs/daily-ping",
             post(handlers::game::jobs::job_daily_ping),
         )
+        // Les routes de cycle de vie des conteneurs rejoignent le groupe
+        // protege : elles heritent du Bearer et du verrou mono-serveur, et
+        // portent en plus leur rate limit strict.
+        .merge(heavy)
         .layer(middleware::from_fn_with_state(
             state.clone(),
             require_api_key,
-        ));
+        ))
+        // Pose APRES l'auth donc traverse AVANT elle : une inondation de
+        // requetes non authentifiees doit etre coupee sans consulter l'etat.
+        .layer(middleware::from_fn_with_state(limiter, rate_limit_middleware));
 
     // Vitrine publique : montee HORS du groupe protege par le Bearer, comme
     // /health. Le DTO est ecrit champ par champ (cf. public_servers.rs).
-    let public = Router::new().route(
-        "/api/public/games/{guild_id}/servers",
-        get(handlers::game::public_servers::public_servers),
-    );
+    //
+    // Pas de Bearer ne veut pas dire pas de limite : c'est la seule route que
+    // n'importe qui sur Internet peut appeler, donc elle porte son propre rate
+    // limit, plus genereux que le strict mais borne.
+    let public = Router::new()
+        .route(
+            "/api/public/games/{guild_id}/servers",
+            get(handlers::game::public_servers::public_servers),
+        )
+        .route_layer(middleware::from_fn_with_state(
+            public_limiter,
+            rate_limit_middleware,
+        ));
 
-    Router::new()
+    let routes = Router::new()
         .route("/health", get(|| async { "ok" }))
+        // Expose les metriques pour Prometheus. Protegeable par
+        // NEXUS_METRICS_TOKEN ; hors du groupe Bearer car le scraper porte son
+        // propre jeton (ou aucun, sur le reseau interne).
+        .route("/metrics", get(metrics::metrics_handler))
         .merge(public)
         .merge(api)
         // Verrou mono-serveur applique a TOUT le routeur, public compris.
         // Nexus expose sa propre surface : le verrou de sentinel-api, qui
         // vit dans un autre processus, ne le protege pas.
-        .layer(middleware::from_fn_with_state(
-            state.clone(),
-            single_guild,
+        .layer(middleware::from_fn_with_state(state.clone(), single_guild))
+        // Metriques : pose ici pour que `MatchedPath` soit deja resolu, sinon
+        // toutes les series retomberaient sur le label `unknown`.
+        .layer(middleware::from_fn(metrics::metrics_middleware))
+        // Compression des reponses JSON (zstd prefere, gzip en repli). Les
+        // listes de serveurs et de templates sont tres repetitives.
+        .layer(CompressionLayer::new().zstd(true).gzip(true))
+        .layer(PropagateRequestIdLayer::x_request_id())
+        // Borne la memoire consommee par requete : sans ca, un POST de 2 Go
+        // est bufferise avant meme d'atteindre le handler.
+        .layer(RequestBodyLimitLayer::new(config.max_body_size))
+        .layer(
+            TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
+                let request_id = request
+                    .headers()
+                    .get("x-request-id")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("-");
+                // /health est appele en boucle par Docker : en DEBUG pour ne
+                // pas noyer les logs utiles.
+                if request.uri().path() == "/health" {
+                    tracing::debug_span!(
+                        "http_request",
+                        method = %request.method(),
+                        uri = %request.uri(),
+                        request_id = %request_id,
+                    )
+                } else {
+                    tracing::info_span!(
+                        "http_request",
+                        method = %request.method(),
+                        uri = %request.uri(),
+                        request_id = %request_id,
+                    )
+                }
+            }),
+        )
+        .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid));
+
+    platform_common_api::http::security_headers(routes)
+        .layer(platform_common_api::http::build_cors(
+            &config.allowed_origins,
+            ORIGINES_DEV,
+            &[],
         ))
         .with_state(state)
 }

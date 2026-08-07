@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::ports::outbound::system::quarantine_repository::QuarantineRepository;
+use sentinel_core::ports::outbound::system::quarantine_repository::QuarantineRepository;
 use sentinel_core::domain::entities::system::quarantine::ActiveQuarantine;
 use sentinel_core::domain::errors::DomainError;
 

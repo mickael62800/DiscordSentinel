@@ -23,14 +23,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .compile_protos(
             &[
                 "proto/ai_dataset.proto",
+                "proto/audit.proto",
                 "proto/automod.proto",
                 "proto/common.proto",
                 "proto/community.proto",
                 "proto/export.proto",
+                "proto/guild_backup.proto",
+                "proto/ideas.proto",
                 "proto/images.proto",
                 "proto/members.proto",
                 "proto/moderation.proto",
                 "proto/progression.proto",
+                "proto/purge.proto",
                 "proto/roles.proto",
                 "proto/security.proto",
                 "proto/stats.proto",

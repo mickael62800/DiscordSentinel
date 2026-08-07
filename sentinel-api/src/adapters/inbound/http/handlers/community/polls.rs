@@ -15,7 +15,7 @@ use crate::adapters::inbound::http::handlers::community::public_guard::{
     clamp_limit, ensure_guild_id,
 };
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::CommunityState;
 use sentinel_core::domain::entities::community::poll::{Poll, UpsertPollCommand};
 use sentinel_core::domain::errors::DomainError;
 
@@ -122,7 +122,7 @@ pub struct VoteDto {
 
 /// GET /api/polls/{guild_id}
 pub async fn list_polls(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
@@ -141,7 +141,7 @@ pub async fn list_polls(
 
 /// POST /api/polls/{guild_id}
 pub async fn create_poll(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<CreatePollDto>,
@@ -176,7 +176,7 @@ pub async fn create_poll(
 
 /// POST /api/polls/detail/{id}/close
 pub async fn close_poll(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -188,7 +188,7 @@ pub async fn close_poll(
 
 /// DELETE /api/polls/detail/{id}
 pub async fn delete_poll(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -200,7 +200,7 @@ pub async fn delete_poll(
 
 /// POST /api/polls/detail/{id}/vote
 pub async fn vote_poll(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<VoteDto>,
@@ -229,7 +229,7 @@ pub async fn vote_poll(
 ///
 /// Aucun parametre `all` ici : un membre n'a pas a fouiller les archives.
 pub async fn my_polls(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<PollDto>>, ApiError> {
@@ -270,7 +270,7 @@ pub async fn my_polls(
 /// qu'il ne contient deja aucune donnee sensible : ni auteur, ni qui a vote
 /// quoi. `my_vote` reste `None`, un visiteur n'ayant pas d'identite.
 pub async fn public_polls(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,

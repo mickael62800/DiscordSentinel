@@ -20,10 +20,10 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 use crate::adapters::inbound::http::validation;
-use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
-use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_core::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
 use sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview;
@@ -49,7 +49,7 @@ pub struct DetectionQuery {
 
 /// GET /api/automod/{guild_id}/detections
 pub async fn list_detections(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<DetectionQuery>,
@@ -79,7 +79,7 @@ pub struct ListReviewsQuery {
 
 /// GET /api/automod/{guild_id}/reviews
 pub async fn list_reviews(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<ListReviewsQuery>,
@@ -142,7 +142,7 @@ pub struct CreateReviewBody {
 /// carte de review dans le channel Discord. Permet au web de lister les
 /// reviews en attente.
 pub async fn create_review(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Json(body): Json<CreateReviewBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
@@ -227,14 +227,14 @@ pub struct ResolveReviewBody {
 /// (prevention/warn/mute/ban) ; "delete"/"ignore" ne sont pas des sanctions.
 /// Best-effort : un echec est logge mais ne fait pas echouer la resolution.
 async fn log_review_sanction(
-    state: &AppState,
+    state: &ModerationState,
     review: &AutomodReview,
     applied_action: &str,
     moderator_id: &str,
     moderator_name: &str,
 ) {
-    use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-    use crate::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
+    use sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+    use sentinel_core::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
 
     // La DÉCISION (quelle action journaliser, avec ou sans strike — règles C1
     // anti double-strike et BUG #5 escalade) vit dans le domaine ; le handler
@@ -368,7 +368,7 @@ async fn log_review_sanction(
 /// edite la carte Discord (greyed-out + footer "via web") et applique
 /// l'action Discord (warn/mute/ban/delete) en miroir.
 pub async fn resolve_review(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
     Json(body): Json<ResolveReviewBody>,
@@ -512,7 +512,7 @@ fn facts_from_role(role: Role) -> ModeratorFacts {
 /// Fail-closed : une erreur DB sur le lookup de role remonte un 500 (le
 /// handler/caller retry) plutot que de degrader silencieusement les privileges.
 async fn effective_facts(
-    _state: &AppState,
+    _state: &ModerationState,
     user: &Option<Extension<WebUser>>,
     _review_id: Uuid,
     body_facts: Option<ModeratorFacts>,
@@ -531,12 +531,12 @@ async fn effective_facts(
 /// POST /api/automod/reviews/{review_id}/ignore
 /// Clore immediatement le dossier en "ignore" (tout moderateur).
 pub async fn ignore_review(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
     Json(body): Json<CloseIgnoreBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
-    use crate::ports::inbound::moderation::manage_automod_reviews::CloseIgnoredCommand;
+    use sentinel_core::ports::inbound::moderation::manage_automod_reviews::CloseIgnoredCommand;
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let source = match body.source.as_deref() {
         Some("discord") => "discord",
@@ -600,12 +600,12 @@ pub struct ReopenBody {
 /// POST /api/automod/reviews/{review_id}/reopen
 /// Rouvrir un dossier resolu/ignore -> repasse en vote (tout moderateur).
 pub async fn reopen_review(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
     Json(body): Json<ReopenBody>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
-    use crate::ports::inbound::moderation::manage_automod_reviews::ReopenReviewCommand;
+    use sentinel_core::ports::inbound::moderation::manage_automod_reviews::ReopenReviewCommand;
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
     let source = match body.source.as_deref() {
         Some("discord") => "discord",
@@ -665,7 +665,7 @@ pub struct CastVoteBody {
 
 /// POST /api/automod/reviews/{review_id}/vote
 pub async fn vote_review(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
     Json(body): Json<CastVoteBody>,
@@ -686,7 +686,7 @@ pub async fn vote_review(
     let votes = state
         .automod_reviews_uc
         .cast_vote(
-            crate::ports::inbound::moderation::manage_automod_reviews::CastVoteCommand {
+            sentinel_core::ports::inbound::moderation::manage_automod_reviews::CastVoteCommand {
                 review_id: id,
                 voter_id: body.voter_id.clone(),
                 voter_name: body.voter_name.clone(),
@@ -704,7 +704,7 @@ pub async fn vote_review(
 
 /// GET /api/automod/reviews/{review_id}
 pub async fn get_review(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
 ) -> Result<Json<AutomodReviewDto>, ApiError> {
@@ -726,7 +726,7 @@ pub async fn get_review(
 
 /// GET /api/automod/reviews/{review_id}/votes
 pub async fn list_review_votes(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
 ) -> Result<Json<Vec<ReviewVoteDto>>, ApiError> {
@@ -748,7 +748,7 @@ pub struct DecideReviewBody {
 /// la review en 'decided'. Publie `automod_review_decided` pour que le bot
 /// edite la carte et revele le bouton admin de finalisation.
 pub async fn decide_review(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Path(review_id): Path<String>,
     Json(body): Json<DecideReviewBody>,
@@ -778,7 +778,7 @@ pub async fn decide_review(
 /// Retrouve la review associee a un message Discord (pour retrouver le
 /// review_id depuis une carte 1-clic dont les boutons ne le portent pas).
 pub async fn find_review_by_message(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Path((guild_id, message_id)): Path<(String, String)>,
 ) -> Result<Json<Option<AutomodReviewDto>>, ApiError> {

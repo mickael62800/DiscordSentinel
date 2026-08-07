@@ -9,11 +9,11 @@ use sentinel_api::adapters::outbound::postgres::moderation::infraction_repositor
 use sentinel_api::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
 use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
 use sentinel_api::adapters::outbound::text_tokenizer::TextTokenizer;
-use sentinel_api::application::ai::analyze_message_service::AnalyzeMessageService;
-use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
-use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
-use sentinel_api::ports::inbound::ai::analyze_message::ContextMessageEntry;
-use sentinel_api::ports::outbound::moderation::rule_repository::RuleRepository;
+use sentinel_core::application::ai::analyze_message_service::AnalyzeMessageService;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use sentinel_core::ports::inbound::ai::analyze_message::ContextMessageEntry;
+use sentinel_core::ports::outbound::moderation::rule_repository::RuleRepository;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::services::ai::inference_limiter::InferenceRateLimiter;
 
@@ -427,7 +427,7 @@ fn build_analyze_service(pool: PgPool) -> AnalyzeMessageService {
 struct NoCache;
 
 #[async_trait::async_trait]
-impl sentinel_api::ports::outbound::system::cache::CachePort for NoCache {
+impl sentinel_core::ports::outbound::system::cache::CachePort for NoCache {
     async fn get_rules(
         &self,
         _: &str,

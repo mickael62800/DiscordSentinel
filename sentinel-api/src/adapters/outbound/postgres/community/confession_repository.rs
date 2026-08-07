@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use crate::ports::outbound::community::confession_repository::ConfessionRepository;
+use sentinel_core::ports::outbound::community::confession_repository::ConfessionRepository;
 use sentinel_core::domain::entities::community::confession::{
     Confession, ConfessionConfig, ConfessionReply, ConfessionReport, ReportStatus,
 };

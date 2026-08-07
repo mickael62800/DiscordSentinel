@@ -48,3 +48,7 @@ impl ManageGameTemplatesUseCase for ManageGameTemplatesService {
             .ok_or_else(|| DomainError::NotFound(format!("template slug={slug} introuvable")))
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_templates_service.rs"]
+mod tests;

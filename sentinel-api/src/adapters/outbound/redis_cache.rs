@@ -3,7 +3,7 @@ use redis::AsyncCommands;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 
-use crate::ports::outbound::system::cache::CachePort;
+use sentinel_core::ports::outbound::system::cache::CachePort;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::rule::Rule;
 use sentinel_core::domain::enums::moderation::flag_type::FlagType;
@@ -12,8 +12,6 @@ use sentinel_core::domain::errors::DomainError;
 const RULES_TTL: u64 = 300; // 5 minutes
 
 pub struct RedisCache {
-    #[allow(dead_code)]
-    client: redis::Client,
     /// Connexion multiplexee persistante (cloneable, partage le meme socket TCP).
     conn: redis::aio::MultiplexedConnection,
     /// Compteur de cache hits.
@@ -35,7 +33,6 @@ impl RedisCache {
     pub async fn new(client: redis::Client) -> Result<Self, redis::RedisError> {
         let conn = client.get_multiplexed_async_connection().await?;
         Ok(Self {
-            client,
             conn,
             hits: AtomicU64::new(0),
             misses: AtomicU64::new(0),

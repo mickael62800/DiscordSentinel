@@ -1,0 +1,108 @@
+syntax = "proto3";
+
+package sentinel.guild_backup.v1;
+
+// Sauvegarde / restauration de la structure d'un serveur.
+//
+// # Pourquoi le snapshot voyage en JSON et non en message protobuf
+//
+// `GuildSnapshot` est un document de 9 structures imbriquees (roles,
+// categories, salons, overwrites, bans, emojis, reglages). Le modeliser en
+// protobuf coûterait ~350 lignes de schema et de conversions bidirectionnelles,
+// pour un payload que :
+//   - l'API stocke tel quel en JSONB, sans jamais l'inspecter champ par champ ;
+//   - le bot serialise/deserialise deja avec serde, seul contrat existant.
+//
+// Le transporter en chaine JSON garde une seule definition de sa forme (les
+// structs Rust) au lieu de deux qu'il faudrait tenir synchronisees. En
+// contrepartie, protobuf ne garantit rien sur l'evolution du CONTENU du
+// snapshot — mais ce n'etait deja pas le cas en JSONB.
+//
+// A noter : pour ces deux RPC, le gain de gRPC est l'uniformite du transport
+// cote bot, pas la performance. Une capture est une operation rare.
+service GuildBackupService {
+  rpc StoreSnapshot(StoreSnapshotRequest) returns (StoreSnapshotResponse);
+  rpc ListSnapshots(ListSnapshotsRequest) returns (ListSnapshotsResponse);
+  rpc GetSnapshot(GetSnapshotRequest) returns (GetSnapshotResponse);
+  rpc DeleteSnapshot(DeleteSnapshotRequest) returns (DeleteSnapshotResponse);
+
+  // Re-attribution des roles aux membres absents au moment du restore.
+  rpc SavePendingRoles(SavePendingRolesRequest) returns (SavePendingRolesResponse);
+  // Lit ET supprime en une operation : le membre revient, on lui rend ses
+  // roles une seule fois.
+  rpc ConsumePendingRoles(ConsumePendingRolesRequest) returns (ConsumePendingRolesResponse);
+  rpc ClearPendingRoles(ClearPendingRolesRequest) returns (ClearPendingRolesResponse);
+}
+
+message StoreSnapshotRequest {
+  string guild_id = 1;
+  // `GuildSnapshot` serialise en JSON (cf. note en tete de fichier).
+  string snapshot_json = 2;
+}
+
+message StoreSnapshotResponse {
+  string snapshot_id = 1;
+}
+
+message ListSnapshotsRequest {
+  string guild_id = 1;
+}
+
+// Resume sans le payload : la liste ne rapatrie jamais les captures completes.
+message SnapshotSummary {
+  string id = 1;
+  string label = 2;
+  string created_at = 3;
+  uint32 role_count = 4;
+  uint32 channel_count = 5;
+}
+
+message ListSnapshotsResponse {
+  repeated SnapshotSummary snapshots = 1;
+}
+
+message GetSnapshotRequest {
+  string snapshot_id = 1;
+}
+
+message GetSnapshotResponse {
+  string snapshot_json = 1;
+}
+
+message DeleteSnapshotRequest {
+  string snapshot_id = 1;
+}
+
+message DeleteSnapshotResponse {}
+
+message PendingRoleGrant {
+  string user_id = 1;
+  repeated string role_ids = 2;
+}
+
+message SavePendingRolesRequest {
+  string guild_id = 1;
+  repeated PendingRoleGrant grants = 2;
+}
+
+message SavePendingRolesResponse {
+  uint64 saved = 1;
+}
+
+message ConsumePendingRolesRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message ConsumePendingRolesResponse {
+  // Vide si le membre n'avait aucun role en attente.
+  repeated string role_ids = 1;
+}
+
+message ClearPendingRolesRequest {
+  string guild_id = 1;
+}
+
+message ClearPendingRolesResponse {
+  uint64 cleared = 1;
+}

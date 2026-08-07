@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::ports::outbound::system::log_repository::LogRepository;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;
 use sentinel_core::domain::errors::DomainError;
 

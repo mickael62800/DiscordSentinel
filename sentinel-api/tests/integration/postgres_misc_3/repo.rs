@@ -7,9 +7,9 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::role_panel_repository::PgRolePanelRepository;
 use sentinel_api::adapters::outbound::postgres::community::welcome_config_repository::PgWelcomeConfigRepository;
-use sentinel_api::ports::outbound::community::role_panel_repository::RolePanelRepository;
-use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
-use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
+use sentinel_core::ports::outbound::community::role_panel_repository::RolePanelRepository;
+use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
 use sentinel_core::domain::entities::community::role_panel::RolePanel;
 use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;

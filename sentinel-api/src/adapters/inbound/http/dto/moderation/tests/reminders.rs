@@ -23,21 +23,21 @@ fn default_remind_before_is_one_hour() {
 #[test]
 fn from_dto_valid_uuid_preserved() {
     let id = "550e8400-e29b-41d4-a716-446655440000";
-    let cmd: crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand =
+    let cmd: sentinel_core::ports::inbound::moderation::manage_reminders::CreateReminderCommand =
         make_dto(id).into();
     assert_eq!(cmd.action_id.to_string(), id);
 }
 
 #[test]
 fn from_dto_invalid_uuid_falls_back_to_nil() {
-    let cmd: crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand =
+    let cmd: sentinel_core::ports::inbound::moderation::manage_reminders::CreateReminderCommand =
         make_dto("not-a-uuid").into();
     assert_eq!(cmd.action_id, Uuid::nil());
 }
 
 #[test]
 fn from_dto_empty_uuid_falls_back_to_nil() {
-    let cmd: crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand =
+    let cmd: sentinel_core::ports::inbound::moderation::manage_reminders::CreateReminderCommand =
         make_dto("").into();
     assert_eq!(cmd.action_id, Uuid::nil());
 }
@@ -45,7 +45,7 @@ fn from_dto_empty_uuid_falls_back_to_nil() {
 #[test]
 fn from_dto_preserves_all_fields() {
     let dto = make_dto("550e8400-e29b-41d4-a716-446655440000");
-    let cmd: crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand =
+    let cmd: sentinel_core::ports::inbound::moderation::manage_reminders::CreateReminderCommand =
         dto.into();
     assert_eq!(cmd.guild_id, "g".into());
     assert_eq!(cmd.moderator_id, "m");

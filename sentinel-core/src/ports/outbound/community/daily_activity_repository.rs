@@ -10,6 +10,5 @@ pub trait DailyActivityRepository: Send + Sync {
         guild_id: Option<&str>,
         days: i32,
     ) -> Result<Vec<DailyActivity>, DomainError>;
-    #[allow(dead_code)]
     async fn record_daily_snapshot(&self, guild_id: &str) -> Result<(), DomainError>;
 }

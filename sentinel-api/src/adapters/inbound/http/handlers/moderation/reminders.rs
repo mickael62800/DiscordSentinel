@@ -1,4 +1,4 @@
-use crate::adapters::inbound::http::extractors::ValidatedGuild;
+﻿use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use axum::extract::State;
 use axum::Json;
 
@@ -7,11 +7,11 @@ use crate::adapters::inbound::http::dto::moderation::reminders::SanctionReminder
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 
 /// POST /api/reminders
 pub async fn create_reminder(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Json(dto): Json<CreateReminderDto>,
 ) -> Result<Json<SanctionReminderDto>, ApiError> {
     let command = dto.into();
@@ -21,7 +21,7 @@ pub async fn create_reminder(
 
 /// GET /api/reminders/pending
 pub async fn get_pending(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
 ) -> Result<Json<Vec<SanctionReminderDto>>, ApiError> {
     let reminders = state.reminders_uc.get_pending_reminders().await?;
     Ok(map_to_dtos(reminders))
@@ -29,7 +29,7 @@ pub async fn get_pending(
 
 /// GET /api/reminders/{guild_id}
 pub async fn list_by_guild(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<SanctionReminderDto>>, ApiError> {
     let reminders = state.reminders_uc.list_by_guild(&guild_id).await?;

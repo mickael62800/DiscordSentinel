@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
-use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::community::manage_bump::RecordBumpCommand;
+use crate::bootstrap::state::CommunityState;
+use sentinel_core::ports::inbound::community::manage_bump::RecordBumpCommand;
 
 /// Provider par defaut si un vieux client n'envoie pas le champ (retrocompat).
 fn default_provider() -> String {
@@ -42,7 +42,7 @@ pub struct BumpRewardDto {
 
 /// POST /api/bump/{guild_id}/{user_id} — enregistre un bump.
 pub async fn record_bump(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Json(body): Json<RecordBumpBody>,
 ) -> Result<Json<BumpRewardDto>, ApiError> {
@@ -80,7 +80,7 @@ pub struct DueReminderDto {
 
 /// GET /api/bump/due-reminders — rappels dus (poll par le bot).
 pub async fn due_reminders(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
 ) -> Result<Json<Vec<DueReminderDto>>, ApiError> {
     let rows = state.bump_uc.due_reminders().await?;
     Ok(Json(
@@ -103,7 +103,7 @@ pub struct MarkReminderBody {
 
 /// POST /api/bump/{guild_id}/reminder-sent — marque le rappel envoye.
 pub async fn mark_reminder_sent(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     body: Option<Json<MarkReminderBody>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -127,7 +127,7 @@ pub struct BumpStatusDto {
 
 /// GET /api/bump/{guild_id}/status — etat par provider (carte de statut du bot).
 pub async fn guild_status(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<BumpStatusDto>>, ApiError> {
     let states = state.bump_uc.guild_status(&guild_id).await?;

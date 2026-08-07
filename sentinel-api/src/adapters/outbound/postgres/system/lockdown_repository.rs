@@ -6,7 +6,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::ports::outbound::system::lockdown_repository::LockdownRepository;
+use sentinel_core::ports::outbound::system::lockdown_repository::LockdownRepository;
 use sentinel_core::domain::errors::DomainError;
 
 pub struct PgLockdownRepository {

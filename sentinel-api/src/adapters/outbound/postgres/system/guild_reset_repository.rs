@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use super::super::pg_err_ctx;
-use crate::ports::outbound::system::guild_reset_repository::{
+use sentinel_core::ports::outbound::system::guild_reset_repository::{
     GuildResetRepository, ResetDiscordContext,
 };
 use sentinel_core::domain::errors::DomainError;

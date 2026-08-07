@@ -8,7 +8,7 @@ use tracing::warn;
 use crate::adapters::inbound::http::dto::audit::analytics::*;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::AuditState;
 
 /// TTL du cache analytics (5 minutes).
 const ANALYTICS_CACHE_TTL: u64 = 300;
@@ -23,7 +23,7 @@ fn cache_key(endpoint: &str, guild_id: Option<&str>, days: i32, limit: Option<i6
 }
 
 /// Tente de lire une valeur depuis le cache Redis.
-async fn try_cache_get<T: serde::de::DeserializeOwned>(state: &AppState, key: &str) -> Option<T> {
+async fn try_cache_get<T: serde::de::DeserializeOwned>(state: &AuditState, key: &str) -> Option<T> {
     let mut conn = state
         .redis_client
         .get_multiplexed_async_connection()
@@ -35,7 +35,7 @@ async fn try_cache_get<T: serde::de::DeserializeOwned>(state: &AppState, key: &s
 }
 
 /// Ecrit une valeur dans le cache Redis.
-async fn try_cache_set<T: serde::Serialize>(state: &AppState, key: &str, value: &T) {
+async fn try_cache_set<T: serde::Serialize>(state: &AuditState, key: &str, value: &T) {
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(value) {
             let result: Result<(), _> = conn.set_ex(key, json, ANALYTICS_CACHE_TTL).await;
@@ -49,7 +49,7 @@ async fn try_cache_set<T: serde::Serialize>(state: &AppState, key: &str, value: 
 /// Wrapper cache-first generique : tente le cache, sinon execute `compute`,
 /// ecrit le resultat en cache (TTL `ANALYTICS_CACHE_TTL`) puis renvoie le Json.
 /// Factorise le pattern repete par les handlers analytics.
-async fn cached<T, F, Fut>(state: &AppState, key: &str, compute: F) -> Result<Json<T>, ApiError>
+async fn cached<T, F, Fut>(state: &AuditState, key: &str, compute: F) -> Result<Json<T>, ApiError>
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
     F: FnOnce() -> Fut,
@@ -67,7 +67,7 @@ where
 
 /// GET /api/analytics — Retourne toutes les analytics en une seule requete (cache 5min).
 pub async fn get_full_analytics(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     _user: Option<Extension<WebUser>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<FullAnalyticsDto>, ApiError> {
@@ -110,7 +110,7 @@ pub struct ResetAnalyticsResponse {
 }
 
 pub async fn reset_analytics(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     _user: Option<Extension<WebUser>>,
     Query(params): Query<AnalyticsQuery>,
 ) -> Result<Json<ResetAnalyticsResponse>, ApiError> {

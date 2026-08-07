@@ -33,7 +33,7 @@ pub async fn purge_infractions(
     // Phase 7 B — Gate RBAC : owner requis pour une purge massive.
 
     let count = state
-        .infractions_uc
+        .moderation.infractions_uc
         .delete_older_than_days(&dto.guild_id, dto.days)
         .await?;
     info!(guild_id = %dto.guild_id, days = dto.days, deleted = count, "Purge infractions");
@@ -67,7 +67,7 @@ pub async fn purge_audit_logs(
     // Phase 7 B — Gate RBAC : owner requis pour purger l'audit log.
 
     let count = state
-        .audit_logs_uc
+        .audit.audit_logs_uc
         .delete_older_than_days(&dto.guild_id, dto.days)
         .await?;
     info!(guild_id = %dto.guild_id, days = dto.days, deleted = count, "Purge audit logs");

@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::GuildBackupState;
 use sentinel_core::domain::entities::guild_backup::pending_role_grant::PendingRoleGrant;
 
 
@@ -45,7 +45,7 @@ pub struct ClearedGrantsDto {
 /// POST /api/guild-backup/{guild_id}/pending-roles — enregistre les grants.
 /// Body = liste de `{user_id, role_ids}`. Owner requis (bypass interne bot).
 pub async fn save_pending_roles(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<Vec<PendingRoleGrantDto>>,
 ) -> Result<(StatusCode, Json<SavedGrantsDto>), ApiError> {
@@ -68,7 +68,7 @@ pub async fn save_pending_roles(
 /// supprime (atomique) les roles en attente d'un membre. `role_ids` vide si
 /// aucune entree.
 pub async fn consume_pending_roles(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<ConsumedGrantDto>, ApiError> {
     let role_ids = state
@@ -81,7 +81,7 @@ pub async fn consume_pending_roles(
 
 /// DELETE /api/guild-backup/{guild_id}/pending-roles — purge la guild.
 pub async fn clear_pending_roles(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<ClearedGrantsDto>, ApiError> {
     let cleared = state.pending_role_grants_uc.clear_guild(&guild_id).await?;

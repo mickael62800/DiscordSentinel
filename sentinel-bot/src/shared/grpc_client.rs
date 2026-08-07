@@ -48,6 +48,10 @@ use sentinel_proto::roles::v1::role_panels_service_client::RolePanelsServiceClie
 use sentinel_proto::security::v1::security_service_client::SecurityServiceClient;
 use sentinel_proto::stats::v1::stats_service_client::StatsServiceClient;
 use sentinel_proto::tickets::v1::tickets_service_client::TicketsServiceClient;
+use sentinel_proto::audit::v1::audit_service_client::AuditServiceClient;
+use sentinel_proto::guild_backup::v1::guild_backup_service_client::GuildBackupServiceClient;
+use sentinel_proto::ideas::v1::ideas_service_client::IdeasServiceClient;
+use sentinel_proto::purge::v1::purge_service_client::PurgeServiceClient;
 use sentinel_proto::voice::v1::voice_channels_service_client::VoiceChannelsServiceClient;
 use sentinel_proto::welcome::v1::welcome_service_client::WelcomeServiceClient;
 
@@ -327,6 +331,36 @@ impl SentinelGrpcClient {
     /// Retourne un client `AutomodService` pret a l'emploi.
     pub fn automod(&self) -> AutomodServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         AutomodServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `AuditService` (journal, surveillance, anomalies).
+    pub fn audit(&self) -> AuditServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        AuditServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `GuildBackupService` (captures + roles en attente).
+    pub fn guild_backup(
+        &self,
+    ) -> GuildBackupServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        GuildBackupServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `IdeasService` pret a l'emploi (boite a idees).
+    pub fn ideas(&self) -> IdeasServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        IdeasServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `PurgeService` pret a l'emploi (commandes `/cleanup`).
+    pub fn purge(&self) -> PurgeServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        PurgeServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
     }

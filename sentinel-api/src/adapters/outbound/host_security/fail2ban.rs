@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 
-use crate::ports::outbound::system::host_ban_queue::Fail2banStatusReader;
+use sentinel_core::ports::outbound::system::host_ban_queue::Fail2banStatusReader;
 use sentinel_core::domain::entities::system::ip_ban::{Fail2banJail, Fail2banStatus};
 use sentinel_core::domain::errors::DomainError;
 

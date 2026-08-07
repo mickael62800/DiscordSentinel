@@ -67,7 +67,7 @@ async fn run_once(state: &AppState) -> Result<(), sqlx::Error> {
             .unwrap_or(24);
 
         // Age de la sauvegarde la plus recente.
-        let snaps = match state.guild_snapshots_uc.list_snapshots(&gid).await {
+        let snaps = match state.guild_backup.guild_snapshots_uc.list_snapshots(&gid).await {
             Ok(s) => s,
             Err(_) => continue,
         };

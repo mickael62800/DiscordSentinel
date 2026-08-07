@@ -4,7 +4,6 @@ use crate::domain::entities::system::analytics::*;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-#[allow(dead_code)]
 pub trait AnalyticsRepository: Send + Sync {
     /// Heatmap : activite par heure et jour de la semaine.
     async fn get_heatmap(

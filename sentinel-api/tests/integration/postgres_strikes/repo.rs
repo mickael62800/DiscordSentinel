@@ -7,7 +7,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::moderation::strike_repository::PgStrikeRepository;
-use sentinel_api::ports::outbound::moderation::strike_repository::StrikeRepository;
+use sentinel_core::ports::outbound::moderation::strike_repository::StrikeRepository;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeConfig;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeThreshold;
 use sentinel_core::domain::entities::moderation::action::strikes::UserStrike;

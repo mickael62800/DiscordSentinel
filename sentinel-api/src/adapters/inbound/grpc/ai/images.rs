@@ -11,8 +11,8 @@ use tonic::Response;
 use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
-use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
 use sentinel_core::domain::entities::ai::image_analysis::ImageClassification;
 use sentinel_core::domain::enums::moderation::action::Action;

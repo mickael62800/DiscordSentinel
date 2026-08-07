@@ -47,20 +47,19 @@ impl SponsorshipTracker {
         Ok(())
     }
 
-    /// Recupere le parrain d'un filleul.
-    #[allow(dead_code)]
+    /// Accesseur de test : la production n'interroge pas le tracker.
+    #[cfg(test)]
     pub fn get_sponsor(&self, guild_id: u64, filleul_id: u64) -> Option<u64> {
         self.sponsors.get(&(guild_id, filleul_id)).map(|v| *v)
     }
 
     /// Verifie si un membre est parraine.
-    #[allow(dead_code)]
     pub fn is_sponsored(&self, guild_id: u64, user_id: u64) -> bool {
         self.sponsors.contains_key(&(guild_id, user_id))
     }
 
-    /// Nombre de filleuls actifs d'un parrain.
-    #[allow(dead_code)]
+    /// Accesseur de test : verifie le compteur incremente par sponsor.
+    #[cfg(test)]
     pub fn active_count(&self, guild_id: u64, parrain_id: u64) -> u32 {
         self.counts
             .get(&(guild_id, parrain_id))

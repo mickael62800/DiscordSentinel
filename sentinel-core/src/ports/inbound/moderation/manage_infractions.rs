@@ -10,8 +10,28 @@ pub struct InfractionFilters {
     pub offset: i64,
 }
 
+/// Compteurs d'infractions d'un membre, par nature d'action.
+///
+/// `total` couvre toutes les natures, y compris celles qui n'ont pas de
+/// compteur dedie ici.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub struct UserInfractionCounts {
+    pub warns: u32,
+    pub deletes: u32,
+    pub mutes: u32,
+    pub bans: u32,
+    pub total: u32,
+}
+
 #[async_trait]
 pub trait ManageInfractionsUseCase: Send + Sync {
+    /// Compteurs d'un membre, agreges en base (pas de rapatriement du journal).
+    async fn count_user_infractions(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<UserInfractionCounts, DomainError>;
+
     async fn list_infractions(
         &self,
         guild_id: &str,

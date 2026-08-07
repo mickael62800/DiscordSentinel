@@ -6,6 +6,7 @@ use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use crate::ports::inbound::moderation::manage_infractions::UserInfractionCounts;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
 
 pub struct ManageInfractionsService {
@@ -20,6 +21,33 @@ impl ManageInfractionsService {
 
 #[async_trait]
 impl ManageInfractionsUseCase for ManageInfractionsService {
+    async fn count_user_infractions(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<UserInfractionCounts, DomainError> {
+        let rows = self
+            .infraction_repo
+            .count_by_action_for_user(guild_id, user_id)
+            .await?;
+
+        let mut counts = UserInfractionCounts::default();
+        for (action, n) in rows {
+            let n = n as u32;
+            counts.total = counts.total.saturating_add(n);
+            // Les natures non listees alimentent `total` uniquement : le
+            // detail affiche reste celui des quatre sanctions courantes.
+            match action.as_str() {
+                "warn" => counts.warns = n,
+                "delete" => counts.deletes = n,
+                "mute" => counts.mutes = n,
+                "ban" => counts.bans = n,
+                _ => {}
+            }
+        }
+        Ok(counts)
+    }
+
     async fn list_infractions(
         &self,
         guild_id: &str,

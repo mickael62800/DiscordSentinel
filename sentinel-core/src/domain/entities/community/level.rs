@@ -29,7 +29,6 @@ impl XpSource {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct UserLevel {
     pub id: Uuid,
     pub guild_id: GuildId,

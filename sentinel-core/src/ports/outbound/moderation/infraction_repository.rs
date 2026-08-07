@@ -18,4 +18,14 @@ pub trait InfractionRepository: Send + Sync {
     async fn find_by_id(&self, id: &str) -> Result<Option<Infraction>, DomainError>;
     async fn delete_by_id(&self, id: &str) -> Result<bool, DomainError>;
     async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError>;
+
+    /// Nombre d'infractions d'un membre, groupe par nature d'action.
+    ///
+    /// Existe pour eviter de rapatrier tout le journal d'un serveur juste pour
+    /// afficher quatre compteurs : le regroupement se fait en base.
+    async fn count_by_action_for_user(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<(String, u64)>, DomainError>;
 }

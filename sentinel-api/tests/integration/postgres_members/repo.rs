@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::member_repository::PgMemberRepository;
-use sentinel_api::ports::outbound::community::member_repository::MemberRepository;
+use sentinel_core::ports::outbound::community::member_repository::MemberRepository;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
 
 async fn pool() -> PgPool {

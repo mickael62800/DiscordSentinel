@@ -10,7 +10,6 @@
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use crate::shared::heartbeat::ApiClientKey;
 
 use super::api_client::ApiClient;
 use super::WatchedUserIdsKey;
@@ -44,7 +43,7 @@ pub async fn track_activity(
     if !is_watched(&data, user_id) {
         return;
     }
-    if let Some(base) = data.get::<ApiClientKey>() {
+    if let Some(base) = data.get::<crate::shared::grpc_client::GrpcClientKey>() {
         let api = ApiClient::new(base.clone());
         if let Err(e) = api
             .log_user_activity(
@@ -74,11 +73,11 @@ pub async fn bootstrap_watched_users(ctx: &Context) {
         warn!("bootstrap_watched_users: WatchedUserIdsKey manquant");
         return;
     };
-    let api_client = data.get::<ApiClientKey>().cloned();
+    let api_client = data.get::<crate::shared::grpc_client::GrpcClientKey>().cloned();
     drop(data);
 
     let Some(base) = api_client else {
-        warn!("bootstrap_watched_users: ApiClientKey manquant, cache vide");
+        warn!("bootstrap_watched_users: GrpcClientKey manquant, cache vide");
         return;
     };
     let api = ApiClient::new(base);
@@ -137,11 +136,11 @@ pub async fn handle_watched_refresh_event(ctx: &Context, payload_json: &str) {
     let Some(watched_set) = data.get::<WatchedUserIdsKey>().cloned() else {
         return;
     };
-    let api_client = data.get::<ApiClientKey>().cloned();
+    let api_client = data.get::<crate::shared::grpc_client::GrpcClientKey>().cloned();
     drop(data);
 
     let Some(base) = api_client else {
-        warn!("handle_watched_refresh_event: ApiClientKey manquant");
+        warn!("handle_watched_refresh_event: GrpcClientKey manquant");
         return;
     };
     let api = ApiClient::new(base);

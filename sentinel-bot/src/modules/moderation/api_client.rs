@@ -27,6 +27,9 @@ pub struct ModerationAction {
 }
 
 #[derive(Debug, Deserialize)]
+/// Action de moderation renvoyee par l'API. `target_name` n'est pas relu par
+/// le bot (il l'a deja au moment d'agir) mais fait partie du contrat : le
+/// dashboard web l'affiche dans l'historique.
 #[allow(dead_code)]
 pub struct ModerationActionResponse {
     pub id: String,
@@ -43,6 +46,9 @@ pub struct ModerationActionResponse {
 
 /// Historique des sanctions d'un utilisateur.
 #[derive(Debug, Deserialize)]
+/// Dossier d'un membre. Le bot affiche les compteurs et le nom ; `target_id`
+/// n'est pas relu (il est deja connu de l'appelant) mais fait partie du contrat
+/// de l'API, ou le dashboard web s'en sert.
 #[allow(dead_code)]
 pub struct UserHistory {
     pub target_id: String,
@@ -54,41 +60,36 @@ pub struct UserHistory {
 }
 
 /// MOD #2 — Preuve attachee a une action de moderation.
-#[derive(Debug, Deserialize, Serialize)]
-#[allow(dead_code)]
+///
+/// Reduit aux champs rendus par `/evidence` ; le message proto en porte
+/// davantage (identifiant, auteur nomme, horodatage) pour le dashboard web.
+#[derive(Debug)]
 pub struct EvidenceEntry {
-    pub id: String,
     pub action_id: String,
     pub url: String,
     pub description: Option<String>,
     pub uploaded_by: String,
-    pub uploaded_by_name: String,
-    pub uploaded_at: String,
 }
 
 /// MOD #3 — Entree de la file de relecture.
-#[derive(Debug, Deserialize, Serialize)]
-#[allow(dead_code)]
+///
+/// Reduit aux champs rendus par `/review add` et `/review list` ; le message
+/// proto porte tout le dossier (relecteur, statut, horodatages) pour le web.
+#[derive(Debug)]
 pub struct ReviewQueueEntry {
     pub id: String,
     pub action_id: String,
-    pub guild_id: String,
     pub added_by: String,
-    pub added_by_name: String,
     pub reason: Option<String>,
-    pub status: String,
-    pub reviewer_id: Option<String>,
-    pub reviewer_name: Option<String>,
-    pub reviewer_notes: Option<String>,
-    pub added_at: String,
-    pub resolved_at: Option<String>,
+    /// Enrichis par jointure ; `None` si l'action a disparu entre-temps.
     pub action_type: Option<String>,
     pub target_name: Option<String>,
-    pub action_reason: Option<String>,
 }
 
 /// MOD #7 — Agregation d'actions de moderation par moderateur.
-#[derive(Debug, Deserialize)]
+/// Ligne du classement des moderateurs. Le bot n'affiche que le nom et les
+/// compteurs ; `moderator_id` sert au dashboard web pour lier vers le profil.
+#[derive(Debug)]
 #[allow(dead_code)]
 pub struct ModStatsEntry {
     pub moderator_id: String,
@@ -101,22 +102,17 @@ pub struct ModStatsEntry {
 }
 
 /// Sanction temporaire active (reminder pending).
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
+///
+/// Reduit aux 5 champs affiches par `/expirations`. Les champs d'audit
+/// (identifiants, horodatages de creation, statut) restent cote HTTP : seul le
+/// dashboard web les exploite.
+#[derive(Debug)]
 pub struct SanctionReminder {
-    pub id: String,
-    pub guild_id: String,
-    pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,
-    pub target_name: String,
     pub action_type: String,
     pub reason: String,
-    pub action_id: String,
-    pub remind_at: String,
     pub expires_at: String,
-    pub status: String,
-    pub created_at: String,
 }
 
 /// Copilote — compte d'une action (sanction par type ou precedent par action).
@@ -159,7 +155,7 @@ pub struct MemberContext {
 }
 
 /// Faits Discord d'une cible envoyes a l'API pour l'evaluation de risque.
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct TargetRiskFacts {
     pub account_age_days: i64,
     pub is_bot: bool,
@@ -167,7 +163,7 @@ pub struct TargetRiskFacts {
 }
 
 /// Decision de risque renvoyee par l'API (seuil + politique server-side).
-#[derive(Debug, Deserialize)]
+#[derive(Debug)]
 pub struct TargetRiskDecision {
     pub risky: bool,
     pub reason: Option<String>,
@@ -320,12 +316,17 @@ impl ApiClient {
         guild_id: &str,
         facts: &TargetRiskFacts,
     ) -> Result<TargetRiskDecision, String> {
-        self.base
-            .post_json(
-                &format!("/api/moderation/{}/assess-target-risk", guild_id),
-                facts,
-            )
-            .await
+        let req = proto_mod::AssessTargetRiskRequest {
+            guild_id: guild_id.to_string(),
+            account_age_days: facts.account_age_days,
+            is_bot: facts.is_bot,
+            has_mod_perms: facts.has_mod_perms,
+        };
+        let d = crate::grpc_call!(self.grpc, moderation, assess_target_risk, req)?;
+        Ok(TargetRiskDecision {
+            risky: d.risky,
+            reason: d.reason,
+        })
     }
 
     /// Nombre d'actions de moderation posees par ce moderateur sur la fenetre.
@@ -336,31 +337,25 @@ impl ApiClient {
         moderator_id: &str,
         window_secs: u64,
     ) -> Result<u32, String> {
-        #[derive(serde::Deserialize)]
-        struct CountResp {
-            count: i64,
-        }
-        let path = format!(
-            "/api/moderation/mod-action-count/{guild_id}/{moderator_id}?window_secs={window_secs}"
-        );
-        let r: CountResp = self.base.get_json(&path).await?;
-        Ok(r.count.max(0) as u32)
+        let req = proto_mod::CountModeratorActionsRequest {
+            guild_id: guild_id.to_string(),
+            moderator_id: moderator_id.to_string(),
+            window_secs,
+        };
+        let r = crate::grpc_call!(self.grpc, moderation, count_moderator_actions, req)?;
+        Ok(r.count)
     }
 
-    /// Supprime une action de moderation par son ID (unwarn).
+    /// Annule une action de moderation par son ID (`/unwarn`).
+    ///
+    /// L'API applique l'effet Discord inverse (unban, retrait de timeout) et
+    /// annule le rappel d'auto-unban : le bot n'a rien a orchestrer.
     pub async fn delete_action(&self, action_id: &str) -> Result<bool, String> {
-        let req = self.base.client().delete(format!(
-            "{}/api/moderation/actions/{}",
-            self.base.base_url(),
-            action_id
-        ));
-        let resp = self
-            .base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur HTTP delete_action: {e}"))?;
-        Ok(resp.status().is_success())
+        let req = proto_mod::CancelActionRequest {
+            action_id: action_id.to_string(),
+        };
+        let resp = crate::grpc_call!(self.grpc, moderation, cancel_action, req)?;
+        Ok(resp.cancelled)
     }
 
     /// MOD #1 — Liste les sanctions temporaires actives (reminders pending) d'une guild.
@@ -368,16 +363,44 @@ impl ApiClient {
         &self,
         guild_id: &str,
     ) -> Result<Vec<SanctionReminder>, String> {
-        self.base
-            .get_json(&format!("/api/reminders/{}", guild_id))
-            .await
+        let req = proto_mod::ListActiveRemindersRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let resp = crate::grpc_call!(self.grpc, moderation, list_active_reminders, req)?;
+        Ok(resp
+            .reminders
+            .into_iter()
+            .map(|r| SanctionReminder {
+                moderator_name: r.moderator_name,
+                target_id: r.target_id,
+                action_type: r.action_type,
+                reason: r.reason,
+                expires_at: r.expires_at,
+            })
+            .collect())
     }
 
     /// MOD #7 — Top 20 des moderateurs par nombre d'actions sur les 30 derniers jours.
     pub async fn get_modstats(&self, guild_id: &str) -> Result<Vec<ModStatsEntry>, String> {
-        self.base
-            .get_json(&format!("/api/moderation/modstats/{}", guild_id))
-            .await
+        let req = proto_mod::GetModStatsRequest {
+            guild_id: guild_id.to_string(),
+            // 0 = fenetre par defaut du serveur (30 jours).
+            days: 0,
+        };
+        let resp = crate::grpc_call!(self.grpc, moderation, get_mod_stats, req)?;
+        Ok(resp
+            .entries
+            .into_iter()
+            .map(|e| ModStatsEntry {
+                moderator_id: e.moderator_id,
+                moderator_name: e.moderator_name,
+                total: e.total,
+                warns: e.warns,
+                mutes: e.mutes,
+                bans: e.bans,
+                kicks: e.kicks,
+            })
+            .collect())
     }
 
     /// MOD #2 — Attache une preuve a une action de moderation existante.
@@ -389,25 +412,24 @@ impl ApiClient {
         uploaded_by: &str,
         uploaded_by_name: &str,
     ) -> Result<EvidenceEntry, String> {
-        self.base
-            .post_json(
-                "/api/moderation/evidence",
-                &serde_json::json!({
-                    "action_id": action_id,
-                    "url": url,
-                    "description": description,
-                    "uploaded_by": uploaded_by,
-                    "uploaded_by_name": uploaded_by_name,
-                }),
-            )
-            .await
+        let req = proto_mod::AddEvidenceRequest {
+            action_id: action_id.to_string(),
+            url: url.to_string(),
+            description: description.map(str::to_string),
+            uploaded_by: uploaded_by.to_string(),
+            uploaded_by_name: uploaded_by_name.to_string(),
+        };
+        let e = crate::grpc_call!(self.grpc, moderation, add_evidence, req)?;
+        Ok(evidence_from_proto(e))
     }
 
     /// MOD #2 — Liste les preuves attachees a une action.
     pub async fn list_evidence(&self, action_id: &str) -> Result<Vec<EvidenceEntry>, String> {
-        self.base
-            .get_json(&format!("/api/moderation/evidence/{}", action_id))
-            .await
+        let req = proto_mod::ListEvidenceRequest {
+            action_id: action_id.to_string(),
+        };
+        let resp = crate::grpc_call!(self.grpc, moderation, list_evidence, req)?;
+        Ok(resp.entries.into_iter().map(evidence_from_proto).collect())
     }
 
     /// MOD #3 — Ajoute une action a la file de relecture.
@@ -419,18 +441,15 @@ impl ApiClient {
         added_by_name: &str,
         reason: Option<&str>,
     ) -> Result<ReviewQueueEntry, String> {
-        self.base
-            .post_json(
-                "/api/moderation/review",
-                &serde_json::json!({
-                    "action_id": action_id,
-                    "guild_id": guild_id,
-                    "added_by": added_by,
-                    "added_by_name": added_by_name,
-                    "reason": reason,
-                }),
-            )
-            .await
+        let req = proto_mod::AddReviewRequest {
+            action_id: action_id.to_string(),
+            guild_id: guild_id.to_string(),
+            added_by: added_by.to_string(),
+            added_by_name: added_by_name.to_string(),
+            reason: reason.map(str::to_string),
+        };
+        let e = crate::grpc_call!(self.grpc, moderation, add_review, req)?;
+        Ok(review_from_proto(e))
     }
 
     /// MOD #3 — Liste les reviews en attente d'une guild.
@@ -438,9 +457,11 @@ impl ApiClient {
         &self,
         guild_id: &str,
     ) -> Result<Vec<ReviewQueueEntry>, String> {
-        self.base
-            .get_json(&format!("/api/moderation/review/{}/pending", guild_id))
-            .await
+        let req = proto_mod::ListPendingReviewsRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let resp = crate::grpc_call!(self.grpc, moderation, list_pending_reviews, req)?;
+        Ok(resp.entries.into_iter().map(review_from_proto).collect())
     }
 
     /// MOD #6 — Ecrit une cle de config bot.
@@ -473,17 +494,22 @@ impl ApiClient {
         reviewer_name: &str,
         notes: Option<&str>,
     ) {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/moderation/review/{}/resolve", review_id),
-                &serde_json::json!({
-                    "status": status,
-                    "reviewer_id": reviewer_id,
-                    "reviewer_name": reviewer_name,
-                    "reviewer_notes": notes,
-                }),
-            )
-            .await
+        let req = proto_mod::ResolveReviewRequest {
+            review_id: review_id.to_string(),
+            status: status.to_string(),
+            reviewer_id: reviewer_id.to_string(),
+            reviewer_name: reviewer_name.to_string(),
+            notes: notes.map(str::to_string),
+        };
+        let res: Result<_, crate::shared::grpc_client::GrpcCallError> =
+            crate::grpc_call!(@raw self.grpc, moderation, resolve_review, req);
+        match res {
+            Ok(r) if !r.resolved => {
+                tracing::warn!(review_id = %review_id, "review introuvable a la resolution")
+            }
+            Err(e) => tracing::warn!(error = %e, review_id = %review_id, "echec resolution review"),
+            _ => {}
+        }
     }
 
     /// Ajoute une note sur un utilisateur.
@@ -495,35 +521,55 @@ impl ApiClient {
         author_name: &str,
         content: &str,
         category: &str,
-    ) -> Result<serde_json::Value, String> {
-        self.base
-            .post_json(
-                "/api/notes",
-                &serde_json::json!({
-                    "guild_id": guild_id,
-                    "user_id": user_id,
-                    "author_id": author_id,
-                    "author_name": author_name,
-                    "content": content,
-                    "category": category,
-                }),
-            )
-            .await
+    ) -> Result<String, String> {
+        let req = proto_mod::AddNoteRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            author_id: author_id.to_string(),
+            author_name: author_name.to_string(),
+            content: content.to_string(),
+            category: category.to_string(),
+        };
+        let resp = crate::grpc_call!(self.grpc, moderation, add_note, req)?;
+        Ok(resp.id)
     }
 
     // ── Pending Actions (mode apprenti) ──
 
     /// Met a jour le statut d'une action en attente (approved/rejected).
     pub async fn resolve_pending_action(&self, action_id: &str, status: &str, reviewed_by: &str) {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/moderation/pending/{action_id}/resolve"),
-                &serde_json::json!({
-                    "status": status,
-                    "reviewed_by": reviewed_by,
-                }),
-            )
-            .await;
+        let req = proto_mod::ResolvePendingActionRequest {
+            action_id: action_id.to_string(),
+            status: status.to_string(),
+            reviewed_by: reviewed_by.to_string(),
+        };
+        let res: Result<(), crate::shared::grpc_client::GrpcCallError> =
+            crate::grpc_call!(@raw_unit self.grpc, moderation, resolve_pending_action, req);
+        if let Err(e) = res {
+            tracing::warn!(error = %e, action_id = %action_id, "echec resolution action en attente");
+        }
+    }
+}
+
+/// Conversions proto -> types du bot. Isolees ici pour que les methodes
+/// restent lisibles et que l'ajout d'un champ ne se fasse qu'a un endroit.
+fn evidence_from_proto(e: proto_mod::EvidenceEntry) -> EvidenceEntry {
+    EvidenceEntry {
+        action_id: e.action_id,
+        url: e.url,
+        description: e.description,
+        uploaded_by: e.uploaded_by,
+    }
+}
+
+fn review_from_proto(r: proto_mod::ReviewEntry) -> ReviewQueueEntry {
+    ReviewQueueEntry {
+        id: r.id,
+        action_id: r.action_id,
+        added_by: r.added_by,
+        reason: r.reason,
+        action_type: r.action_type,
+        target_name: r.target_name,
     }
 }
 

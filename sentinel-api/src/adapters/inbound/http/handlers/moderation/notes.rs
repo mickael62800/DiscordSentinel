@@ -1,11 +1,11 @@
-use crate::adapters::inbound::http::dto::moderation::notes::AddNoteDto;
+﻿use crate::adapters::inbound::http::dto::moderation::notes::AddNoteDto;
 use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 use crate::adapters::inbound::http::validation;
 use axum::extract::Path;
 use axum::extract::State;
@@ -13,7 +13,7 @@ use axum::Json;
 
 /// POST /api/notes
 pub async fn add_note(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Json(dto): Json<AddNoteDto>,
 ) -> Result<Json<UserNoteDto>, ApiError> {
     // Validation
@@ -29,7 +29,7 @@ pub async fn add_note(
 
 /// GET /api/notes/{guild_id}/{user_id}
 pub async fn get_notes(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<UserNoteDto>>, ApiError> {
     // Validation
@@ -42,7 +42,7 @@ pub async fn get_notes(
 
 /// DELETE /api/notes/{id}
 pub async fn delete_note(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation de format : 422 si l'id n'est pas un UUID, plutot qu'une

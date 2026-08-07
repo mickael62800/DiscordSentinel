@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 
 #[derive(Deserialize)]
 pub struct CreateQuarantineDto {
@@ -22,7 +22,7 @@ pub struct CreateQuarantineDto {
 /// POST /api/security/quarantine — bot enregistre la mise en quarantaine
 /// d'un user. UPSERT pour idempotence (re-quarantaine reset le timer).
 pub async fn create_quarantine(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     Json(dto): Json<CreateQuarantineDto>,
 ) -> Result<StatusCode, ApiError> {
     state
@@ -37,7 +37,7 @@ pub async fn create_quarantine(
 /// (sinon, apres un reboot, un user quarantine ne peut plus se verifier et sa
 /// quarantaine ne peut plus etre levee cote bot).
 pub async fn list_active_quarantines(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
 ) -> Result<Json<Vec<(String, String)>>, ApiError> {
     let rows = state.quarantine_uc.list_active().await?;
     Ok(Json(
@@ -49,7 +49,7 @@ pub async fn list_active_quarantines(
 /// user de la quarantaine apres validation captcha (ou suppression par
 /// admin). Idempotent.
 pub async fn delete_quarantine(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<StatusCode, ApiError> {
     state.quarantine_uc.lift(&guild_id, &user_id).await?;

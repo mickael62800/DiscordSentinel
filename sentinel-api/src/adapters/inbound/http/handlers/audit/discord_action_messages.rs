@@ -11,7 +11,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::AuditState;
 use sentinel_core::domain::entities::audit::discord_action_message::DiscordActionMessage;
 use sentinel_core::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
@@ -53,7 +53,7 @@ impl From<DiscordActionMessage> for DiscordActionMessageDto {
 
 /// POST /api/discord-messages/register
 pub async fn register(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     Json(dto): Json<RegisterDto>,
 ) -> Result<StatusCode, ApiError> {
     state
@@ -71,7 +71,7 @@ pub async fn register(
 
 /// GET /api/discord-messages/{action_id}
 pub async fn list_for_action(
-    State(state): State<AppState>,
+    State(state): State<AuditState>,
     Path(action_id): Path<Uuid>,
 ) -> Result<Json<Vec<DiscordActionMessageDto>>, ApiError> {
     let list = state

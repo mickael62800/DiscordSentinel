@@ -295,7 +295,7 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
                     Some(g) => g.clone(),
                     None => return,
                 };
-                let api = ApiClient::new(base.clone(), grpc);
+                let api = ApiClient::new(grpc);
                 if let Ok(tickets) = api.list_tickets().await {
                     // Compteur scope a CE serveur (list_tickets cote bot n'est
                     // pas scope -> sans ce filtre, on comptait les tickets de
@@ -385,7 +385,7 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
             return;
         }
     };
-    let api = ApiClient::new(base.clone(), grpc);
+    let api = ApiClient::new(grpc);
     let guild_config = match base
         .get_guild_config_for(
             &guild_id.to_string(),

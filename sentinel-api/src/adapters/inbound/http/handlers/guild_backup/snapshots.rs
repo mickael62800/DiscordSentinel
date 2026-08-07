@@ -8,13 +8,15 @@
 //! Phase 1 (backbone) : STOCKAGE seul. La capture Discord (production du
 //! `GuildSnapshot`) et la restauration effective sont cote bot (phase 2).
 
+use axum::Extension;
 use axum::Json;
 use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::middleware::superadmin::WebUser;
+use crate::bootstrap::state::GuildBackupState;
 use crate::adapters::inbound::http::validation;
 use axum::http::StatusCode;
 use sentinel_core::domain::entities::guild_backup::snapshot::GuildSnapshot;
@@ -56,7 +58,7 @@ impl From<SnapshotSummary> for SnapshotSummaryDto {
 /// POST /api/guild-backup/{guild_id}/snapshots — stocke une nouvelle capture.
 /// Body = `GuildSnapshot`. Owner requis (bypass interne pour le bot).
 pub async fn store_snapshot(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(mut snapshot): Json<GuildSnapshot>,
 ) -> Result<(StatusCode, Json<StoredSnapshotDto>), ApiError> {
@@ -90,7 +92,7 @@ pub async fn store_snapshot(
 
 /// GET /api/guild-backup/{guild_id}/snapshots — liste les captures (resumes).
 pub async fn list_snapshots(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<SnapshotSummaryDto>>, ApiError> {
     let summaries = state.guild_snapshots_uc.list_snapshots(&guild_id).await?;
@@ -100,7 +102,7 @@ pub async fn list_snapshots(
 /// GET /api/guild-backup/snapshots/{snapshot_id} — capture complete (pour la
 /// restauration). Owner de la guild concernee requis (bypass interne bot).
 pub async fn get_snapshot(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
     Path(snapshot_id): Path<String>,
 ) -> Result<Json<GuildSnapshot>, ApiError> {
     let id = parse_id(&snapshot_id)?;
@@ -112,7 +114,7 @@ pub async fn get_snapshot(
 
 /// DELETE /api/guild-backup/snapshots/{snapshot_id} — supprime une capture.
 pub async fn delete_snapshot(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
     Path(snapshot_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     let id = parse_id(&snapshot_id)?;
@@ -130,7 +132,7 @@ pub struct RenameSnapshotBody {
 /// PATCH /api/guild-backup/snapshots/{snapshot_id} — renomme une capture.
 /// Owner de la guild concernee requis (bypass interne bot).
 pub async fn rename_snapshot(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
     Path(snapshot_id): Path<String>,
     Json(body): Json<RenameSnapshotBody>,
 ) -> Result<StatusCode, ApiError> {
@@ -152,9 +154,18 @@ pub struct CaptureRequestBody {
 
 /// POST /api/guild-backup/{guild_id}/capture — publie un event Redis pour que
 /// le bot capture le serveur. Le web ne peut pas agir sur Discord : l'API se
-/// contente de publier `guild_backup:capture_requested`. Owner requis.
+/// contente de publier `guild_backup:capture_requested`.
+///
+/// **Controle d'acces** : assure par les middlewares du routeur — Bearer API
+/// key puis `superadmin_middleware`. Il n'y a PAS de gate « Owner » propre a ce
+/// handler, contrairement a ce que disait ce commentaire auparavant.
+///
+/// `requested_by` est derive de l'identite AUTHENTIFIEE, jamais du corps :
+/// c'est une trace d'audit d'une action massive, un appelant ne doit pas
+/// pouvoir l'attribuer a quelqu'un d'autre.
 pub async fn request_capture(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
+    user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<CaptureRequestBody>,
 ) -> Result<StatusCode, ApiError> {
@@ -163,25 +174,47 @@ pub async fn request_capture(
         serde_json::json!({
             "guild_id": guild_id,
             "label": body.label,
-            "requested_by": body.requested_by,
+            "requested_by": resolve_requester(&user),
         }),
     );
     Ok(StatusCode::ACCEPTED)
 }
 
+/// Identite a journaliser pour une action de sauvegarde/restauration.
+///
+/// Renvoie l'identifiant Discord authentifie quand l'appel vient du web. Pour
+/// un appel interne (bot/worker, Bearer sans `X-Discord-Token`), renvoie
+/// `"internal"` : mieux vaut une trace explicite qu'un `null` ambigu.
+fn resolve_requester(user: &Option<Extension<WebUser>>) -> String {
+    match user {
+        Some(Extension(ctx)) => ctx.discord_user_id.clone(),
+        None => "internal".to_string(),
+    }
+}
+
 /// Corps de `POST /snapshots/{snapshot_id}/restore` — demande de restauration.
+///
+/// `requested_by` a ete RETIRE volontairement : il etait fourni par l'appelant
+/// et servait ensuite de trace d'audit sur l'operation la plus destructive de
+/// l'API. N'importe qui pouvait donc attribuer un restore a un autre membre.
+/// L'identite est desormais derivee de l'authentification.
 #[derive(Debug, Deserialize)]
 pub struct RestoreRequestBody {
     #[serde(default)]
     pub wipe: bool,
-    #[serde(default)]
-    pub requested_by: Option<String>,
 }
 
 /// POST /api/guild-backup/snapshots/{snapshot_id}/restore — publie un event
-/// Redis pour que le bot restaure le serveur depuis la capture. Owner requis.
+/// Redis pour que le bot restaure le serveur depuis la capture.
+///
+/// **Controle d'acces** : Bearer API key puis `superadmin_middleware`, poses au
+/// niveau du routeur. Ce handler n'a PAS de gate « Owner » propre, contrairement
+/// a ce qu'affirmait ce commentaire auparavant, et le reglage
+/// « Roles autorises a restaurer » n'a jamais ete applique (cf. la migration
+/// qui le retire du schema de configuration).
 pub async fn request_restore(
-    State(state): State<AppState>,
+    State(state): State<GuildBackupState>,
+    user: Option<Extension<WebUser>>,
     Path(snapshot_id): Path<String>,
     Json(body): Json<RestoreRequestBody>,
 ) -> Result<StatusCode, ApiError> {
@@ -194,7 +227,7 @@ pub async fn request_restore(
             "guild_id": snapshot.guild_id,
             "snapshot_id": id.to_string(),
             "wipe": body.wipe,
-            "requested_by": body.requested_by,
+            "requested_by": resolve_requester(&user),
         }),
     );
     Ok(StatusCode::ACCEPTED)

@@ -9,14 +9,14 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::ModerationState;
 use axum::extract::State;
 use axum::Extension;
 use axum::Json;
 
 /// GET /api/strikes/config/{guild_id}
 pub async fn get_config(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<StrikeConfigDto>, ApiError> {
@@ -26,7 +26,7 @@ pub async fn get_config(
 
 /// PUT /api/strikes/config/{guild_id}
 pub async fn save_config(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<SaveStrikeConfigDto>,
@@ -39,7 +39,7 @@ pub async fn save_config(
 
 /// GET /api/strikes/{guild_id}/{user_id}
 pub async fn get_active_strikes(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<Vec<UserStrikeDto>>, ApiError> {
@@ -52,7 +52,7 @@ pub async fn get_active_strikes(
 
 /// POST /api/strikes
 pub async fn add_strike(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     Json(dto): Json<AddStrikeDto>,
 ) -> Result<Json<StrikeResultDto>, ApiError> {
@@ -80,7 +80,7 @@ pub async fn add_strike(
 
 /// DELETE /api/strikes/{guild_id}/{user_id}
 pub async fn reset_strikes(
-    State(state): State<AppState>,
+    State(state): State<ModerationState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {

@@ -93,3 +93,7 @@ impl CoussinStealUseCase for CoussinStealService {
         Ok(StealResult { success, amount })
     }
 }
+
+#[cfg(test)]
+#[path = "tests/coussin_steal_service.rs"]
+mod tests;

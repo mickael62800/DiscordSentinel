@@ -313,7 +313,6 @@ struct DiscordUser {
 
 // Suppress unused warnings on DateTime import — utile si on ajoute du tracking
 // temporel plus tard
-#[allow(dead_code)]
 fn _ensure_chrono_used() -> Option<DateTime<Utc>> {
     None
 }

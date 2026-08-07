@@ -15,10 +15,10 @@ use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::ports::inbound::community::manage_members::ManageMembersUseCase;
-use sentinel_api::ports::inbound::community::manage_members::RegisterMemberCommand;
-use sentinel_api::ports::inbound::community::manage_members::SyncMembersCommand;
-use sentinel_api::ports::inbound::community::manage_members::UpdateMemberCommand;
+use sentinel_core::ports::inbound::community::manage_members::ManageMembersUseCase;
+use sentinel_core::ports::inbound::community::manage_members::RegisterMemberCommand;
+use sentinel_core::ports::inbound::community::manage_members::SyncMembersCommand;
+use sentinel_core::ports::inbound::community::manage_members::UpdateMemberCommand;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
 use sentinel_core::domain::entities::community::guild_member::MemberInfractions;
 use sentinel_core::domain::entities::community::guild_member::MemberModeration;
@@ -178,7 +178,7 @@ impl ManageMembersUseCase for MockMembersUC {
 
 fn build_state(uc: Arc<MockMembersUC>) -> AppState {
     let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
-    state.members_uc = uc;
+    state.community.members_uc = uc;
     state.discord_api = Arc::new(test_helpers::MockDiscordApi::new());
     state
 }

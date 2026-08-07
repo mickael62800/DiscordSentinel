@@ -74,7 +74,6 @@ impl ChannelTensionBuffer {
     }
 
     /// Retourne la somme courante sans rien modifier. Utile pour les tests.
-    #[allow(dead_code)]
     pub fn current_sum(&self, guild_id: &str, channel_id: &str) -> f64 {
         let guard = self.inner.lock().expect("channel tension mutex poisoned");
         guard

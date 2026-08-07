@@ -1,6 +1,57 @@
 # DiscordSentinel
 
-Plateforme de modération et d'animation distribuée pour serveurs Discord. Architecture microservices : **un bot Discord unifié** (interface Serenity), **API centrale** (intelligence + IA), **gateway WebSocket** (temps réel), **app web** (administration), **un worker unifié `sentinel-worker`** (scheduler regroupant 17 domaines périodiques), **inférence ONNX** embarquée.
+Monorepo Rust hébergeant **deux plateformes Discord** qui partagent la même infrastructure, le même dashboard web et les mêmes conventions d'architecture :
+
+- **Sentinel** — modération, sécurité et animation de serveurs Discord (bot unifié + API + worker + gateway).
+- **Nexus** — plateforme de **serveurs de jeux** (provisioning Docker, templates, catalogue) et de mini-jeux / casino.
+
+Architecture **hexagonale** dans les deux cas : un crate `*-core` pur (domain / application / ports), des crates `*-api`, `*-bot`, `*-worker`, `*-gateway` qui n'en sont que des adaptateurs.
+
+---
+
+## Vue d'ensemble du workspace
+
+```
+DiscordSentinel/
+├── platform-common/     # Socle partagé — bus d'événements Redis Streams (aucun framework)
+├── platform-common-api/ # Middlewares HTTP partagés — rate limit, métriques, CORS, en-têtes
+│
+├── sentinel-core/       # Cœur hexagonal Sentinel — domain / application / ports (aucune dep infra)
+├── sentinel-api/        # API Axum 0.8 — adapters inbound (HTTP + gRPC) & outbound (Postgres, Redis, Discord)
+├── sentinel-bot/        # Bot Discord unifié (Serenity 0.12) — 25 modules, un seul process
+├── sentinel-worker/     # Meta-scheduler Tokio — 16 domaines périodiques
+├── sentinel-gateway/    # Relay Redis Streams → WebSocket
+├── sentinel-proto/      # Définitions gRPC (tonic + prost)
+│
+├── nexus-core/          # Cœur hexagonal Nexus — jeux, serveurs de jeux, casino, wallet
+├── nexus-api/           # API HTTP Nexus (axum) + runtime Docker des serveurs de jeux
+├── nexus-bot/           # Bot Discord Nexus (portail de jeux, roue, coussin)
+├── nexus-worker/        # Jobs de fond Nexus
+├── nexus-gateway/       # Point d'entrée réseau Nexus (stub)
+├── nexus-proto/         # Protos gRPC Nexus (stub)
+│
+├── web/                 # Dashboard Vue 3 + TS + Vite + Pinia (partagé Sentinel/Nexus, multi-marque)
+├── infrastructure/      # docker/ (compose, bake, Dockerfiles), grafana/, prometheus/, scripts/
+├── sentinel-ml/         # Configs d'entraînement YAML + points de montage des exports ONNX
+├── persona/             # 17 fiches de personas markdown (utilisées par la skill /party-mode)
+├── docs/                # Documentation ponctuelle
+└── Cargo.toml           # Workspace Rust — 14 crates
+```
+
+### Poids relatif des composants
+
+| Crate / dossier | Fichiers | Lignes | Rôle |
+|---|---:|---:|---|
+| `sentinel-api` | 837 | ~93 k | 21 fichiers de routes, 108 handlers, adapters Postgres/Redis |
+| `sentinel-bot` | 202 | ~48 k | 25 modules Discord |
+| `sentinel-core` | 466 | ~42 k | domain + ~70 services applicatifs |
+| `web` | 410 | ~44 k | dashboard Vue 3 (atomic design) |
+| `nexus-core` | 90 | ~7,8 k | jeux, serveurs, casino |
+| `nexus-api` | 77 | ~7,4 k | HTTP + `game_runtime` (bollard) |
+| `nexus-bot` | 7 | ~3,8 k | portail de jeux, roue, coussin |
+| `sentinel-worker` | 60 | ~5,6 k | 16 domaines périodiques |
+| `sentinel-gateway` | 7 | ~0,8 k | broadcaster WebSocket |
+| `nexus-worker` / `nexus-gateway` / `*-proto` | — | < 0,3 k | jobs + stubs |
 
 ---
 
@@ -10,51 +61,52 @@ Plateforme de modération et d'animation distribuée pour serveurs Discord. Arch
 Discord Messages / Events / Images
        │
        ▼
-┌─────────────────────────────────────────────────────────────┐
-│      Bot Discord unifié (Serenity 0.12)  — sentinel-bot      │
-│   22 modules : ai_dataset · announcements · audit · automod ·│
-│   blackjack · bump · cleanup · command_channel · community · │
-│   confessions · games · moderation · progression ·           │
-│   rotation · security · slot · tamagotchi · tickets · voice ·│
-│   welcome · wheel                                            │
-└────────────┬─────────────────────────────────┬──────────────┘
-             │ HTTP (BaseApiClient keep-alive)  │ Redis streams
-             ▼                                  ▼
+┌──────────────────────────────────────────────────────────────┐
+│      Bot Discord unifié (Serenity 0.12)  — sentinel-bot       │
+│  25 modules : ai_dataset · announcements · audit · automod ·  │
+│  bump · cleanup · command_channel · community · confessions · │
+│  embeds · emoji · guild_backup · help_panel · ideas ·         │
+│  logs_setup · messages · moderation · nasa_apod · presence ·  │
+│  progression · rotation · security · tickets · voice · welcome│
+└────────────┬──────────────────────────────────┬──────────────┘
+             │ HTTP (BaseApiClient keep-alive)   │ Redis Streams
+             ▼                                   ▼
 ┌─────────────────────────┐         ┌──────────────────────────┐
-│  API backend (Axum 0.8) │◄────────┤  Gateway WebSocket       │
-│  sentinel-api           │         │  sentinel-gateway        │
-│  - 1 migration init     │         │  (relay Redis → clients) │
-│  - ONNX inference       │         └─────────┬────────────────┘
-│  - ~150 handlers HTTP   │                   │
-│  - Hexagonal            │                   │
-│  - guild_auth multi-    │                   │
-│    tenant (OAuth2)      │                   │
-│  - OAuth Discord        │                   │
+│  sentinel-api (Axum 0.8)│◄────────┤  sentinel-gateway        │
+│  adapters HTTP + gRPC   │         │  (relay Redis → clients) │
+│  ONNX inference         │         └─────────┬────────────────┘
+│  guild_auth multi-tenant│                   │
 └──────┬──────────────┬───┘                   │
        │              │                       │
+       │ délègue à    │                       │
+       ▼              │                       │
+┌──────────────────┐  │                       │
+│  sentinel-core   │  │                       │
+│  domain /        │  │                       │
+│  application /   │  │                       │
+│  ports (pur)     │  │                       │
+└──────────────────┘  │                       │
        │ PostgreSQL   │ Redis                 │
        ▼              ▼                       ▼
 ┌───────────┐  ┌───────────┐        ┌────────────────────────┐
-│ Postgres  │  │  Redis    │        │ web (Vue 3)   │
+│ Postgres  │  │  Redis    │        │ web (Vue 3)            │
 │(PgBouncer)│  │ (cache +  │        │ OAuth2 Discord + WS    │
-│ 1 mig init│  │  streams) │        └────────────────────────┘
-└─────┬─────┘  └─────┬─────┘
-      │              │
+└─────┬─────┘  │  streams) │        └────────────────────────┘
+      │        └─────┬─────┘
       └──────┬───────┘
              ▼
-┌─────────────────────────────────────────┐
-│ sentinel-worker (Tokio) — worker unifié  │
-│ Meta-scheduler, 17 domaines périodiques: │
-│ ai · analytics · announcements ·         │
-│ appeal_sla · audit_cache · automod ·     │
-│ cache · cleanup · discord_audit_sync ·   │
-│ export · game_portal · guild_backup ·    │
-│ moderation · monitoring · security ·     │
-│ temp_roles · tickets                     │
+┌─────────────────────────────────────────┐    ┌──────────────────────┐
+│ sentinel-worker (Tokio) — 16 domaines   │    │ Stack Nexus          │
+│ ai · analytics · announcements ·        │    │ nexus-api + bot +    │
+│ appeal_sla · audit_cache · automod ·    │    │ worker (serveurs de  │
+│ cache · cleanup · discord_audit_sync ·  │    │ jeux via Docker)     │
+│ export · guild_backup · moderation ·    │    └──────────────────────┘
+│ monitoring · security · temp_roles ·    │
+│ tickets                                 │
 └─────────────────────────────────────────┘
 ```
 
-**Philosophie** : Bot = interface légère (multi-module dans un seul process) · API = cerveau (décisions + IA + persistance) · Gateway = temps réel découplé · Workers = jobs DB-bound périodiques · Web = admin remote.
+**Philosophie** : `*-core` = les règles métier · API = adaptateurs + IA + persistance · Bot = interface Discord légère · Gateway = temps réel découplé · Worker = jobs DB-bound périodiques · Web = administration.
 
 ---
 
@@ -62,337 +114,232 @@ Discord Messages / Events / Images
 
 | Composant | Technologie | Détails |
 |---|---|---|
-| API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~150 handlers, 1 migration init (historique archivé dans migrations_legacy/), ONNX inference, OAuth Discord |
-| Gateway WebSocket | Rust / Axum 0.8 / Redis | Service dédié temps réel, auto-reconnect exponential backoff |
-| Bot Discord unifié | Rust / Serenity 0.12 | Process unique, 22 modules chargés dynamiquement selon config per-guild (helpers communs dans `src/shared/`) |
-| Worker unifié | Rust / Tokio / sqlx / lib `worker-common` | 1 binaire `sentinel-worker` (meta-scheduler, 17 domaines périodiques), heartbeat + métriques Prometheus |
-| gRPC | `tonic` 0.13 + `prost` 0.13 | Crate `sentinel-proto` (CRUD voice/IA/modération en gRPC) |
-| PostgreSQL | Postgres 16 + **PgBouncer** | 1 migration init (historique archivé dans migrations_legacy/), partitionnement RANGE mensuel, vues matérialisées |
-| Cache / Bus | Redis 7 | `maxmemory=2gb allkeys-lru`, **Redis Streams** (`sentinel:events`, consumer groups durables), cache `user_guilds` multi-tenant |
-| Inférence IA | ONNX Runtime 2.0 (`ort` 2.0-rc.12) / ndarray / tokenizers | Vision (NSFW/illicite) + Text (sentiments multilingues) |
-| Web dashboard | Vue 3 + TS + Vite + Pinia + Chart.js | `web` — servi par Nginx (Dockerfile + nginx.conf) |
+| Socles partagés | Rust pur / axum | `platform-common` (bus Redis) et `platform-common-api` (middlewares), séparés par surface de dépendances |
+| Cœur métier | Rust pur | `sentinel-core` : `domain/{entities,enums,services}`, `application/*`, `ports/{inbound,outbound}` + `uow.rs` |
+| API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | `sentinel-api` réduit aux adapters : `adapters/inbound/{http,grpc}`, `adapters/outbound/{postgres,ws,audit,batching,host_security,system}`, `bootstrap/` |
+| Bot Discord | Rust / Serenity 0.12 | Process unique, 25 modules chargés selon la config per-guild ; helpers dans `src/shared/` (api_client, circuit_breaker, event_bus, grpc_client, shard_launcher, …) |
+| Worker | Rust / Tokio / sqlx | 1 binaire `sentinel-worker` (`scheduler.rs` + `domains/`), heartbeat + métriques Prometheus |
+| Gateway | Rust / Axum / Redis | Relay `XREAD $` → WebSocket, auto-reconnect exponential backoff |
+| gRPC | `tonic` 0.13 + `prost` 0.13 | Crate `sentinel-proto`, serveur dans `adapters/inbound/grpc/` |
+| PostgreSQL | Postgres 16 + **PgBouncer** | 17 migrations Sentinel + 24 migrations Nexus, partitionnement RANGE mensuel, vues matérialisées |
+| Cache / Bus | Redis 7 | `maxmemory=2gb allkeys-lru`, **Redis Streams** (`sentinel:events`, consumer groups durables) |
+| Inférence IA | ONNX Runtime (`ort` 2.0-rc) / ndarray / tokenizers | Vision (NSFW/illicite) + Text (sentiments multilingues) |
+| Serveurs de jeux | `bollard` 0.18 (Docker API) | `nexus-api/adapters/outbound/game_runtime` — provisioning conteneurisé |
+| Middlewares HTTP | `tower-http` 0.6 | Pile identique sur les deux APIs : CORS, en-têtes de sécurité, trace + request-id, limite de corps, compression zstd/gzip, rate limit par IP, métriques |
+| Web dashboard | Vue 3 + TS + Vite + Pinia + Chart.js | `web/` — atomic design (`atoms/molecules/organisms/templates/pages`), servi par Nginx |
 | Observabilité | Prometheus + Grafana + tokio-metrics | Middleware Axum metrics, dashboards provisionnés |
-| Containerisation | Docker Alpine multi-stage + Compose | Infra + API + gateway + bot + workers + web + monitoring |
+| Containerisation | Docker Alpine multi-stage + Compose + Bake | `infrastructure/docker/` |
 
-**Dépendances workspace** : `tokio`, `serde`, `reqwest 0.12` (rustls, pool tuné), `sqlx 0.8`, `chrono`, `uuid`, `tracing`, `async-trait`, `tower-http` (CORS, compression zstd/gzip, rate limit, request-id), `ort` (ONNX), `tokenizers`, `ndarray`, `redis 0.27` (streams), `tonic`/`prost` (gRPC), `metrics-exporter-prometheus`, `tokio-metrics`, `tikv-jemallocator` (Linux/macOS). Profil release : `lto = "thin"`, `codegen-units = 16`, `strip = true`.
-
----
-
-## Structure du projet
-
-```
-DiscordSentinel/
-├── web/                # Vue 3 web dashboard (Pinia, vue-router, Chart.js, Nginx)
-│
-├── sentinel-bot/                # Bot Discord unifié (single process, 22 modules)
-│   └── src/
-│       ├── modules/             # ai_dataset · announcements · audit · automod · blackjack ·
-│       │                        # bump · cleanup · command_channel · community · confessions ·
-│       │                        # games · moderation · progression · rotation ·
-│       │                        # security · slot · tamagotchi · tickets · voice ·
-│       │                        # welcome · wheel
-│       └── shared/              # Helpers communs (api_client, event_bus, cache_settings, embeds, grpc_client, ...)
-│
-├── sentinel-api/                # API backend (Axum 0.8) — hexagonal
-│   ├── src/
-│   │   ├── adapters/inbound/http/   # handlers, 21 fichiers de routes, middlewares (auth, guild_auth, rate_limit, api_logger, metrics)
-│   │   ├── adapters/inbound/grpc/   # services gRPC (voice, ai, moderation)
-│   │   ├── adapters/outbound/       # repositories postgres, redis_cache
-│   │   ├── application/             # use case services
-│   │   ├── domain/                  # entities, value_objects, services (ONNX, Discord API)
-│   │   └── ports/                   # traits inbound/outbound
-│   └── migrations/                  # 1 migration init (historique dans migrations_legacy/)
-│
-├── sentinel-gateway/            # WebSocket relay (Redis → clients)
-├── sentinel-proto/              # Définitions gRPC (`tonic` + `prost`)
-├── sentinel-worker/             # Meta-scheduler unifié — 17 domaines périodiques
-│
-├── sentinel-ml/                 # Configs d'entraînement (YAML) + dossiers d'exports ONNX (montés par Docker)
-├── infrastructure/              # docker/ (compose + Dockerfiles), prometheus.yml, grafana, scripts/ (build-all, dev, health-check, ...)
-│                                # (partagé par les stacks Sentinel et Nexus — ex-sentinel-infrastructure/)
-│
-├── nexus-core/                  # Nexus (jeux) — cœur hexagonal pur (scaffold)
-├── nexus-api/                   # Nexus — API HTTP axum (scaffold)
-├── nexus-bot/                   # Nexus — bot Discord serenity (scaffold)
-├── nexus-worker/                # Nexus — worker tokio (scaffold)
-├── nexus-gateway/               # Nexus — gateway (scaffold)
-├── nexus-proto/                 # Nexus — définitions gRPC (stub)
-│
-├── Cargo.toml                   # Workspace Rust (11 crates)
-└── README.md                    # ← ce fichier
-```
-
-> Note : `web/` et `infrastructure/` (ex-`sentinel-web/` / `sentinel-infrastructure/`)
-> sont désormais partagés par les deux stacks (Sentinel et Nexus).
-
-## Nexus (plateforme jeux, en construction)
-
-Nouvelle plateforme de jeux, architecture calquée sur Sentinel (hexagonale) :
-
-- `nexus-core` — lib pure : domain / application / ports, zéro dépendance infra
-- `nexus-api` — API HTTP (axum), port `NEXUS_API_PORT` (défaut 3100)
-- `nexus-bot` — bot Discord (serenity) ; ne se connecte pas sans `NEXUS_DISCORD_TOKEN`
-- `nexus-worker` — jobs de fond (tokio)
-- `nexus-gateway` — point d'entrée réseau
-- `nexus-proto` — protos gRPC (stub, modèle `sentinel-proto`)
+Profil release partagé : `lto = "thin"`, `codegen-units = 16`, `strip = true`. Deps communes déclarées une seule fois dans le `Cargo.toml` racine (`[workspace.dependencies]`), lints clippy partagés via `[workspace.lints]`.
 
 ---
 
-## Modules, fonctionnalités & commandes
+## Sentinel — modules du bot (25)
 
-Le bot expose **22 modules** activables/configurables par serveur (table `bot_guild_config`, schéma de formulaire dans `bot_definitions.config_schema`, éditables depuis le dashboard web). Chaque commande slash est filtrée par module activé **et** par permission Discord. Référence détaillée : [`docs/COMMANDES_ADMIN.md`](docs/COMMANDES_ADMIN.md) (staff) et [`docs/COMMANDES_UTILISATEURS.md`](docs/COMMANDES_UTILISATEURS.md) (membres).
+Chaque module est activable/configurable par serveur (table `bot_guild_config`, schéma de formulaire dans `bot_definitions.config_schema`, éditable depuis le dashboard web). Chaque commande slash est filtrée par module activé **et** par permission Discord.
 
 ### 🤖 automod — Modération automatique + vote des modérateurs
 
-Analyse chaque message (texte + images) : détecteurs locaux (spam, insulte, lien, phishing, caps, flood, emoji, mentions, unicode, fichiers suspects) **+** IA ONNX (texte multilingue, vision NSFW/illicite). Chaque flag a un **poids** ; la somme donne un **score** comparé aux **seuils** (warn / delete / mute / ban) configurés sur la page **Règles de modération** (`/api/rules`).
+Analyse chaque message (texte + images) : détecteurs locaux (spam, insulte, juron, lien, phishing, caps, flood, emoji, mentions, unicode, fichiers suspects) **+** IA ONNX (texte multilingue, vision NSFW/illicite). Chaque flag a un **poids** ; la somme donne un **score** comparé aux **seuils** (warn / delete / mute / ban).
 
-**Selon le score et la config**, le message :
-- est traité **automatiquement** (warn / delete / mute appliqués ; le ban n'est jamais automatique → simple signalement), **ou**
-- déclenche une **carte de review/vote** dans le salon de review (`log_channel_id`).
+Selon le score et la config, le message est traité **automatiquement** (warn / delete / mute ; le ban n'est jamais automatique) **ou** déclenche une **carte de review/vote** dans le salon de review.
 
-**Système de vote** (`vote_enabled`) : la carte affiche le contexte et des boutons **Warn / Delete / Mute / Ban / Ignorer**. Les modérateurs votent ; à l'échéance (`vote_deadline_hours`) le `sentinel-worker` (domaine `automod`) dépouille (quorum + tie-break) ; un **administrateur finalise** via un bouton dédié (seule voie d'un ban réel).
+**Système de vote** (`vote_enabled`) : boutons **Warn / Delete / Mute / Ban / Ignorer**. À l'échéance (`vote_deadline_hours`) le domaine `automod` du worker dépouille (quorum + tie-break) ; un **administrateur finalise** (seule voie d'un ban réel).
 
-- **Regroupement par utilisateur** (`vote_aggregate_enabled`) : tant qu'une carte est ouverte pour un membre, les nouveaux signalements **s'agrègent** dans la même carte (liste d'incidents, score cumulé, deadline prolongée) au lieu de spammer des cartes.
-- **Salon de discussion** (`discussion_channel_enabled`) : un bouton « Ouvrir une discussion » crée un **salon textuel privé** (membre concerné + rôle modo) sous une catégorie configurable (`discussion_category_id`), avec un message de contexte épinglé, pour échanger avant décision.
+- **Regroupement par utilisateur** (`vote_aggregate_enabled`) : les nouveaux signalements s'agrègent dans la carte ouverte.
+- **Salon de discussion** (`discussion_channel_enabled`) : bouton créant un salon privé membre + modo sous une catégorie configurable.
 
-| Commande | Permission | Rôle |
-|---|---|---|
-| `/automod status` / `/automod test` | Gérer le serveur | État des caches/trackers ; tester l'analyse d'un message |
+| Commande | Permission |
+|---|---|
+| `/automod status` · `/automod test` | Gérer le serveur |
 
-### ⚖️ moderation — Modération manuelle (22 commandes)
+### ⚖️ moderation — Modération manuelle
 
 Sanctions (`/warn`, `/unwarn`, `/mute`, `/unmute`, `/ban`, `/unban`, `/massmute`, `/massban`), dossiers (`/history`, `/note`, `/context`, `/evidence`, `/expirations`, `/compare`, `/call`), outils (`/appeal`, `/review`, `/template`, `/transcript`, `/export`, `/modstats`).
 
-- **`/card`** — crée manuellement une carte de vote (identique à l'automod, contexte **avant + après** le message) quand une détection est passée au travers. Cible via **lien Discord** (cross-salon) ou ID. Postée dans le salon de review automod, flux de vote/finalisation complet.
-- **`/context`** — affiche les messages autour d'un message pour comprendre une situation.
+- **`/card`** — crée manuellement une carte de vote quand une détection est passée au travers (ciblage par lien Discord cross-salon ou par ID).
+- **`/context`** — affiche les messages autour d'un message.
+- Côté core : sursis, strikes/escalade, copilote de modération, évaluation du risque d'une cible.
 
 ### 🔐 security — Anti-raid / alt accounts
 
-Détection de raids (pics de joins), comptes récents/alt, captcha, quarantaine, lockdown, slowmode adaptatif. `/security status`, `/security history`. *(Seuils & toggles configurés au démarrage via variables d'env — voir section Déploiement.)*
+Détection de raids (pics de joins), comptes récents/alt, captcha, quarantaine, lockdown, slowmode adaptatif, bans IP, GeoIP. `/security status`, `/security history`.
 
-### 🎉 welcome — Accueil & onboarding
+### 💾 guild_backup — Sauvegarde / restauration de serveur
 
-Messages de bienvenue / départ / retour (rich embeds), validation du règlement (bouton → rôle), anniversaires d'arrivée, et **deux compteurs de salon renommés** :
-- **Compteur de membres** (`counter_*`) → ex. `Membres : 1234`
-- **Compteur de présence vocale** (`voice_counter_*`) → ex. `En Vocal : 5`, mis à jour à chaque connexion/déconnexion vocale.
+Capture la structure complète d'un serveur (rôles, catégories, salons + overwrites, réglages, bans, emojis, rôles par membre) vers l'API, et la restaure via Serenity avec **remapping d'IDs**. Action massive/destructive : réservée à l'**owner** ou à un Administrateur, avec confirmation par bouton. Domaine worker dédié (`guild_backup`) + service core `manage_snapshots_service`.
 
-*(Pas de commande : tout se configure via le dashboard web `/api/welcome`.)*
+### 💡 ideas — Boîte à idées
 
-### 🔊 voice — Salons vocaux temporaires
-
-Création à la volée (salon « créateur »), panneau de contrôle (renommer, lock, limite, visibilité, kick, ban, co-admins, transfert, file d'attente, vote-kick), thèmes réutilisables, cleanup auto des salons vides, liens d'invitation.
-
-- **Whitelist persistante par propriétaire** (« liste d'amis ») : réappliquée à chaque création de salon.
-- **Preset de paramètres par propriétaire** : le bouton **« Sauvegarder params »** mémorise l'état courant (nom, limite, visibilité, verrou, file) ; à la création suivante, le salon reprend ces réglages **et** la whitelist. Mode **caché-sauf-whitelist** : `@everyone` ne voit pas le salon, seuls les membres whitelistés y accèdent.
-
-### 🐾 tamagotchi — Compagnon virtuel
-
-Jeu d'animation (coins partagés). Panneau public → **salon privé par joueur** : choix d'espèce à la naissance, puis **carte** du compagnon (rendu PNG) avec boutons de soin (Nourrir / Jouer / Dormir / Câliner), entraînement de stats, boutique, visite, combat PvP asynchrone (ELO).
-
-- **Cycle de vie** : le `sentinel-worker` (domaine `tamagotchi`) applique périodiquement la décroissance des jauges (faim / bonheur / énergie) et les transitions **maladie → mort → guérison**, selon des seuils configurables par serveur. Pagination par curseur (aucune limite sur le nombre de compagnons).
-- **Rafraîchissement automatique de la carte** dans Discord : tâche par serveur, **fréquence réglable sur le web** (`card_refresh_interval_minutes`). La carte est ré-éditée sans intervention du joueur.
-- **Notifications** : DM au propriétaire + édition immédiate de la carte quand le compagnon tombe malade ou meurt (event Redis Stream consommé par le bot).
-
-| Commande | Permission | Rôle |
-|---|---|---|
-| `/tama-setup` | Admin | Déploie le panneau public « Ouvrir mon compagnon » |
+Panneau public → bouton « Proposer une idée » → catégorie → modale (titre + description) → salon privé auteur + staff, avec carte de décision réservée au staff. Messages synchronisés vers l'API pour relecture depuis le web (event Redis `idea_decided`).
 
 ### 🎫 tickets — Support
 
-`/ticket close` (membre), `/ticket-admin panel|invite` (staff). SLA, fermeture sur inactivité, transcripts.
+`/ticket close` (membre), `/ticket-admin panel|invite` (staff). SLA (domaine worker `appeal_sla`), fermeture sur inactivité, transcripts.
 
 ### 🔎 audit — Journal d'audit Discord
 
-`/audit search`, `/audit stats`. Ingestion des audit-logs (domaine `discord_audit_sync` du worker), surveillance d'utilisateurs, rapports hebdomadaires.
+`/audit search`, `/audit stats`. Ingestion des audit-logs (domaine worker `discord_audit_sync`), surveillance d'utilisateurs, rapports hebdomadaires, détection d'anomalies de modération.
+
+### 🎉 welcome — Accueil & onboarding
+
+Messages de bienvenue / départ / retour (rich embeds), validation du règlement (bouton → rôle), anniversaires d'arrivée, **compteur de membres** et **compteur de présence vocale** (salons renommés).
+
+### 🔊 voice — Salons vocaux temporaires
+
+Création à la volée, panneau de contrôle (renommer, lock, limite, visibilité, kick, ban, co-admins, transfert, file d'attente, vote-kick), thèmes réutilisables, cleanup auto.
+
+- **Whitelist persistante par propriétaire**, réappliquée à chaque création.
+- **Preset de paramètres par propriétaire** (« Sauvegarder params ») + mode **caché-sauf-whitelist**.
+
+### 👥 community — Rôles, parrainage, vie du serveur
+
+Panels de rôles auto-assignables (`/roles-panel`), groupes exclusifs, auto-rôles, **rôles temporaires**, parrainage (`/parrain`). Côté core : événements, sondages, LFG, news, spotlight, classement mensuel, éligibilité, déclaration d'âge.
 
 ### 📈 progression — Niveaux & XP
 
-XP par activité (messages, vocal, ancienneté), rôles de niveau. `/level user|top`, `/stats`, `/progression-resync` (admin).
+XP par activité (messages, vocal, ancienneté), rôles de niveau et paliers. `/level user|top`, `/stats`, `/progression-resync`.
 
 ### 🧹 cleanup — Nettoyage
 
-`/purge last|user|contains` (Gérer les messages), `/cleanup logs|infractions|audit` (admin).
+`/purge last|user|contains`, `/cleanup logs|infractions|audit`, autopurge planifiée par salon.
 
-### 👥 community — Rôles & parrainage
+### 📣 announcements · 🖼️ embeds · ✉️ messages — Publication depuis le web
 
-`/roles-panel` (panels de rôles auto-assignables, staff), `/parrain` (parrainage de nouveaux membres).
+Trois consumers Redis Streams complémentaires :
+- **announcements** — annonces planifiées, publiées par le worker puis postées par le bot (résultat rapporté à l'API).
+- **embeds** — builder d'embeds style Carl-bot : poste **ou édite** une carte selon `message_id`, puis rapporte `(channel_id, message_id)`.
+- **messages** — pendant dépouillé : poste du markdown brut, sans carte, quand le message doit ressembler à celui d'un membre.
+
+### 🛰️ presence — Présence en direct (page membre publique)
+
+Publie qui est dans quel salon vocal, **uniquement** pour les salons visibles par `@everyone` — filtre **fermant** : en cas de doute (salon absent du cache, guilde inconnue), rien n'est publié. Seul le bot peut trancher, l'API n'ayant pas de vue sur les permissions Discord.
+
+### 🌌 nasa_apod — Astronomy Picture of the Day
+
+Publie chaque jour l'APOD de la NASA dans un salon configuré, traduite en français via DeepL si une clé est fournie (repli en anglais sinon). Idempotent : ne republie pas si la photo du jour est déjà présente.
 
 ### 🔁 rotation — Administrateur tournant
 
-Chaque période, un modérateur (rôle configuré) devient administrateur à tour de rôle, après acceptation en MP + validation de l'owner. Le précédent admin redevient modérateur. État persisté via `/api/rotation`.
+Chaque période, un modérateur devient administrateur à tour de rôle, après acceptation en MP + validation de l'owner. Le précédent redevient modérateur.
 
-### 🤫 confessions — Confessions anonymes
+### 🤫 confessions · ⬆️ bump · 💬 command_channel · 🧠 ai_dataset · 😀 emoji · ❓ help_panel · 🗂️ logs_setup
 
-`/confess` (membre, anonyme), `/confess-admin deploy-panel|delete|reveal` (admin).
+- **confessions** — `/confess` (anonyme), `/confess-admin deploy-panel|delete|reveal`.
+- **bump** — détecte un `/bump` Disboard réussi (providers configurables), récompense en coins selon le nombre de bumps de la semaine, rappelle après cooldown.
+- **command_channel** — supprime en silence les messages texte classiques dans les salons « commandes uniquement » (owner et bots épargnés).
+- **ai_dataset** — désactivé par défaut ; alimente `ai_dataset_messages` pour l'étiquetage manuel et l'export CSV depuis le web.
+- **emoji** / **help_panel** / **logs_setup** — utilitaires : emojis du serveur, panneau d'aide (off par défaut), configuration guidée des salons de logs.
 
-### 📣 announcements — Annonces planifiées
+---
 
-Annonces programmées (publiées par le worker, consommées via Redis Stream par le bot).
+## Nexus — plateforme de jeux
 
-### ⬆️ bump — Récompenses Disboard
+`nexus-core` suit la même structure hexagonale que `sentinel-core` (`domain/{entities,enums,services}`, `application/`, `ports/`).
 
-Détecte un `/bump` Disboard réussi, récompense l'auteur en coins (montant gradué selon le nombre de bumps de la semaine, calculé côté API) et rappelle quand un nouveau bump est possible après le cooldown.
+### Serveurs de jeux (`application/game`)
 
-### 💬 command_channel — Salons « commandes uniquement »
+Provisioning de serveurs de jeux dédiés en conteneurs Docker, piloté depuis le dashboard :
 
-Supprime en silence tout message texte classique dans les salons configurés (les commandes slash, étant des interactions, ne sont pas affectées). L'owner et les bots ne sont jamais supprimés.
+- **Templates** (`manage_templates_service`) — catalogue de jeux (7 Days to Die, Valheim, Palworld, …), covers, réglages exposés, mods/plugins, limites CPU/RAM.
+- **Serveurs** (`manage_game_servers_service`) — cycle de vie, sessions, événements de session, jobs de fond, génération de mots de passe, chargement de config.
+- **Runtime** (`nexus-api/adapters/outbound/game_runtime`) — pilotage Docker via `bollard`.
+- Routes : `servers`, `public_servers`, `templates`, `sessions`, `session_events`, `jobs`, `games`.
 
-### 🧠 ai_dataset — Collecte de dataset IA
+### Casino & économie (`domain/entities/casino`)
 
-Module indépendant (désactivé par défaut) : quand actif, envoie chaque message non-bot à `POST /api/ai-dataset/collect` pour alimenter la table `ai_dataset_messages`. La page web « Dataset IA » permet l'étiquetage manuel et l'export CSV.
+`wallet`, `wheel` (roue du destin — voir [`docs/roue-du-destin.md`](docs/roue-du-destin.md)), `coussin` / `coussin_shop` (voir `COUSSIN_PIEGE.md`). Le bot Nexus expose le portail de jeux (`game_portal.rs`), la roue (`wheel_panel.rs`) et le catalogue (`games.rs`).
 
-### 🎮 Jeux & casino
-
-- **games** — `/game list|join|leave`, `/game-admin` (catalogue de jeux + panels d'inscription).
-- **blackjack** — `/blackjack` (solo) + tables multijoueur via `/blackjack-setup`.
-- **slot** — `/slot-setup` (machine à sous, jackpot progressif).
-- **wheel** — `/wheel-setup` (roue du destin).
+> Historique : les modules de jeux (blackjack, slot, wheel, games, tamagotchi) vivaient auparavant dans `sentinel-bot`. Ils ont été extraits vers la stack Nexus.
 
 ---
 
 ## Base de données
 
-**PostgreSQL 16** derrière **PgBouncer** (transaction pooling). **1 migration init** (`sentinel-api/migrations/001_init.sql`, base vierge requise — historique archivé dans `sentinel-api/migrations_legacy/`).
+**PostgreSQL 16** derrière **PgBouncer** (transaction pooling).
+
+- **Sentinel** — `sentinel-api/migrations/` : `001_init.sql` (base vierge requise, historique archivé dans `migrations_legacy/`) puis 16 migrations incrémentales (community events, paliers de rôles, embeds builder, idées, autopurge par salon, scoring automod, …).
+- **Nexus** — `nexus-api/migrations/` : 24 migrations (wallet, coussin, game portal, templates, mods/plugins, économie, roue configurable, …).
 
 ### Optimisations structurelles
 
-- **Vues matérialisées** (`mv_wallet_leaderboard`, `mv_level_leaderboard`) refreshées toutes les 5 min par le domaine `cache` du worker. Gain 100–1000× sur les endpoints leaderboard.
-- **Partitionnement RANGE mensuel** sur 4 tables hot : `infractions`, `audit_logs`, `user_activity_log`, `logs`. Génération automatique M+1/M+2 par le domaine `cache`.
-- **Enums Postgres** : `moderation_gravity`, `voice_channel_kind` (wrappers Rust `#[derive(sqlx::Type)]`). `discord_roles.permissions` en `BIGINT`.
-- **Index GIN** sur `infractions.flags`, `security_events.user_ids`, `bot_definitions.config_schema`. Partials soft-delete sur `voice_channels` + `tickets`. Discord IDs typés `VARCHAR(20)`.
-- **Table `user_cache`** : source de vérité des usernames Discord, alimentée par agrégation périodique depuis 4 tables hot.
-- **Table `ai_jobs`** : file d'attente asynchrone pour l'inférence IA (consommée par le domaine `ai`).
+- **Vues matérialisées** (`mv_wallet_leaderboard`, `mv_level_leaderboard`) refreshées toutes les 5 min par le domaine `cache` du worker.
+- **Partitionnement RANGE mensuel** sur `infractions`, `audit_logs`, `user_activity_log`, `logs` — génération automatique M+1/M+2 par le domaine `cache`.
+- **Enums Postgres** (`moderation_gravity`, `voice_channel_kind`) mappés en Rust via `#[derive(sqlx::Type)]`.
+- **Index GIN** sur `infractions.flags`, `security_events.user_ids`, `bot_definitions.config_schema` ; partials soft-delete sur `voice_channels` et `tickets` ; Discord IDs en `VARCHAR(20)`.
+- **`user_cache`** : source de vérité des usernames Discord, agrégée périodiquement.
+- **`ai_jobs`** : file d'attente asynchrone pour l'inférence IA.
 
 ### Tables principales (extrait)
 
 | Table | Description |
 |---|---|
 | `rules` / `infractions` | Règles de modération + infractions (flags JSONB + GIN) |
-| `tickets` / `ticket_messages` | Tickets support + SLA |
 | `moderation_actions` | Historique modération manuelle (enum `moderation_gravity`) |
+| `automod_reviews` / `automod_review_votes` | Cartes de review + votes (incidents agrégés, score cumulé) |
+| `automod_discussion_channels` | Salons de discussion liés à une review |
+| `tickets` / `ticket_messages` | Tickets support + SLA |
 | `security_events` | Détection raid / alt accounts |
-| `audit_logs` **(partitionné)** | Logs d'audit Discord (ingestés par `discord_audit_sync`) |
-| `user_activity_log` **(partitionné)** | Activité utilisateur pour surveillance |
-| `logs` **(partitionné)** | Logs applicatifs bot/workers |
-| `user_stats` / `user_levels` / `user_wallets` | Stats, XP, wallets (3 vues matérialisées) |
-| `voice_channels` + sub-tables | Salons vocaux temporaires (enum `voice_channel_kind`), whitelists, bans, invites, **presets par propriétaire** |
-| `pets` / `pet_events` | Tamagotchi : compagnons (jauges, stats, statut, position de la carte Discord) + journal d'actions |
-| `bot_guild_config` / `bot_definitions` | Config per-guild + schéma de config par module bot |
-| `sanction_reminders` | Rappels 24 h avant expiration mute/ban |
-| `temp_roles` | Rôles temporaires (scan par le domaine `temp_roles`) |
+| `audit_logs` **(partitionné)** | Audit-logs Discord ingérés |
+| `user_activity_log` / `logs` **(partitionnés)** | Activité utilisateur, logs applicatifs |
+| `user_stats` / `user_levels` / `user_wallets` | Stats, XP, wallets (vues matérialisées) |
+| `voice_channels` + sub-tables | Salons vocaux (enum `voice_channel_kind`), whitelists, bans, invites, presets |
+| `bot_guild_config` / `bot_definitions` | Config per-guild + schéma de config par module |
+| `sanction_reminders` / `temp_roles` | Rappels d'expiration + rôles temporaires |
 | `ai_jobs` / `ai_dataset_messages` | Queue IA async + dataset collecté |
 | `welcome_config` | Config bienvenue + rich embeds |
-| `automod_reviews` / `automod_review_votes` | Cartes de review + votes des modérateurs (incidents agrégés, score cumulé) |
-| `automod_discussion_channels` | Salons de discussion liés à une review (audit + idempotence) |
 
-### Flag types supportés (10)
+### Flag types supportés
 
 | Type | Source | Poids défaut |
 |---|---|---|
-| `spam` / `insult` / `link` / `phishing` | Module automod | 3.0 / 5.0 / 1.0 / 7.0 |
+| `spam` / `insult` / `link` / `phishing` | Détecteurs automod | 3.0 / 5.0 / 1.0 / 7.0 |
 | `nsfw` / `illicit` | IA Vision ONNX | 8.0 / 9.0 |
 | `anger` / `rage` / `threat` / `harassment` | IA Text ONNX | 3.0 / 6.0 / 8.0 / 7.0 |
 
 ---
 
-## Endpoints API (résumé)
+## API Sentinel
 
-**Authentification** : `Authorization: Bearer <API_KEY>` obligatoire (sauf `/health` et `/metrics`). Le middleware `guild_auth_middleware` filtre en plus par `X-Discord-Token` si présent (multi-tenant OAuth2). ~150 endpoints répartis sur **21 fichiers de routes**.
+**Authentification** : `Authorization: Bearer <API_KEY>` obligatoire (sauf `/health` et `/metrics`). Le middleware `guild_auth_middleware` filtre en plus par `X-Discord-Token` si présent (multi-tenant OAuth2). **108 handlers** répartis sur **21 fichiers de routes**.
 
-| Préfixe | Handler | Description |
+| Fichier de routes | Domaine couvert |
+|---|---|
+| `analytics.rs` · `dashboard.rs` · `stats.rs` | Heatmaps, trends, KPIs, top infractors |
+| `automod.rs` | Règles, scoring, reviews & votes |
+| `moderation.rs` | Infractions, strikes, sursis, notes, rappels, purges |
+| `security.rs` | Events de détection, quarantaine, lockdown, IP bans |
+| `audit.rs` | Audit-logs, utilisateurs surveillés, rapports |
+| `ticket.rs` · `idea.rs` | Support + boîte à idées |
+| `community.rs` | Panels de rôles, événements, sondages, LFG, news, spotlight, parrainage |
+| `progression.rs` | XP, niveaux, paliers |
+| `voice_channels.rs` | Salons vocaux (presets, whitelists, bans, invites, thèmes) |
+| `welcome` (via `community`) | Config bienvenue + embeds |
+| `guild_backup.rs` · `guild_structure.rs` | Snapshots de serveur, structure Discord |
+| `members.rs` | Membres, guilds, salons, présence |
+| `bump.rs` | Récompenses Disboard |
+| `rotation.rs` | Administrateur tournant |
+| `bot.rs` · `bot_persistence.rs` | Config per-guild, définitions de modules, persistance bot |
+| `system.rs` | Health, metrics, exports, OAuth, logs, alertes, GeoIP, TLS, host probe |
+
+**gRPC** : serveur `tonic` dans `adapters/inbound/grpc/` (crate `sentinel-proto`).
+
+### Inférence IA (ONNX)
+
+| | Vision | Text |
 |---|---|---|
-| `/health`, `/metrics` | health / metrics / system | Publics (Prometheus + healthcheck) |
-| `/analyze`, `/analyze/image` | analyze*.rs | Inférence IA **synchrone** (rate limit strict) |
-| `/api/ai/jobs` | ai_jobs.rs | Queue **async** (POST = 202 + job_id, GET = status) |
-| `/api/analytics/*`, `/api/dashboard/*`, `/api/stats/*` | analytics / dashboard / dashboard_charts / stats | Heatmap, trends, top infractors, KPIs |
-| `/api/rules/*` | rules.rs | Règles de modération |
-| `/api/infractions/*`, `/api/strikes/*` | infractions / strikes | Infractions + escalade |
-| `/api/tickets/*` | tickets.rs | Tickets support |
-| `/api/moderation/*`, `/api/purge/*` | moderation / purge | `log_action`, history, bans, purges |
-| `/api/security/*` | security.rs | Events de détection |
-| `/api/notes/*`, `/api/reminders/*` | notes / reminders | Notes mod + rappels |
-| `/api/voice-channels/*` | voice_channels.rs | Salons vocaux dynamiques (presets, whitelists, bans, invites, thèmes) |
-| `/api/tamagotchi/*` | tamagotchi/pets.rs | Compagnons : CRUD, soins, combat, tick de cycle de vie, cartes à rafraîchir |
-| `/api/levels/*` | levels | XP/niveaux |
-| `/api/blackjack/*`, `/api/games/*`, `/api/wallet/*` | blackjack/* / games / wallet | Jeux + porte-monnaie |
-| `/api/audit-logs/*`, `/api/watched-users/*`, `/api/user-activity/*` | audit_logs / watched_users / user_activity | Audit + dossiers surveillés |
-| `/api/ai-dataset/*` | ai_dataset | Collecte + étiquetage dataset IA |
-| `/api/discord-roles/*`, `/api/role-panels/*` | discord_roles / role_panels | Sync rôles + panels réactionnels |
-| `/api/members/*`, `/api/guilds/*`, `/api/guild-channels/*` | guild_members / guild_channels | Membres + guilds + salons |
-| `/api/welcome/*` | welcome.rs | Config bienvenue + rich embeds |
-| `/api/models/*`, `/api/cache/*`, `/api/bots/*` | models_status / cache_stats / bot_config / bot_persistence | Monitoring ONNX + cache + config per-guild |
-| `/api/oauth/*`, `/api/rbac/*` | oauth / rbac | OAuth2 Discord + rôles applicatifs |
-| `/api/exports/*` | exports.rs | Exports async (délégués au domaine `export`) |
+| Architecture | EfficientNetV2-S | DistilBERT multilingual |
+| Classes | `safe`, `nsfw`, `illicit` | `neutral`, `anger`, `rage`, `threat`, `harassment` |
+| Input | 224×224 normalisé ImageNet | Tokens (max 256) + attention mask |
+| Format | ONNX (opset 17) | ONNX + tokenizer HuggingFace (Rust) |
 
----
+Modèles chargés au démarrage de l'API, **mode dégradé** automatique s'ils sont absents (scoring règles seulement). Configs d'entraînement dans `sentinel-ml/{text,vision}/configs/`, exports attendus dans `sentinel-ml/{text,vision}/exports/` (montés en `/models/*`). Le pipeline d'entraînement est externe au repo.
 
-## Inférence IA (ONNX)
+**Mode async** : `POST /api/ai/jobs` retourne `202 Accepted` + `job_id` ; le domaine `ai` du worker dépile la file et publie sur Redis `ai_result:{job_id}` (TTL 600 s). Alternative au `POST /analyze` synchrone (timeout 5 s côté bot).
 
-### Modèle Vision
+**Config IA per-guild** : centralisée dans `bot_guild_config` (bot `automod-bot`) — `text_enabled`, `text_threshold`, `vision_enabled`, `vision_threshold`, `context_dampening`, `context_format`, `context_max_messages`, `context_max_chars`, `channel_tension_*`, et tout le bloc `vote_*` / `discussion_*`.
 
-| Propriété | Valeur |
-|---|---|
-| Architecture | EfficientNetV2-S |
-| Classes | `safe`, `nsfw`, `illicit` |
-| Input | 224×224 normalisé ImageNet |
-| Format | ONNX (opset 17) |
-
-### Modèle Text
-
-| Propriété | Valeur |
-|---|---|
-| Architecture | DistilBERT multilingual |
-| Classes | `neutral`, `anger`, `rage`, `threat`, `harassment` |
-| Input | Tokens (max 256) + attention mask |
-| Tokenizer | HuggingFace tokenizers (Rust) |
-
-Les modèles sont chargés au démarrage de l'API. **Mode dégradé** automatique si absents (scoring règles seulement). Les configs d'entraînement vivent dans `sentinel-ml/{text,vision}/configs/`, les exports ONNX sont attendus dans `sentinel-ml/{text,vision}/exports/` (montés en `/models/*` par `docker-compose.yml`). Le pipeline d'entraînement lui-même est externe au repo.
-
-### Config IA per-guild
-
-Centralisée dans `bot_guild_config` (bot_name = `automod-bot`) : détection IA (`text_enabled`, `text_threshold`, `vision_enabled`, `vision_threshold`, `context_dampening`, `context_format`, `context_max_messages`, `context_max_chars`), tension de salon (`channel_tension_*`), et **système de vote** (`vote_enabled`, `vote_deadline_hours`, `vote_quorum`, `vote_mod_role_id`, `vote_admin_role_id`, `vote_tie_action`, `vote_context_before`, `vote_thread_enabled`, `vote_aggregate_enabled`, `discussion_channel_enabled`, `discussion_category_id`). Configurable depuis le dashboard web.
-
-### Mode async
-
-Alternative à `POST /analyze` (synchrone, timeout 5 s côté bot) : **`POST /api/ai/jobs`** retourne `202 Accepted` + `job_id` immédiatement. Le domaine `ai` du worker dépile la file et publie le résultat sur Redis `ai_result:{job_id}` (+ `SET` TTL 600 s).
-
----
-
-## Bus d'événements (Redis Streams)
-
-Tous les producers (API, workers) publient sur une **stream unique `sentinel:events`** (`XADD MAXLEN ~ 10000`). Format d'entrée : un champ `payload` = `{"event": ..., "data": ...}`.
-
-- **Consumers durables** (bot) : `XREADGROUP` + `XACK` (at-least-once), un consumer group par feature (`tamagotchi-bot-lifecycle`, …), auto-claim `XAUTOCLAIM` des pending > 60 s après un crash.
-- **Consumers live-tail** (gateway) : `XREAD $` sans group → relay WebSocket.
-
-**Events** : `infraction_new`, `ticket_*`, `security_event`, `moderation_action`, `voice_channel_updated/closed`, `tamagotchi_pet_status`, `tournament_resolved`, `sanction_expiry_reminder`, `temp_role_expire`, `bot_log`, etc.
-
----
-
-## Multi-tenant
-
-Middleware **`guild_auth_middleware`** : filtre les requêtes selon l'appartenance Discord du user appelant.
-
-1. Le web fait OAuth2 Discord (scopes `identify` + `guilds`) → `access_token`.
-2. L'adaptateur client envoie ce token dans `X-Discord-Token` sur toutes les requêtes.
-3. Le middleware extrait le `guild_id` de l'URI, interroge `/users/@me/guilds` (cache Redis 5 min par hash de token), et refuse `403` si le guild n'est pas dans la liste autorisée.
-4. Si `X-Discord-Token` est absent (appel bot/worker interne), le middleware est **pass-through** — `auth_middleware` (Bearer API key) reste obligatoire.
-
----
-
-## Gateway WebSocket
-
-| Propriété | Valeur |
-|---|---|
-| Port | 3001 |
-| Auth | `?token=<api_key>` |
-| Max connexions | 1000 (configurable) |
-| Reconnexion Redis | Exponential backoff |
-| Healthcheck | `GET /health` |
-
----
-
-## Middleware API (ordre de traversée)
+### Middleware (ordre de traversée)
 
 ```
 Request
@@ -411,14 +358,61 @@ Request
 
 **Rate limit inférence ONNX** : semaphore (`INFERENCE_MAX_CONCURRENT=4`) + token bucket (`INFERENCE_MAX_PER_SEC=20`). HTTP 429 si dépassement.
 
+### Multi-tenant
+
+1. Le web fait OAuth2 Discord (scopes `identify` + `guilds`) → `access_token`.
+2. Le client envoie ce token dans `X-Discord-Token` sur toutes les requêtes.
+3. `guild_auth_middleware` extrait le `guild_id` de l'URI, interroge `/users/@me/guilds` (cache Redis 5 min par hash de token), et refuse `403` si le guild n'est pas autorisé.
+4. Si `X-Discord-Token` est absent (appel bot/worker interne) le middleware est **pass-through** — `auth_middleware` (Bearer) reste obligatoire.
+
+---
+
+## Bus d'événements (Redis Streams)
+
+Tous les producers (API, workers) publient sur une **stream unique `sentinel:events`** (`XADD MAXLEN ~ 10000`). Format d'entrée : un champ `payload` = `{"event": ..., "data": ...}`.
+
+- **Consumers durables** (bot) : `XREADGROUP` + `XACK` (at-least-once), un consumer group par feature, auto-claim `XAUTOCLAIM` des pending > 60 s après un crash.
+- **Consumers live-tail** (gateway) : `XREAD $` sans group → relay WebSocket.
+
+**Events** : `infraction_new`, `ticket_*`, `idea_decided`, `security_event`, `moderation_action`, `voice_channel_updated/closed`, `announcement_publish`, `embed_publish`, `message_send`, `sanction_expiry_reminder`, `temp_role_expire`, `bot_log`, etc.
+
+### Gateway WebSocket
+
+| Propriété | Valeur |
+|---|---|
+| Port | 3001 |
+| Auth | `?token=<api_key>` |
+| Max connexions | 1000 (configurable) |
+| Reconnexion Redis | Exponential backoff |
+| Healthcheck | `GET /health` |
+
+---
+
+## Dashboard web
+
+`web/` — Vue 3 + TypeScript + Vite + Pinia + vue-router + Chart.js + `@vueuse/motion`, servi par Nginx.
+
+```
+web/src/
+├── components/{atoms,molecules,organisms,templates,pages}   # atomic design
+├── api/          # http.ts, nexusHttp.ts (les deux backends), events, store, config
+├── stores/       # Pinia
+├── composables/ · services/ · utils/ · types/ · data/ · styles/
+├── games/catalog.ts
+├── branding.ts · siteConfig.ts · entrySpace.ts   # thématisation multi-marque
+└── router/
+```
+
+Le dashboard adresse **les deux APIs** (Sentinel via `http.ts`, Nexus via `nexusHttp.ts`).
+
 ---
 
 ## Observabilité
 
-- **Prometheus** — endpoint `/metrics` sur l'API et chaque worker (port 9100). Compteurs `http_requests_total{route,method,status}`, histogrammes `http_request_duration_seconds`, gauges `tokio_busy_ratio`, `tokio_live_tasks_count`, `tokio_global_queue_depth`.
-- **Grafana** — dashboards auto-provisionnés dans `infrastructure/grafana/`. Démarrage : `docker compose -f infrastructure/docker/docker-compose.yml --profile monitoring up -d prometheus grafana`. UI sur `http://localhost:3002` (admin/admin).
-- **pg_stat_statements** — extension activée. `SELECT * FROM pg_stat_statements ORDER BY total_exec_time DESC`.
-- **Tracing structuré** — `tracing-subscriber` JSON en prod, correlation IDs `X-Request-ID` propagés via `tower_http::request_id`.
+- **Prometheus** — `/metrics` sur `sentinel-api` (port 3000), `nexus-api` (port 3100) et le worker (port 9100). Les deux APIs exposent les **mêmes noms de métriques**, donc les dashboards Grafana se réutilisent en filtrant sur le label `service`. Compteurs `http_requests_total{route,method,status}`, histogrammes `http_request_duration_seconds`, gauges `tokio_busy_ratio`, `tokio_live_tasks_count`, `tokio_global_queue_depth`.
+- **Grafana** — dashboards auto-provisionnés dans `infrastructure/grafana/`. UI sur `http://localhost:3002` (admin/admin).
+- **pg_stat_statements** — `SELECT * FROM pg_stat_statements ORDER BY total_exec_time DESC`.
+- **Tracing structuré** — `tracing-subscriber` JSON en prod, correlation IDs `X-Request-ID` via `tower_http::request_id`.
 
 ---
 
@@ -427,14 +421,16 @@ Request
 ### Docker Compose
 
 ```bash
-# Stack complète (infra + API + bot unifié + worker unifié + gateway + web)
+# Stack complète
 docker compose -f infrastructure/docker/docker-compose.yml up -d
 
 # Avec Prometheus + Grafana
 docker compose -f infrastructure/docker/docker-compose.yml --profile monitoring up -d
 ```
 
-**Services infra** : `postgres` (tuning RAM : `shared_buffers=4GB`, `work_mem=64MB`, WAL tuning), `pgbouncer` (transaction pooling), `redis` (`maxmemory=2gb allkeys-lru`).
+**Services** : `postgres` (tuning RAM : `shared_buffers=4GB`, `work_mem=64MB`, WAL tuning), `pgbouncer`, `redis` (`maxmemory=2gb allkeys-lru`), `api`, `gateway`, `sentinel-worker`, `sentinel-bot`, `web`, `nexus-api`, `nexus-bot`, `nexus-worker`, `grpc-certs-init`, `nexus-db-init`, `certbot`, et en profils : `pgadmin`, `redis-commander`, `prometheus`, `grafana`.
+
+Images construites depuis `infrastructure/docker/Dockerfile.rust-alpine` (ou `.rust-debian`), orchestration multi-images via `docker-bake.hcl`.
 
 ### Variables d'environnement (.env)
 
@@ -453,7 +449,7 @@ TEXT_MODEL_PATH=/models/text/text_sentinel.onnx
 TEXT_TOKENIZER_PATH=/models/text/tokenizer.json
 TEXT_MAX_LENGTH=256
 
-# Bot Discord unifié (réutilisé par l'API et certains workers pour audit-sync, etc.)
+# Bot Discord unifié (réutilisé par l'API et discord_audit_sync)
 SENTINEL_DISCORD_TOKEN=...
 
 # Module security (seuils & toggles globaux, lus au démarrage du bot)
@@ -470,24 +466,37 @@ VOICE_PUBLIC_CREATOR_CHANNEL_ID=...
 VOICE_PRIVATE_CREATOR_CHANNEL_ID=...
 VOICE_LOG_CHANNEL_ID=...
 
-# Tamagotchi (intervalle du tick de cycle de vie ; le refresh des cartes
-# est configuré par serveur via le web : card_refresh_interval_minutes)
-TAMAGOTCHI_TICK_INTERVAL_SECS=300
+# Module nasa_apod
+NASA_API_KEY=...
+DEEPL_API_KEY=...          # optionnel : sans clé, publication en anglais
 
 # Économie (fallback pour le solde de départ des wallets)
 WALLET_STARTING_COINS=100
+
+# Nexus
+NEXUS_API_PORT=3100
+NEXUS_API_KEY=...            # Bearer exigé sur /api/* ; absent = API ouverte (dev)
+NEXUS_DISCORD_TOKEN=...      # sans cette variable, nexus-bot ne se connecte pas
+NEXUS_METRICS_TOKEN=         # optionnel : protège /metrics
+NEXUS_ALLOWED_ORIGINS=       # CORS ; vide = origines de dev uniquement
+NEXUS_MAX_BODY_SIZE=10485760
+NEXUS_RATE_LIMIT_PER_SEC=50        # routes de lecture
+NEXUS_HEAVY_RATE_LIMIT_PER_SEC=2   # routes qui lancent un conteneur
+TRUST_PROXY_HOPS=1                 # proxies de confiance devant l'API
 ```
 
-> **Note** — Plusieurs réglages historiquement portés par des variables d'env sont désormais éditables **par serveur** depuis le dashboard web (`bot_guild_config`) : solde de départ, fréquence de refresh des cartes tamagotchi, salons/catégories voice/tickets, etc. Les variables d'env restent des **fallbacks** ou des réglages **globaux** lus au démarrage (un changement nécessite alors un redémarrage).
+> **Note** — La plupart des réglages sont désormais éditables **par serveur** depuis le dashboard (`bot_guild_config` + `config_schema`). Les variables d'env restent des **fallbacks** ou des réglages **globaux lus au démarrage** (un changement impose alors un redémarrage).
 
 ### Développement local
 
 ```bash
 bash infrastructure/scripts/dev.sh              # Lance API + bot + web
 bash infrastructure/scripts/build-all.sh        # Build release de tous les crates
+bash infrastructure/scripts/start-all.sh        # Démarre la stack complète
 bash infrastructure/scripts/health-check.sh     # Vérifie que tous les services répondent
 bash infrastructure/scripts/seed-rules.sh       # Seed de règles de dev
-bash infrastructure/scripts/start-all.sh        # Démarre la stack complète
+bash infrastructure/scripts/setup-host-security.sh
+bash infrastructure/scripts/tls-issue.sh        # Émission des certificats
 
 # Ou composant par composant :
 cd sentinel-api && cargo run
@@ -500,26 +509,26 @@ cd web && npm run dev
 
 ## Tests
 
-Tests `cargo test --lib` côté API + unitaires workers/modules bot. Couverture principale :
+```bash
+cargo test --workspace                          # Rust
+bash infrastructure/scripts/run-tests.sh        # (ou run-tests.ps1 sous Windows)
+cd web && npm run test                          # Vitest
+```
 
-- **API** : ScoringService, InferenceService, ValueObjects, MV repos, middleware (`guild_auth`), handlers (welcome, infractions postgres, repos outbound).
-- **Bot unifié** : détecteurs automod, security, tickets, audit, progression, community, voice.
-- **Workers** : helpers `worker-common`.
-- **Gateway** : broadcaster.
-
-Stack de tests dédiée via `infrastructure/docker/docker-compose.test.yml`.
+Couverture principale : services applicatifs et value objects de `sentinel-core`, middlewares et repositories de `sentinel-api` (`adapters/outbound/tests/`, `adapters/inbound/http/tests/`), détecteurs automod et modules du bot, helpers du worker, broadcaster de la gateway, `nexus-core/src/application/tests`. Stack de tests dédiée : `infrastructure/docker/docker-compose.test.yml`. CI : `.github/workflows/ci.yml`.
 
 ---
 
 ## Bonnes pratiques du projet
 
-- **Bot = interface légère** — logique métier centralisée dans l'API, jamais dans les modules du bot.
-- **Architecture hexagonale** côté API — séparation stricte domain / ports / adapters.
-- **Workers = jobs périodiques DB-bound** — via `spawn_periodic` + Redis Streams, pas de Discord gateway direct (sauf le domaine `discord_audit_sync` qui utilise le token bot pour lire les audit-logs).
+- **Le métier vit dans `*-core`** — `sentinel-api` / `sentinel-bot` / `sentinel-worker` sont des adaptateurs ; aucune règle métier ne doit y être écrite.
+- **Architecture hexagonale stricte** — `domain` ne dépend de rien, `application` ne dépend que des `ports`, les adapters implémentent les ports.
+- **Bot = interface légère** — décisions et persistance côté API, jamais dans les modules du bot.
+- **Workers = jobs périodiques DB-bound** — via `spawn_periodic` + Redis Streams, pas de gateway Discord (exception : `discord_audit_sync`).
 - **Gateway découplé** — absorbe les bursts WebSocket indépendamment de l'API.
-- **Inférence IA gracieuse** — si modèles absents, fallback scoring règles.
-- **Multi-tenant** — filtre `guild_auth` avec pass-through pour appels internes.
-- **Config par serveur d'abord** — `config_schema` + `bot_guild_config` éditables sur le web ; les variables d'env servent de fallback / réglage global.
-- **Observabilité first** — métriques Prometheus + traces JSON + `pg_stat_statements`.
-- **Workspace Rust partagé** — deps communes déclarées une seule fois dans le `Cargo.toml` racine, `lto = "thin"` pour garder les builds rapides.
-```
+- **Inférence IA gracieuse** — si les modèles sont absents, repli sur le scoring par règles.
+- **Multi-tenant** — filtre `guild_auth` avec pass-through pour les appels internes.
+- **Config par serveur d'abord** — `config_schema` + `bot_guild_config` éditables sur le web ; les variables d'env ne sont que des fallbacks.
+- **Filtres fermants sur les données publiques** — en cas de doute sur une permission Discord, on ne publie pas (cf. module `presence`).
+- **Observabilité first** — métriques Prometheus, traces JSON, `pg_stat_statements`.
+- **Workspace partagé** — deps et lints déclarés une seule fois à la racine, `lto = "thin"` pour garder les builds rapides.

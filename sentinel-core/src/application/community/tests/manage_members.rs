@@ -125,6 +125,16 @@ use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCas
 struct StubInfUc;
 #[async_trait]
 impl ManageInfractionsUseCase for StubInfUc {
+    async fn count_user_infractions(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        crate::ports::inbound::moderation::manage_infractions::UserInfractionCounts,
+        crate::domain::errors::DomainError,
+    > {
+        Ok(Default::default())
+    }
     async fn list_infractions(
         &self,
         _: &str,
@@ -391,6 +401,16 @@ async fn get_member_summary_not_found_returns_404() {
 struct RichInfUc;
 #[async_trait]
 impl ManageInfractionsUseCase for RichInfUc {
+    async fn count_user_infractions(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<
+        crate::ports::inbound::moderation::manage_infractions::UserInfractionCounts,
+        crate::domain::errors::DomainError,
+    > {
+        Ok(Default::default())
+    }
     async fn list_infractions(
         &self,
         g: &str,

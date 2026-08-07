@@ -10,7 +10,7 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::outbound::system::rate_limiter::RateLimiter;
-use crate::ports::outbound::system::log_repository::LogRepository;
+use sentinel_core::ports::outbound::system::log_repository::LogRepository;
 use sentinel_core::domain::entities::system::log_entry::LogEntry;
 
 #[derive(Clone)]
@@ -23,7 +23,7 @@ impl ApiLoggerState {
     pub fn from_app(state: &AppState) -> Self {
         Self {
             log_repo: state.log_repo.clone(),
-            rate_limiter: state.rate_limiter.clone(),
+            rate_limiter: state.system.rate_limiter.clone(),
         }
     }
 }

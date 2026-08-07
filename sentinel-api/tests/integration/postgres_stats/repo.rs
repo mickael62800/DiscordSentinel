@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::audit::stats_repository::PgStatsRepository;
-use sentinel_api::ports::outbound::audit::stats_repository::StatsRepository;
+use sentinel_core::ports::outbound::audit::stats_repository::StatsRepository;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;
 
 async fn pool() -> PgPool {

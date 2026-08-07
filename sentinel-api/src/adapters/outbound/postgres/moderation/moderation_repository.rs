@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use sentinel_core::ports::outbound::moderation::moderation_repository::ModerationRepository;
 use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
 use sentinel_core::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use sentinel_core::domain::errors::DomainError;

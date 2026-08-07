@@ -17,6 +17,40 @@ service ModerationService {
   // et suggestion de sanction proportionnee. Chemin bot/interne de confiance ;
   // le bot verifie la permission de moderation Discord avant d'appeler.
   rpc GetMemberContext(GetMemberContextRequest) returns (MemberModerationContext);
+  // Annule une action (/unwarn) : applique l'effet Discord inverse
+  // (unban / retrait de timeout) puis supprime la ligne. L'API decide de
+  // l'effet a partir du type d'action, le bot n'a rien a orchestrer.
+  rpc CancelAction(CancelActionRequest) returns (CancelActionResponse);
+
+  // ── Garde-fous UX (decision server-side) ──
+  // Le bot fournit les FAITS Discord, l'API applique seuil et politique.
+  rpc AssessTargetRisk(AssessTargetRiskRequest) returns (TargetRiskDecision);
+  // Quota d'actions par moderateur sur une fenetre glissante.
+  rpc CountModeratorActions(CountModeratorActionsRequest) returns (CountModeratorActionsResponse);
+
+  // ── Dossier et suivi ──
+  rpc ListActiveReminders(ListActiveRemindersRequest) returns (ListActiveRemindersResponse);
+  rpc GetModStats(GetModStatsRequest) returns (GetModStatsResponse);
+  rpc AddNote(AddNoteRequest) returns (AddNoteResponse);
+
+  // ── Preuves ──
+  rpc AddEvidence(AddEvidenceRequest) returns (EvidenceEntry);
+  rpc ListEvidence(ListEvidenceRequest) returns (ListEvidenceResponse);
+
+  // ── File de relecture ──
+  rpc AddReview(AddReviewRequest) returns (ReviewEntry);
+  rpc ListPendingReviews(ListPendingReviewsRequest) returns (ListPendingReviewsResponse);
+  rpc ResolveReview(ResolveReviewRequest) returns (ResolveReviewResponse);
+
+  // ── Mode apprenti ──
+  rpc ResolvePendingAction(ResolvePendingActionRequest) returns (ResolvePendingActionResponse);
+
+  // Compteurs d'infractions d'UN membre, agreges cote serveur.
+  //
+  // La route HTTP equivalente renvoie la liste complete de la guild ; le bot
+  // la filtrait ensuite en memoire pour afficher quatre nombres dans
+  // `/stats`. Ici le filtre et le comptage restent en base.
+  rpc CountUserInfractions(CountUserInfractionsRequest) returns (UserInfractionCounts);
 }
 
 message LogActionRequest {
@@ -117,4 +151,202 @@ message MemberModerationContext {
   uint32 open_reviews = 4;
   PrecedentDistribution precedents = 5;
   SanctionSuggestion suggestion = 6;
+}
+
+message CancelActionRequest {
+  string action_id = 1;
+}
+
+message CancelActionResponse {
+  // false = aucune action ne portait cet identifiant.
+  bool cancelled = 1;
+}
+
+// ── Garde-fous UX ──
+
+message AssessTargetRiskRequest {
+  string guild_id = 1;
+  int64 account_age_days = 2;
+  bool is_bot = 3;
+  bool has_mod_perms = 4;
+}
+
+message TargetRiskDecision {
+  bool risky = 1;
+  optional string reason = 2;
+}
+
+message CountModeratorActionsRequest {
+  string guild_id = 1;
+  string moderator_id = 2;
+  uint64 window_secs = 3;
+}
+
+message CountModeratorActionsResponse {
+  uint32 count = 1;
+}
+
+// ── Sanctions temporaires actives ──
+
+message ListActiveRemindersRequest {
+  string guild_id = 1;
+}
+
+// Sous-ensemble consomme par `/expirations`. Les champs d'audit
+// (identifiants, horodatages de creation) restent cote HTTP pour le web.
+message SanctionReminder {
+  string moderator_name = 1;
+  string target_id = 2;
+  string action_type = 3;
+  string reason = 4;
+  // RFC3339.
+  string expires_at = 5;
+}
+
+message ListActiveRemindersResponse {
+  repeated SanctionReminder reminders = 1;
+}
+
+// ── Statistiques moderateurs ──
+
+message GetModStatsRequest {
+  string guild_id = 1;
+  // Fenetre en jours. 0 = defaut serveur (30).
+  int32 days = 2;
+}
+
+message ModStatsEntry {
+  string moderator_id = 1;
+  string moderator_name = 2;
+  int64 total = 3;
+  int64 warns = 4;
+  int64 mutes = 5;
+  int64 bans = 6;
+  int64 kicks = 7;
+}
+
+message GetModStatsResponse {
+  repeated ModStatsEntry entries = 1;
+}
+
+// ── Notes ──
+
+message AddNoteRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string author_id = 3;
+  string author_name = 4;
+  string content = 5;
+  string category = 6;
+}
+
+message AddNoteResponse {
+  string id = 1;
+}
+
+// ── Preuves ──
+
+message EvidenceEntry {
+  string id = 1;
+  string action_id = 2;
+  string url = 3;
+  optional string description = 4;
+  string uploaded_by = 5;
+  string uploaded_by_name = 6;
+  // RFC3339.
+  string uploaded_at = 7;
+}
+
+message AddEvidenceRequest {
+  string action_id = 1;
+  string url = 2;
+  optional string description = 3;
+  string uploaded_by = 4;
+  string uploaded_by_name = 5;
+}
+
+message ListEvidenceRequest {
+  string action_id = 1;
+}
+
+message ListEvidenceResponse {
+  repeated EvidenceEntry entries = 1;
+}
+
+// ── File de relecture ──
+
+message ReviewEntry {
+  string id = 1;
+  string action_id = 2;
+  string guild_id = 3;
+  string added_by = 4;
+  string added_by_name = 5;
+  optional string reason = 6;
+  string status = 7;
+  optional string reviewer_id = 8;
+  optional string reviewer_name = 9;
+  optional string reviewer_notes = 10;
+  // RFC3339.
+  string added_at = 11;
+  optional string resolved_at = 12;
+  // Enrichis par jointure sur l'action visee : `/review list` les affiche.
+  // Optionnels parce que l'action peut avoir ete supprimee entre-temps.
+  optional string action_type = 13;
+  optional string target_name = 14;
+  optional string action_reason = 15;
+}
+
+message AddReviewRequest {
+  string action_id = 1;
+  string guild_id = 2;
+  string added_by = 3;
+  string added_by_name = 4;
+  optional string reason = 5;
+}
+
+message ListPendingReviewsRequest {
+  string guild_id = 1;
+}
+
+message ListPendingReviewsResponse {
+  repeated ReviewEntry entries = 1;
+}
+
+message ResolveReviewRequest {
+  string review_id = 1;
+  string status = 2;
+  string reviewer_id = 3;
+  string reviewer_name = 4;
+  optional string notes = 5;
+}
+
+message ResolveReviewResponse {
+  // false = aucune review ne portait cet identifiant.
+  bool resolved = 1;
+}
+
+// ── Mode apprenti ──
+
+message ResolvePendingActionRequest {
+  string action_id = 1;
+  string status = 2;
+  string reviewed_by = 3;
+}
+
+message ResolvePendingActionResponse {}
+
+// ── Infractions ──
+
+message CountUserInfractionsRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message UserInfractionCounts {
+  uint32 warns = 1;
+  uint32 deletes = 2;
+  uint32 mutes = 3;
+  uint32 bans = 4;
+  // Toutes natures confondues, y compris celles non detaillees ci-dessus.
+  uint32 total = 5;
 }

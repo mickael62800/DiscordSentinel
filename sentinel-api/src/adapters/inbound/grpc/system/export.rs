@@ -9,7 +9,7 @@ use tonic::Response;
 use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::application::system::export_service::ExecuteExportUseCase;
+use sentinel_core::application::system::export_service::ExecuteExportUseCase;
 
 pub struct ExportGrpc {
     pub uc: Arc<dyn ExecuteExportUseCase>,

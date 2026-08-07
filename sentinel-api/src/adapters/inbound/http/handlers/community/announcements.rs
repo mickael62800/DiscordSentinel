@@ -15,8 +15,8 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::community::manage_announcements::{
+use crate::bootstrap::state::CommunityState;
+use sentinel_core::ports::inbound::community::manage_announcements::{
     CreateAnnouncementCommand, RenderedAnnouncement, UpdateAnnouncementCommand,
 };
 use axum::Extension;
@@ -30,7 +30,7 @@ fn map_validation_string<T>(r: Result<T, String>) -> Result<T, ApiError> {
 
 // ── Helpers config ──────────────────────────────────────────────────────
 
-async fn read_cfg(state: &AppState, guild_id: &str, key: &str) -> Option<String> {
+async fn read_cfg(state: &CommunityState, guild_id: &str, key: &str) -> Option<String> {
     let cfgs = state
         .bot_config_repo
         .get_config(guild_id, ANNOUNCEMENTS_BOT)
@@ -57,48 +57,36 @@ fn parse_hex_color(s: &str) -> Option<i32> {
 /// Poste un embed de log dans `log_channel_id` (best-effort, ne fait rien
 /// si pas de salon configure ni de bot token).
 async fn try_post_log_embed(
-    state: &AppState,
+    state: &CommunityState,
     guild_id: &str,
     title: &str,
     description: &str,
     color: i32,
 ) {
-    if state.discord_bot_token.is_empty() {
-        return;
-    }
     let channel_id = match read_cfg(state, guild_id, "log_channel_id").await {
         Some(s) if !s.is_empty() => s,
         _ => return,
     };
-    // Securite : valider channel_id (config guild) comme snowflake avant de
-    // l'interpoler dans l'URL Discord (cf. snapshots.rs).
-    if crate::adapters::inbound::http::validation::validate_discord_id("channel_id", &channel_id)
-        .is_err()
-    {
-        return;
-    }
-    let url = format!("https://discord.com/api/v10/channels/{channel_id}/messages");
-    let payload = serde_json::json!({
-        "embeds": [{
-            "title": title,
-            "description": description,
-            "color": color,
-            "timestamp": Utc::now().to_rfc3339(),
-        }]
+    let embed = serde_json::json!({
+        "title": title,
+        "description": description,
+        "color": color,
+        "timestamp": Utc::now().to_rfc3339(),
     });
-    let res = reqwest::Client::new()
-        .post(&url)
-        .header("Authorization", format!("Bot {}", state.discord_bot_token))
-        .json(&payload)
-        .send()
-        .await;
-    if let Err(e) = res {
+    // Best-effort : un log qui ne part pas ne doit pas faire echouer l'action
+    // qu'il documente. La validation du salon et l'absence de token sont
+    // gerees par l'adaptateur, qui rend une erreur au lieu d'appeler Discord.
+    if let Err(e) = state
+        .discord_api
+        .send_channel_embed(&channel_id, embed)
+        .await
+    {
         tracing::warn!(error = %e, guild = %guild_id, "log_channel_id post echec");
     }
 }
 
 pub async fn create_announcement(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     user: Option<Extension<WebUser>>,
     Json(dto): Json<CreateAnnouncementDto>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
@@ -184,7 +172,7 @@ pub async fn create_announcement(
 }
 
 pub async fn update_announcement(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<UpdateAnnouncementDto>,
@@ -225,7 +213,7 @@ pub async fn update_announcement(
 }
 
 pub async fn delete_announcement(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<()>, ApiError> {
@@ -236,7 +224,7 @@ pub async fn delete_announcement(
 }
 
 pub async fn get_announcement(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<AnnouncementDto>, ApiError> {
@@ -247,7 +235,7 @@ pub async fn get_announcement(
 }
 
 pub async fn list_announcements(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<AnnouncementDto>>, ApiError> {
@@ -256,7 +244,7 @@ pub async fn list_announcements(
 }
 
 pub async fn toggle_announcement(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Json(dto): Json<ToggleAnnouncementDto>,
@@ -268,7 +256,7 @@ pub async fn toggle_announcement(
 }
 
 pub async fn preview_announcement(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<RenderedAnnouncement>, ApiError> {
@@ -278,7 +266,7 @@ pub async fn preview_announcement(
 }
 
 pub async fn list_runs(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Query(params): Query<RunsLimitQuery>,
@@ -309,7 +297,7 @@ pub struct FetchDueQuery {
 /// Post-traitement : pour chaque embed sans couleur explicite, applique
 /// la couleur par defaut du guild (`default_color_hex`).
 pub async fn fetch_due(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Query(params): Query<FetchDueQuery>,
 ) -> Result<Json<Vec<RenderedAnnouncement>>, ApiError> {
@@ -351,7 +339,7 @@ pub async fn fetch_due(
 /// plus vieux que `history_retention_days` (defaut 90j) par guild. Si la
 /// cle est 0, la guild est skip (illimite).
 pub async fn retention_cleanup_all(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let summary = state.announcements_uc.retention_cleanup_all().await?;
@@ -366,7 +354,7 @@ pub async fn retention_cleanup_all(
 /// POST /api/announcements/internal/runs/{run_id}/result — appele par
 /// le bot apres publication des messages Discord.
 pub async fn record_run_result(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(run_id): Path<Uuid>,
     Json(dto): Json<RecordRunResultDto>,
@@ -381,7 +369,7 @@ pub async fn record_run_result(
 /// POST /api/announcements/internal/button-click — appele par le bot
 /// quand un user clique sur un bouton interactif d'une annonce.
 pub async fn record_button_click(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Json(dto): Json<ButtonClickDto>,
 ) -> Result<Json<()>, ApiError> {
@@ -401,7 +389,7 @@ pub async fn record_button_click(
 
 /// GET /api/announcements/{id}/interactions — liste des clics sur les boutons.
 pub async fn list_button_interactions(
-    State(state): State<AppState>,
+    State(state): State<CommunityState>,
     _user: Option<Extension<WebUser>>,
     Path(id): Path<Uuid>,
     Query(params): Query<RunsLimitQuery>,

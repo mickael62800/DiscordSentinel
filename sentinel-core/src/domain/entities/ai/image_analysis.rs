@@ -31,7 +31,6 @@ mod tests;
 
 /// Resultat de l'analyse d'une image par le modele vision ONNX.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ImageAnalysis {
     pub action: Action,
     pub reason: String,

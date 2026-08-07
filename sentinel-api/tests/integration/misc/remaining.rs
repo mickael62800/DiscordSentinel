@@ -18,14 +18,6 @@ fn ugid() -> String {
     )
 }
 
-#[allow(dead_code)]
-fn short_gid() -> String {
-    use rand::Rng;
-    format!(
-        "{}",
-        rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64)
-    )
-}
 
 // ── Guild members ──
 

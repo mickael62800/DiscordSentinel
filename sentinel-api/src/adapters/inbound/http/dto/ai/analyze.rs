@@ -1,4 +1,4 @@
-use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
@@ -65,7 +65,7 @@ impl From<AnalyzeRequestDto> for AnalyzeMessageCommand {
             .context_messages
             .into_iter()
             .map(
-                |m| crate::ports::inbound::ai::analyze_message::ContextMessageEntry {
+                |m| sentinel_core::ports::inbound::ai::analyze_message::ContextMessageEntry {
                     username: m.username,
                     content: m.content,
                 },

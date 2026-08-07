@@ -9,7 +9,7 @@ use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
-use crate::adapters::inbound::http::state::AppState;
+use crate::bootstrap::state::SystemState;
 
 #[derive(Deserialize)]
 pub struct CreateLockdownDto {
@@ -23,7 +23,7 @@ pub struct CreateLockdownDto {
 /// POST /api/security/lockdown — bot enregistre un lockdown actif.
 /// UPSERT pour idempotence (re-activation reset le timer + states).
 pub async fn create_lockdown(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     Json(dto): Json<CreateLockdownDto>,
 ) -> Result<StatusCode, ApiError> {
     state
@@ -36,7 +36,7 @@ pub async fn create_lockdown(
 /// DELETE /api/security/lockdown/{guild_id} — bot retire un lockdown
 /// (deactivation manuelle ou via worker).
 pub async fn delete_lockdown(
-    State(state): State<AppState>,
+    State(state): State<SystemState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<StatusCode, ApiError> {
     state.lockdown_uc.deactivate(&guild_id).await?;

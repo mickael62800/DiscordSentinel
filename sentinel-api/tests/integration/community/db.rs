@@ -287,12 +287,19 @@ mod community_grpc {
         // conserver le round-trip DB de ces tests.
         use std::sync::Arc;
         let uc = Arc::new(
-            sentinel_api::application::community::manage_sponsorships_service::ManageSponsorshipsService::new(
+            sentinel_core::application::community::manage_sponsorships_service::ManageSponsorshipsService::new(
                 Arc::new(sentinel_api::adapters::outbound::postgres::community::sponsorship_repository::PgSponsorshipRepository::new(p.clone())),
                 Arc::new(sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository::new(p.clone())),
             ),
         );
-        CommunityGrpc { uc }
+                // Ce test de base couvre sponsorships + temp-roles. L'eligibilite et
+        // le classement mensuel ont leurs propres tests : ils sont cables sur
+        // des doubles qui echouent bruyamment si on les emprunte ici.
+        CommunityGrpc {
+            uc,
+            eligibility_uc: Arc::new(StubEligibilite),
+            monthly_ranking_uc: Arc::new(StubClassement),
+        }
     }
 
     #[tokio::test]
@@ -512,5 +519,64 @@ mod community_grpc {
             .roles;
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].role_id, role2);
+    }
+}
+
+struct StubEligibilite;
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::community::check_eligibility::CheckEligibilityUseCase
+    for StubEligibilite
+{
+    async fn check_role_eligibility(
+        &self,
+        _: sentinel_core::ports::inbound::community::check_eligibility::CheckRoleEligibilityCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::community::eligibility::EligibilityDecision,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("eligibilite non exercee par ce test")
+    }
+    async fn validate_sponsorship(
+        &self,
+        _: sentinel_core::ports::inbound::community::check_eligibility::ValidateSponsorshipCommand,
+    ) -> Result<
+        sentinel_core::domain::entities::community::eligibility::EligibilityDecision,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("eligibilite non exercee par ce test")
+    }
+}
+
+struct StubClassement;
+
+#[async_trait::async_trait]
+impl sentinel_core::ports::inbound::community::manage_monthly_ranking::ManageMonthlyRankingUseCase
+    for StubClassement
+{
+    async fn force_ranking(
+        &self,
+        _: &str,
+        _: Option<String>,
+    ) -> Result<
+        sentinel_core::domain::entities::community::monthly_ranking::MonthlyRankingData,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("classement mensuel non exerce par ce test")
+    }
+    async fn plan_and_baseline(
+        &self,
+    ) -> Result<
+        sentinel_core::domain::entities::community::monthly_ranking::MonthlyPublishPlan,
+        sentinel_core::domain::errors::DomainError,
+    > {
+        unimplemented!("classement mensuel non exerce par ce test")
+    }
+    async fn mark_published(
+        &self,
+        _: &str,
+        _: &str,
+    ) -> Result<(), sentinel_core::domain::errors::DomainError> {
+        unimplemented!("classement mensuel non exerce par ce test")
     }
 }
