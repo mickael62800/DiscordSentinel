@@ -307,7 +307,8 @@ impl EventHandler for Handler {
             )
             .await
         {
-            if let Err(error) = message.channel_id.say(&ctx.http, reply).await {
+            let mentioned_reply = format!("<@{}> {reply}", message.author.id);
+            if let Err(error) = message.channel_id.say(&ctx.http, mentioned_reply).await {
                 tracing::warn!(%error, "reponse Atrium non envoyee");
             }
         }
