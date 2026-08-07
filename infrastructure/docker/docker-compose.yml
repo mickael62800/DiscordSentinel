@@ -540,7 +540,10 @@ services:
     volumes:
       - atrium_ollama_data:/root/.ollama
     healthcheck:
-      test: ["CMD-SHELL", "ollama show nomic-embed-text >/dev/null 2>&1"]
+      # Le modele est telecharge par `atrium-ollama-init` apres ce check :
+      # verifier seulement que le serveur repond, sans creer une dependance
+      # circulaire entre le healthcheck et le pull.
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 12
