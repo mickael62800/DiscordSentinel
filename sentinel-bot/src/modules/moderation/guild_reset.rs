@@ -43,7 +43,7 @@ pub async fn handle_guild_reset_event(ctx: &Context, payload: &str) {
     // En prod (secret non vide) un event guild_reset non signe ou mal signe est
     // REJETE -> impossible de forcer un reset destructif en publiant sur Redis
     // sans le secret. En dev (API_KEY vide) la signature n'est pas exigee.
-    let secret = std::env::var("API_KEY").unwrap_or_default();
+    let secret = std::env::var("SENTINEL_API_KEY").unwrap_or_default();
     if !secret.is_empty() {
         let guild_id_str = data
             .get("guild_id")

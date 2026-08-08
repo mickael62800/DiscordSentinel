@@ -255,7 +255,7 @@ impl WorkerConfig {
             ),
 
             // monitoring
-            api_key: std::env::var("API_KEY").unwrap_or_default(),
+            api_key: std::env::var("SENTINEL_API_KEY").unwrap_or_default(),
             monitor_check_interval_secs: load_env(
                 "MONITOR_CHECK_INTERVAL",
                 DEFAULT_MONITOR_CHECK_INTERVAL_SECS,

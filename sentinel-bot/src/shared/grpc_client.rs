@@ -204,7 +204,7 @@ impl SentinelGrpcClient {
     pub async fn from_env() -> Result<Self, tonic::transport::Error> {
         let url =
             std::env::var("GRPC_API_URL").unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
-        let api_key = std::env::var("API_KEY").unwrap_or_default();
+        let api_key = std::env::var("SENTINEL_API_KEY").unwrap_or_default();
         Self::connect(&url, &api_key).await
     }
 

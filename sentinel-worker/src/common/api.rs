@@ -20,7 +20,7 @@ fn full_url(path: &str) -> String {
 }
 
 fn api_key() -> String {
-    std::env::var("API_KEY").unwrap_or_default()
+    std::env::var("SENTINEL_API_KEY").unwrap_or_default()
 }
 
 fn add_auth(req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {

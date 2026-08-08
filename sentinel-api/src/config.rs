@@ -60,11 +60,8 @@ impl AppConfig {
             database_url: std::env::var("DATABASE_URL").expect("DATABASE_URL manquant"),
             redis_url: std::env::var("REDIS_URL").expect("REDIS_URL manquant"),
             api_key: {
-                let key = std::env::var("SENTINEL_API_KEY")
-                    .or_else(|_| std::env::var("API_KEY"))
-                    .unwrap_or_default();
+                let key = std::env::var("SENTINEL_API_KEY").unwrap_or_default();
                 let require = std::env::var("SENTINEL_REQUIRE_API_KEY")
-                    .or_else(|_| std::env::var("REQUIRE_API_KEY"))
                     .map(|v| v != "false" && v != "0")
                     .unwrap_or(true);
                 if key.is_empty() && require {

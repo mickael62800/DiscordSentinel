@@ -87,7 +87,7 @@ pub async fn create_pg_pool(database_url: &str) -> PgPool {
 
 /// Envoie un log de cycle de vie a l'API.
 pub async fn send_lifecycle_log(api_url: &str, worker_name: &str, level: &str, message: &str) {
-    let api_key = std::env::var("API_KEY").unwrap_or_default();
+    let api_key = std::env::var("SENTINEL_API_KEY").unwrap_or_default();
     let mut req = reqwest::Client::new()
         .post(format!("{}/api/logs", api_url))
         .json(&serde_json::json!({
@@ -120,7 +120,7 @@ pub fn start_heartbeat(api_url: String, worker_name: &'static str) {
         .and_then(|v| v.parse().ok())
         .unwrap_or(DEFAULT_HEARTBEAT_INTERVAL_SECS);
 
-    let api_key = std::env::var("API_KEY").unwrap_or_default();
+    let api_key = std::env::var("SENTINEL_API_KEY").unwrap_or_default();
     if api_key.is_empty() {
         warn!(
             worker = worker_name,
@@ -372,7 +372,7 @@ pub async fn send_worker_log(
     message: &str,
     details: serde_json::Value,
 ) {
-    let api_key = std::env::var("API_KEY").unwrap_or_default();
+    let api_key = std::env::var("SENTINEL_API_KEY").unwrap_or_default();
     let client = reqwest::Client::new();
     // Merge job dans les details pour retrouver facilement
     let mut details_obj = match details {

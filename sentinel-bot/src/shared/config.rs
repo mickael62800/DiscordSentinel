@@ -17,7 +17,7 @@ impl BaseConfig {
                 .unwrap_or_else(|_| panic!("{token_var} manquant dans .env")),
             api_base_url: std::env::var("API_BASE_URL")
                 .unwrap_or_else(|_| "http://localhost:3000".to_string()),
-            api_key: std::env::var("API_KEY").unwrap_or_default(),
+            api_key: std::env::var("SENTINEL_API_KEY").unwrap_or_default(),
         }
     }
 }

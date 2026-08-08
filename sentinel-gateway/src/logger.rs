@@ -13,7 +13,7 @@ impl GatewayLogger {
         Arc::new(Self {
             client: Client::new(),
             api_url,
-            api_key: std::env::var("API_KEY").unwrap_or_default(),
+            api_key: std::env::var("SENTINEL_API_KEY").unwrap_or_default(),
         })
     }
 
