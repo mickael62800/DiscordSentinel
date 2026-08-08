@@ -18,6 +18,19 @@ use super::render::{
     vote_embed, VOTES_FIELD,
 };
 
+/// Une carte de vote doit toujours proposer au moins le palier `warn`.
+/// Les scores et incidents restent inchangés ; c'est seulement la suggestion
+/// initiale lorsque le mode humain a demandé une carte avant un seuil d'action.
+fn card_suggested_action(action: &Action) -> Action {
+    match action {
+        Action::None => Action::Warn,
+        Action::Warn => Action::Warn,
+        Action::Delete => Action::Delete,
+        Action::Mute => Action::Mute,
+        Action::Ban => Action::Ban,
+    }
+}
+
 /// Cree la review en mode vote et poste la carte avec les boutons de vote.
 #[allow(clippy::too_many_arguments)]
 pub(crate) async fn post_vote_card(
@@ -40,9 +53,15 @@ pub(crate) async fn post_vote_card(
     // double-strike à la finalisation, cf. C1).
     already_sanctioned: bool,
 ) {
-    if matches!(suggested_action, Action::None) {
-        return;
-    }
+    // En moderation humaine, l'API route explicitement chaque signal vers une
+    // carte. Un score individuel peut toutefois rester sous le premier seuil
+    // de sanction (Action::None). Ne pas abandonner ici : cela cassait
+    // l'agregation, donc un membre pouvait enchainer les signaux sans jamais
+    // ouvrir ni mettre a jour sa carte. On propose alors le palier minimal
+    // (warn) ; les moderateurs restent libres de voter une autre action et la
+    // carte agregee affiche le score cumule reel.
+    let card_action = card_suggested_action(suggested_action);
+    let suggested_action = &card_action;
     let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let channel_id = msg.channel_id.to_string();
     let message_id = msg.id.to_string();
@@ -201,6 +220,21 @@ pub(crate) async fn post_vote_card(
     }
 
     info!(review_id, "Carte de vote automod postee");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn card_for_a_signal_below_threshold_starts_at_warn() {
+        assert!(matches!(card_suggested_action(&Action::None), Action::Warn));
+    }
+
+    #[test]
+    fn card_preserves_an_existing_suggested_action() {
+        assert!(matches!(card_suggested_action(&Action::Mute), Action::Mute));
+    }
 }
 
 /// Variante manuelle : une carte de vote creee par un moderateur via la

@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import type { BotDefinition } from "../../types";
 import { useBotEnabledStatus } from "@/composables/useBotEnabledStatus";
 
-defineProps<{
+const props = defineProps<{
   title: string;
   definitions: BotDefinition[];
   selectedKey: string | null;
@@ -22,22 +23,27 @@ const { enabledMap } = useBotEnabledStatus();
 function isOn(botName: string): boolean {
   return enabledMap.value[botName] === true;
 }
+
+const enabledCount = computed(() => props.definitions.filter((definition) => isOn(definition.bot_name)).length);
 </script>
 
 <template>
   <section class="component-section">
     <div class="section-header">
       <h2 class="section-heading">{{ title }}</h2>
+      <span class="section-count">{{ enabledCount }}/{{ definitions.length }} actifs</span>
     </div>
     <div class="component-grid">
-      <div
+      <button
         v-for="def in definitions"
         :key="def.bot_name"
+        type="button"
         class="component-card"
         :class="{
           active: selectedKey === def.bot_name,
           'is-disabled': !isOn(def.bot_name),
         }"
+        :aria-pressed="selectedKey === def.bot_name"
         @click="emit('select', def.bot_name)"
       >
         <div class="component-card-header">
@@ -48,7 +54,7 @@ function isOn(botName: string): boolean {
         <div class="component-params">
           {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
         </div>
-      </div>
+      </button>
     </div>
   </section>
 </template>
@@ -95,15 +101,20 @@ function isOn(botName: string): boolean {
 }
 
 .component-card {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 16px;
   cursor: pointer;
-  transition: border-color var(--transition-fast);
+  transition: border-color var(--transition-fast), transform var(--transition-fast), background var(--transition-fast);
 }
 
-.component-card:hover { border-color: var(--accent); }
+.component-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.component-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .component-card.active {
   border-color: var(--accent);
   background: rgba(99, 102, 241, 0.08);

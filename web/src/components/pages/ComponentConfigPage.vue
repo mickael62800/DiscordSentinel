@@ -70,6 +70,8 @@ onMounted(async () => {
   const wanted = route.query.bot;
   if (typeof wanted === "string" && definitions.value.some((d) => d.bot_name === wanted)) {
     selectComponent(wanted);
+  } else if (moduleDefinitions.value.length > 0) {
+    selectComponent(moduleDefinitions.value[0].bot_name);
   }
 });
 </script>
@@ -112,6 +114,11 @@ onMounted(async () => {
         @saved="reloadAfterSave"
       />
 
+      <div v-else class="select-hint">
+        <strong>Choisissez un composant</strong>
+        <span>Ses réglages apparaîtront ici pour {{ selectedGuild?.name }}.</span>
+      </div>
+
       <!-- Vue debug temporaire : historique des analyses automod. -->
       <AutomodAnalysisHistory
         v-if="selectedComponent === 'automod-bot' && selectedGuildId"
@@ -139,4 +146,15 @@ onMounted(async () => {
 }
 .server-label { color: var(--text-secondary); margin-right: 8px; }
 .server-name { font-weight: 600; color: var(--text-primary); }
+.select-hint {
+  display: grid;
+  gap: 4px;
+  margin-top: 24px;
+  padding: 28px;
+  text-align: center;
+  color: var(--text-secondary);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+.select-hint strong { color: var(--text-primary); }
 </style>
