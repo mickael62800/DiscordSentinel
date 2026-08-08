@@ -300,9 +300,9 @@ impl ManageGameServersService {
             memory_bytes,
             cpu_limit: server.cpu_limit,
             network: cfg.docker_network_name.clone(),
-            // Si run_as_root=true (Terraria, Valheim, Factorio), on ne
-            // passe pas --user et l'image utilise son user par defaut.
-            user: if template.run_as_root {
+            // Si run_as_root=true (Terraria, Valheim, Factorio) ou template palworld,
+            // on ne passe pas --user et l'image utilise son user par defaut (root ou steam).
+            user: if template.run_as_root || template.slug == "palworld" {
                 None
             } else {
                 Some(cfg.container_user.clone())
