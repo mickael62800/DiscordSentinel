@@ -64,6 +64,29 @@ const configFields = computed<ConfigField[]>(() => {
 });
 
 const booleanFields = computed(() => configFields.value.filter((f) => f.type === "boolean"));
+const isAutomod = computed(() => props.definition.bot_name === "automod-bot");
+
+/**
+ * AutoMod comporte maintenant plusieurs niveaux de decision (detecteurs,
+ * analyse IA/tension, protection et review). Les regrouper evite une grille
+ * plate de plusieurs dizaines d'interrupteurs, sans changer le schema DB.
+ */
+function automodToggleGroup(key: string): string {
+  if (key === "enabled") return "Module";
+  if (/^(spam|caps|insult|link|phishing|emoji|mentions|suspicious_)/.test(key)) return "Détecteurs";
+  if (/^(text_|channel_tension|context_)/.test(key)) return "Analyse IA et tension";
+  if (/^(auto_protect|auto_delete|human_only|sanction_)/.test(key)) return "Réponse automatique";
+  if (/^(review|vote|discussion)/.test(key)) return "Validation des modérateurs";
+  return "Autres options";
+}
+
+const booleanSections = computed(() => {
+  if (!isAutomod.value) return [{ title: "Fonctionnalités", fields: booleanFields.value }];
+  const order = ["Module", "Détecteurs", "Analyse IA et tension", "Réponse automatique", "Validation des modérateurs", "Autres options"];
+  return order
+    .map((title) => ({ title, fields: booleanFields.value.filter((field) => automodToggleGroup(field.key) === title) }))
+    .filter((section) => section.fields.length > 0);
+});
 /// Champs de scoring de la moderation (`score_weight_*`, `score_threshold_*`) :
 /// sortis dans LEUR PROPRE section pour ne pas etre noyes parmi les dizaines
 /// d'autres nombres d'automod (l'utilisateur les cherchait sans les trouver).
@@ -302,7 +325,7 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
       <!-- Section toggles -->
       <div v-if="booleanFields.length > 0" class="toggles-section">
         <div class="section-title-row">
-          <h3 class="section-title">Fonctionnalites</h3>
+          <h3 class="section-title">{{ isAutomod ? 'Paramètres AutoMod' : 'Fonctionnalités' }}</h3>
           <button
             class="btn-toggle-all"
             @click="allTogglesOn ? disableAllToggles() : enableAllToggles()"
@@ -310,30 +333,33 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
             {{ allTogglesOn ? 'Tout desactiver' : 'Tout activer' }}
           </button>
         </div>
-        <div class="toggles-grid">
-          <div
-            v-for="field in booleanFields"
-            :key="field.key"
-            class="toggle-card"
-            :class="{ modified: isFieldModified(field.key), 'field-disabled': isFieldDisabled(field) }"
-            :title="isFieldDisabled(field) ? 'Depend d\'une autre option desactivee' : undefined"
-          >
-            <div class="toggle-card-header">
-              <span class="toggle-card-label" :title="field.label">{{ field.label }}</span>
-              <span v-if="field.description" class="tooltip-wrap">
-                <span class="info-icon">i</span>
-                <span class="tooltip-text">{{ field.description }}</span>
-              </span>
-              <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
-            </div>
-            <div class="toggle-card-control">
-              <AppToggle
-                :model-value="formValues[field.key] === 'true' || formValues[field.key] === '1'"
-                @update:model-value="formValues[field.key] = $event ? 'true' : 'false'"
-              />
-              <span class="toggle-state" :class="{ active: formValues[field.key] === 'true' || formValues[field.key] === '1' }">
-                {{ formValues[field.key] === 'true' || formValues[field.key] === '1' ? 'ON' : 'OFF' }}
-              </span>
+        <div v-for="section in booleanSections" :key="section.title" class="toggle-group">
+          <h4 v-if="isAutomod" class="toggle-group-title">{{ section.title }}</h4>
+          <div class="toggles-grid">
+            <div
+              v-for="field in section.fields"
+              :key="field.key"
+              class="toggle-card"
+              :class="{ modified: isFieldModified(field.key), 'field-disabled': isFieldDisabled(field) }"
+              :title="isFieldDisabled(field) ? 'Depend d\'une autre option desactivee' : undefined"
+            >
+              <div class="toggle-card-header">
+                <span class="toggle-card-label" :title="field.label">{{ field.label }}</span>
+                <span v-if="field.description" class="tooltip-wrap">
+                  <span class="info-icon">i</span>
+                  <span class="tooltip-text">{{ field.description }}</span>
+                </span>
+                <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+              </div>
+              <div class="toggle-card-control">
+                <AppToggle
+                  :model-value="formValues[field.key] === 'true' || formValues[field.key] === '1'"
+                  @update:model-value="formValues[field.key] = $event ? 'true' : 'false'"
+                />
+                <span class="toggle-state" :class="{ active: formValues[field.key] === 'true' || formValues[field.key] === '1' }">
+                  {{ formValues[field.key] === 'true' || formValues[field.key] === '1' ? 'ON' : 'OFF' }}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -505,6 +531,13 @@ watch(() => [props.definition.bot_name, props.configs], loadFormValues, { immedi
   white-space: nowrap;
 }
 .btn-toggle-all:hover { background: var(--accent); color: white; }
+.toggle-group + .toggle-group { margin-top: 20px; }
+.toggle-group-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
 
 .toggles-grid {
   display: grid;

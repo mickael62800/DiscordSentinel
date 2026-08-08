@@ -467,7 +467,8 @@ services:
       WEB_FRONT_URL: ${WEB_FRONT_URL:-}
       GRPC_API_URL: http://api:50051
       GRPC_TLS_DIR: /grpc-certs
-      API_KEY: ${SENTINEL_API_KEY:-${API_KEY:-}}
+      # Le bot et son client gRPC lisent SENTINEL_API_KEY.
+      SENTINEL_API_KEY: ${SENTINEL_API_KEY:-${API_KEY:-}}
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       REDIS_CHANNEL: sentinel:events
       VOICE_GUILD_ID: ${VOICE_GUILD_ID:-}
@@ -926,6 +927,10 @@ services:
       NEXUS_DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/nexus
       NEXUS_API_KEY: ${NEXUS_API_KEY:-}
       NEXUS_API_PORT: "3100"
+      NEXUS_GRPC_PORT: "3101"
+      # L'API Nexus appelle aussi Discord (gestion des salons de session).
+      # Elle doit recevoir le meme token que nexus-bot.
+      NEXUS_DISCORD_TOKEN: ${NEXUS_BOT_TOKEN:-${NEXUS_DISCORD_TOKEN:-}}
       # Optionnel : protege /metrics par un Bearer. Vide = ouvert (le port
       # n'est joignable que depuis le reseau interne ou vit Prometheus).
       # Si defini, configurer le meme token dans le job prometheus.
