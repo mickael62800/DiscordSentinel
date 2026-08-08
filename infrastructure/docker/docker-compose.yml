@@ -285,7 +285,9 @@ services:
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-}
       WEB_FRONT_URL: ${WEB_FRONT_URL:-}
       SUPERADMIN_USER_IDS: ${SUPERADMIN_USER_IDS:-}
-      SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
+      # La source publique du .env est SENTINEL_BOT_TOKEN. Le nom injecte
+      # reste SENTINEL_DISCORD_TOKEN, celui lu par les binaires Rust.
+      SENTINEL_DISCORD_TOKEN: ${SENTINEL_BOT_TOKEN:-${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}}
       DEEPSEEK_MODERATION_API_KEY: ${DEEPSEEK_MODERATION_API_KEY:-}
       DEEPSEEK_MODERATION_MODEL: ${DEEPSEEK_MODERATION_MODEL:-deepseek-chat}
       DEEPSEEK_MODERATION_ENDPOINT: ${DEEPSEEK_MODERATION_ENDPOINT:-https://api.deepseek.com/chat/completions}
@@ -402,7 +404,7 @@ services:
       GRPC_API_URL: http://api:50051
       GRPC_TLS_DIR: /grpc-certs
       # Discord (audit-sync, announcement)
-      SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
+      SENTINEL_DISCORD_TOKEN: ${SENTINEL_BOT_TOKEN:-${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}}
       # Cleanup
       VOICE_SESSIONS_RETENTION_DAYS: ${VOICE_SESSIONS_RETENTION_DAYS:-90}
       LOGS_RETENTION_DAYS: ${LOGS_RETENTION_DAYS:-30}
@@ -457,7 +459,7 @@ services:
       # Les API refusent tout autre guild_id ; les bots quittent toute
       # autre guilde. Vide = verrou desactive.
       PUBLIC_GUILD_ID: ${PUBLIC_GUILD_ID:-}
-      SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
+      SENTINEL_DISCORD_TOKEN: ${SENTINEL_BOT_TOKEN:-${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}}
       API_BASE_URL: http://api:3000
       # Adresse PUBLIQUE du site, utilisee pour construire les URL d'images des
       # embeds Discord (web/public/imgs/). Discord ne peut pas lire un fichier
@@ -985,7 +987,9 @@ services:
       # Les API refusent tout autre guild_id ; les bots quittent toute
       # autre guilde. Vide = verrou desactive.
       PUBLIC_GUILD_ID: ${PUBLIC_GUILD_ID:-}
-      NEXUS_DISCORD_TOKEN: ${NEXUS_DISCORD_TOKEN:-}
+      # La source publique du .env est NEXUS_BOT_TOKEN. Le binaire Nexus
+      # lit NEXUS_DISCORD_TOKEN ; conserver aussi ce fallback historique.
+      NEXUS_DISCORD_TOKEN: ${NEXUS_BOT_TOKEN:-${NEXUS_DISCORD_TOKEN:-}}
       NEXUS_API_URL: http://nexus-api:3100
       NEXUS_API_KEY: ${NEXUS_API_KEY:-}
       # Consomme la stream nexus:events (creation/suppression des salons de
