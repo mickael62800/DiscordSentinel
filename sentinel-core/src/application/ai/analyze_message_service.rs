@@ -99,6 +99,7 @@ impl AnalyzeMessageService {
 #[derive(Debug, Clone)]
 pub(crate) struct IaConfigValues {
     pub text_enabled: bool,
+    pub local_onnx_enabled: bool,
     pub text_threshold: f32,
     pub context_dampening: f64,
     pub context_format: String,
@@ -108,6 +109,7 @@ impl Default for IaConfigValues {
     fn default() -> Self {
         Self {
             text_enabled: true,
+            local_onnx_enabled: true,
             text_threshold: DEFAULT_TEXT_THRESHOLD,
             context_dampening: 0.65,
             context_format: "natural".to_string(),
@@ -127,6 +129,10 @@ pub(crate) fn parse_ia_config_from_bot_config(
             "text_enabled" => {
                 let v = e.config_value.to_ascii_lowercase();
                 cfg.text_enabled = matches!(v.as_str(), "true" | "1" | "yes");
+            }
+            "local_onnx_enabled" => {
+                let v = e.config_value.to_ascii_lowercase();
+                cfg.local_onnx_enabled = matches!(v.as_str(), "true" | "1" | "yes");
             }
             "text_threshold" => {
                 if let Ok(n) = e.config_value.parse::<f32>() {
@@ -486,6 +492,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         };
         let ia_cfg = parse_ia_config_from_bot_config(&automod_entries);
         let text_enabled = ia_cfg.text_enabled;
+        let local_onnx_enabled = ia_cfg.local_onnx_enabled;
         let text_threshold = ia_cfg.text_threshold;
         let context_dampening = ia_cfg.context_dampening;
         let context_format = ia_cfg.context_format.clone();
@@ -523,6 +530,45 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
             "Etat inference IA"
         );
 
+        // DeepSeek est un fournisseur distant autonome : il ne depend ni du
+        // modele ONNX local ni de son tokenizer. Le garder dans le bloc ONNX
+        // rendait le mode IA muet (et sans consommation de tokens) sur les
+        // installations qui n'embarquent que DeepSeek.
+        if text_enabled && !cmd.content.is_empty() {
+            if let Some(ds) = &self.deepseek_service {
+                if ds.is_available() {
+                    let _permit = self.inference_limiter.acquire().await?;
+                    debug!("Lancement analyse DeepSeek Moderation...");
+                    let context_texts: Vec<String> = cmd
+                        .context_messages
+                        .iter()
+                        .map(|c| format!("{}: {}", c.username, c.content))
+                        .collect();
+                    match ds.analyze_message(&cmd.content, &context_texts).await {
+                        Ok(ds_analysis) => {
+                            info!(score = ds_analysis.toxicity_score, sentiment = %ds_analysis.sentiment, reason = %ds_analysis.reason, "Reponse DeepSeek Moderation recue");
+                            if ds_analysis.toxicity_score >= text_threshold as f64 {
+                                let ds_reason = format!("DeepSeek [{}]: {}", ds_analysis.sentiment, ds_analysis.reason);
+                                let combined_score = result.score + ds_analysis.toxicity_score;
+                                let action = match ds_analysis.recommended_action.as_str() {
+                                    "ban" => Action::Ban, "mute" => Action::Mute,
+                                    "delete" => Action::Delete, "warn" => Action::Warn,
+                                    _ => result.action.clone(),
+                                };
+                                let is_stronger = action_rank(&action) > action_rank(&result.action);
+                                if is_stronger || combined_score > result.score {
+                                    result.score = combined_score;
+                                    if is_stronger { result.action = action; }
+                                    result.reason = if result.reason.is_empty() { ds_reason } else { format!("{} | {}", result.reason, ds_reason) };
+                                }
+                            }
+                        }
+                        Err(e) => warn!(error = %e, "Echec analyse DeepSeek Moderation, fallback ONNX/Regles"),
+                    }
+                }
+            }
+        }
+
         if let (Some(inference), Some(tokenizer)) = (&self.inference, &self.tokenizer) {
             debug!(
                 text_available = inference.text_available(),
@@ -530,59 +576,8 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 content_empty = cmd.content.is_empty(),
                 "Check inference conditions"
             );
-            // 1. Ingestion DeepSeek Moderation LLM (Prioritaire si disponible et configure)
-            if text_enabled && !cmd.content.is_empty() {
-                if let Some(ds) = &self.deepseek_service {
-                    if ds.is_available() {
-                        let _permit = self.inference_limiter.acquire().await?;
-                        debug!("Lancement analyse DeepSeek Moderation...");
-                        let context_texts: Vec<String> = cmd
-                            .context_messages
-                            .iter()
-                            .map(|c| format!("{}: {}", c.username, c.content))
-                            .collect();
-
-                        match ds.analyze_message(&cmd.content, &context_texts).await {
-                            Ok(ds_analysis) => {
-                                info!(
-                                    score = ds_analysis.toxicity_score,
-                                    sentiment = %ds_analysis.sentiment,
-                                    reason = %ds_analysis.reason,
-                                    "Reponse DeepSeek Moderation recue"
-                                );
-                                if ds_analysis.toxicity_score >= text_threshold as f64 {
-                                    let ds_reason = format!("DeepSeek [{}]: {}", ds_analysis.sentiment, ds_analysis.reason);
-                                    let combined_score = result.score + ds_analysis.toxicity_score;
-                                    let action = match ds_analysis.recommended_action.as_str() {
-                                        "ban" => Action::Ban,
-                                        "mute" => Action::Mute,
-                                        "delete" => Action::Delete,
-                                        "warn" => Action::Warn,
-                                        _ => result.action.clone(),
-                                    };
-                                    let is_stronger = action_rank(&action) > action_rank(&result.action);
-                                    if is_stronger || combined_score > result.score {
-                                        result.score = combined_score;
-                                        if is_stronger {
-                                            result.action = action;
-                                        }
-                                        result.reason = if result.reason.is_empty() {
-                                            ds_reason
-                                        } else {
-                                            format!("{} | {}", result.reason, ds_reason)
-                                        };
-                                    }
-                                }
-                            }
-                            Err(e) => {
-                                warn!(error = %e, "Echec analyse DeepSeek Moderation, fallback ONNX/Regles");
-                            }
-                        }
-                    }
-                }
-            }
-
             if text_enabled
+                && local_onnx_enabled
                 && inference.text_available()
                 && tokenizer.available()
                 && !cmd.content.is_empty()
