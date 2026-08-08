@@ -213,6 +213,22 @@ impl ManageGameServersService {
                 // Port jeu : exposé sur toutes les interfaces.
                 host_ip: "0.0.0.0".to_string(),
             });
+            // Pour Valheim (lloesche/valheim-server), Steam Query Port (container_port + 1) et
+            // communication port (container_port + 2) doivent être exposés en UDP.
+            if template.slug == "valheim" {
+                port_mappings.push(PortMapping {
+                    host_port: host_port + 1,
+                    container_port: template.container_port + 1,
+                    protocol: PortProtocol::Udp,
+                    host_ip: "0.0.0.0".to_string(),
+                });
+                port_mappings.push(PortMapping {
+                    host_port: host_port + 2,
+                    container_port: template.container_port + 2,
+                    protocol: PortProtocol::Udp,
+                    host_ip: "0.0.0.0".to_string(),
+                });
+            }
         }
         if template.supports_rcon && cfg.rcon_enabled {
             if let Some(rcon_host_port) = server.rcon_port {

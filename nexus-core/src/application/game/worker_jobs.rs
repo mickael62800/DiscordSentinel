@@ -60,15 +60,14 @@ pub async fn run_health_check(ctx: &JobContext) -> Result<JobReport, DomainError
 
     for server in &servers {
         let cfg = load_game_portal_config(&ctx.bot_config, &server.guild_id).await?;
-        if !cfg.rcon_enabled {
+        if !cfg.rcon_enabled || server.rcon_port.is_none() || server.rcon_password.is_none() {
+            // Pour les serveurs sans RCON (comme Valheim), rafraîchir l'activité quand le serveur est actif
+            // pour éviter une extinction par erreur.
+            let _ = ctx.server_repo.update_player_activity(server.id, 0).await;
             continue;
         }
-        let Some(port) = server.rcon_port else {
-            continue;
-        };
-        let Some(pwd) = server.rcon_password.clone() else {
-            continue;
-        };
+        let port = server.rcon_port.unwrap();
+        let pwd = server.rcon_password.clone().unwrap();
         let params = RconConnectionParams {
             host: RCON_HOST.to_string(),
             port,
