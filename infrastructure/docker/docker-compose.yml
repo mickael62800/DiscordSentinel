@@ -518,12 +518,10 @@ services:
       ATRIUM_USER_DAILY_LIMIT: ${ATRIUM_USER_DAILY_LIMIT:-30}
       ATRIUM_GLOBAL_DAILY_LIMIT: ${ATRIUM_GLOBAL_DAILY_LIMIT:-500}
       # Base logique Atrium, isolee derriere son pool dedie.
-      ATRIUM_RAG_DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@atrium-pgbouncer:5432/atrium
-      # En Docker, le RAG utilise toujours Ollama local. Ne pas laisser une
-      # ancienne valeur `.env` OpenAI detourner les requetes d'embeddings.
-      ATRIUM_EMBEDDINGS_BASE_URL: http://atrium-ollama:11434/v1
-      ATRIUM_EMBEDDINGS_API_KEY: ""
-      ATRIUM_EMBEDDINGS_MODEL: nomic-embed-text
+      ATRIUM_RAG_DATABASE_URL: ${ATRIUM_RAG_DATABASE_URL:-postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@atrium-pgbouncer:5432/atrium}
+      ATRIUM_EMBEDDINGS_BASE_URL: ${ATRIUM_EMBEDDINGS_BASE_URL:-http://atrium-ollama:11434/v1}
+      ATRIUM_EMBEDDINGS_API_KEY: ${ATRIUM_EMBEDDINGS_API_KEY:-}
+      ATRIUM_EMBEDDINGS_MODEL: ${ATRIUM_EMBEDDINGS_MODEL:-nomic-embed-text}
       RUST_LOG: ${RUST_LOG:-info}
     depends_on:
       atrium-pgbouncer:
