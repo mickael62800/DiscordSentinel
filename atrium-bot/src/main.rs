@@ -38,6 +38,8 @@ struct CalmingEvent {
 #[derive(Deserialize)]
 struct CalmingEventData {
     guild_id: String,
+    #[serde(default)]
+    channel_id: String,
     reason: String,
     #[serde(default)]
     kind: String,
@@ -98,7 +100,9 @@ impl Handler {
             return;
         }
 
-        // Atomique et partage entre replicas : un rappel maximum par 15 min.
+        // Atomique et partage entre replicas : un rappel maximum par salon et
+        // par 15 min. Une tension dans #general ne doit pas empecher Atrium
+        // d'apaiser un autre salon textuel.
         let Ok(client) = redis::Client::open(std::env::var("REDIS_URL").unwrap_or_default()) else {
             tracing::warn!("Rappel Atrium ignore: REDIS_URL invalide");
             return;
@@ -107,7 +111,10 @@ impl Handler {
             tracing::warn!("Rappel Atrium ignore: Redis indisponible");
             return;
         };
-        let key = format!("atrium:calming:cooldown:{}", event.data.guild_id);
+        let key = format!(
+            "atrium:calming:cooldown:{}:{}",
+            event.data.guild_id, event.data.channel_id
+        );
         let accepted: redis::RedisResult<Option<String>> = redis::cmd("SET")
             .arg(&key)
             .arg("1")
@@ -126,10 +133,19 @@ impl Handler {
             "phishing" | "unsafe_link" => "⚠️ N'ouvrez pas les liens suspects. Signalez-les à la modération et respectez les règles de sécurité.",
             _ => "🕊️ Le ton monte un peu. Merci de prendre une pause, de rester respectueux et de suivre le règlement.",
         };
-        if let Err(error) = config.general_channel_id.say(&ctx.http, message).await {
+        // Le rappel est publie directement dans le salon ou Sentinel a
+        // constate la tension. Le general reste le repli pour les evenements
+        // emis par une ancienne version de Sentinel sans channel_id.
+        let target_channel = event
+            .data
+            .channel_id
+            .parse::<u64>()
+            .map(ChannelId::new)
+            .unwrap_or(config.general_channel_id);
+        if let Err(error) = target_channel.say(&ctx.http, message).await {
             tracing::warn!(%error, "rappel apaisant Atrium non envoye");
         } else {
-            tracing::info!(guild_id = %event.data.guild_id, kind = %event.data.kind, "rappel apaisant Atrium envoye");
+            tracing::info!(guild_id = %event.data.guild_id, channel_id = %target_channel, kind = %event.data.kind, "rappel apaisant Atrium envoye");
         }
     }
 

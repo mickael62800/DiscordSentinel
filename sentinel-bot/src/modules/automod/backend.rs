@@ -347,6 +347,7 @@ pub(super) async fn send_to_backend(
                     "atrium_calming_requested",
                     serde_json::json!({
                         "guild_id": request.guild_id,
+                        "channel_id": request.channel_id,
                         "reason": "channel_tension",
                         "kind": calming_kind(&request.flags),
                     }),

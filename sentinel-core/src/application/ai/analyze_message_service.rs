@@ -769,21 +769,24 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                         tension_action = ?action,
                         "Tension de salon declenchee"
                     );
+                    // Toujours exposer la tension dans la raison, y compris
+                    // quand l'action individuelle est deja plus severe. Le
+                    // bot Atrium depend de ce signal pour apaiser le salon.
+                    let tension_reason = format!(
+                        "Tension de salon (somme glissante {:.2} sur {} derniers messages)",
+                        total, tcfg.buffer_size
+                    );
+                    result.reason = if result.reason.is_empty() {
+                        tension_reason
+                    } else {
+                        format!("{} + {}", result.reason, tension_reason)
+                    };
                     if tension_is_stronger(&result.action, action) {
                         let (new_action, duration) = match action {
                             TensionAction::Mute => (Action::Mute, Some(tcfg.mute_duration_secs)),
                             TensionAction::Delete => (Action::Delete, None),
                             TensionAction::Warn => (Action::Warn, None),
                             TensionAction::None => (Action::None, None),
-                        };
-                        let tension_reason = format!(
-                            "Tension de salon (somme glissante {:.2} sur {} derniers messages)",
-                            total, tcfg.buffer_size
-                        );
-                        result.reason = if result.reason.is_empty() {
-                            tension_reason
-                        } else {
-                            format!("{} + {}", result.reason, tension_reason)
                         };
                         result.action = new_action;
                         result.duration = duration;
