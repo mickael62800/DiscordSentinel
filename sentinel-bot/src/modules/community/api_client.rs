@@ -76,6 +76,7 @@ pub struct SyncRole {
     pub member_count: i32,
 }
 
+#[derive(Clone)]
 pub struct ApiClient {
     grpc: Arc<SentinelGrpcClient>,
 }

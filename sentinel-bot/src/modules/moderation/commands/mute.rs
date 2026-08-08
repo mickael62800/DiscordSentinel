@@ -318,15 +318,30 @@ pub async fn execute_mute(
         .unwrap_or_else(|_| time::OffsetDateTime::now_utc());
     let timeout = serenity::model::Timestamp::from(datetime);
 
-    if let Err(e) = member
-        .disable_communication_until_datetime(&ctx.http, timeout)
-        .await
-    {
-        error!(error = %e, "Impossible de mute l'utilisateur");
-        if let Some(cmd) = command {
-            edit_response_text(ctx, cmd, &format!("Erreur Discord : {e}")).await;
+    let role_mute =
+        match crate::modules::moderation::role_mute::apply(ctx, guild_id, target.id, timeout_secs)
+            .await
+        {
+            Ok(active) => active,
+            Err(e) => {
+                error!(error = %e, "Impossible de mute l'utilisateur via role");
+                if let Some(cmd) = command {
+                    edit_response_text(ctx, cmd, &format!("Erreur role de mute : {e}")).await;
+                }
+                return;
+            }
+        };
+    if !role_mute {
+        if let Err(e) = member
+            .disable_communication_until_datetime(&ctx.http, timeout)
+            .await
+        {
+            error!(error = %e, "Impossible de mute l'utilisateur");
+            if let Some(cmd) = command {
+                edit_response_text(ctx, cmd, &format!("Erreur Discord : {e}")).await;
+            }
+            return;
         }
-        return;
     }
 
     let data = ctx.data.read().await;
@@ -502,10 +517,20 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    if let Err(e) = member.enable_communication(&ctx.http).await {
-        error!(error = %e, "Impossible de unmute");
-        edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
-        return;
+    match crate::modules::moderation::role_mute::remove(ctx, guild_id, target_id).await {
+        Ok(true) => {}
+        Ok(false) => {
+            if let Err(e) = member.enable_communication(&ctx.http).await {
+                error!(error = %e, "Impossible de unmute");
+                edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
+                return;
+            }
+        }
+        Err(e) => {
+            error!(error = %e, "Impossible de retirer le role de mute");
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
+            return;
+        }
     }
 
     let data = ctx.data.read().await;

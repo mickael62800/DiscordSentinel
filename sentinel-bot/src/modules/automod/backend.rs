@@ -126,24 +126,29 @@ pub(super) async fn apply_auto_protect(
         Err(_) => return (None, false),
     };
     let mut mute_ok = false;
-    if let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(now_secs + safe as i64) {
-        let timeout = serenity::model::Timestamp::from(dt);
-        match guild_id.member(&ctx.http, msg.author.id).await {
-            Ok(mut member) => match member
-                .disable_communication_until_datetime(&ctx.http, timeout)
-                .await
-            {
-                Ok(_) => {
-                    mute_ok = true;
-                    info!(user = %msg.author.name, duration_secs = safe, "Auto-protection : mute applique");
+    match crate::modules::moderation::role_mute::apply(ctx, guild_id, msg.author.id, safe).await {
+        Ok(true) => mute_ok = true,
+        Ok(false) => {
+            if let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(now_secs + safe as i64) {
+                let timeout = serenity::model::Timestamp::from(dt);
+                match guild_id.member(&ctx.http, msg.author.id).await {
+                    Ok(mut member) => match member
+                        .disable_communication_until_datetime(&ctx.http, timeout)
+                        .await
+                    {
+                        Ok(_) => mute_ok = true,
+                        Err(e) => {
+                            warn!(error = %e, user = %msg.author.name, "Auto-protection : echec timeout")
+                        }
+                    },
+                    Err(e) => {
+                        warn!(error = %e, user = %msg.author.name, "Auto-protection : membre introuvable")
+                    }
                 }
-                Err(e) => {
-                    warn!(error = %e, user = %msg.author.name, "Auto-protection : echec mute (permission MODERATE_MEMBERS ?)")
-                }
-            },
-            Err(e) => {
-                warn!(error = %e, user = %msg.author.name, "Auto-protection : membre introuvable pour mute")
             }
+        }
+        Err(e) => {
+            warn!(error = %e, user = %msg.author.name, "Auto-protection : echec role de mute")
         }
     }
 
@@ -564,35 +569,53 @@ pub(super) async fn execute_action(
                 warn!(error = %e, "Echec envoi notification mute");
             }
             if let (Some(guild_id_val), Ok(member)) = (msg.guild_id, msg.member(&ctx.http).await) {
-                let mut member = guild_id_val.member(&ctx.http, member.user.id).await?;
                 const MAX_MUTE_SECS: u64 = 28 * 24 * 3600;
                 let safe_duration = mute_duration_secs.min(MAX_MUTE_SECS);
-                let secs = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+                match crate::modules::moderation::role_mute::apply(
+                    ctx,
+                    guild_id_val,
+                    member.user.id,
+                    safe_duration,
+                )
+                .await
                 {
-                    Ok(d) => match (d.as_secs() as i64).checked_add(safe_duration as i64) {
-                        Some(v) => v,
-                        None => {
-                            error!("Overflow timestamp mute (cas improbable)");
-                            return Ok(());
-                        }
-                    },
-                    Err(e) => {
-                        error!(error = %e, "Erreur horloge systeme pour le calcul du mute");
-                        return Ok(());
+                    Ok(true) => {
+                        info!(user = %msg.author.name, duration_secs = safe_duration, "Utilisateur mute via role");
                     }
-                };
-                let datetime = match time::OffsetDateTime::from_unix_timestamp(secs) {
-                    Ok(dt) => dt,
                     Err(e) => {
-                        error!(error = %e, "Timestamp invalide pour le mute");
-                        return Ok(());
+                        warn!(error = %e, user = %msg.author.name, "Echec role de mute automatique")
                     }
-                };
-                let timeout = serenity::model::Timestamp::from(datetime);
-                member
-                    .disable_communication_until_datetime(&ctx.http, timeout)
-                    .await?;
-                info!(user = %msg.author.name, duration_secs = mute_duration_secs, "Utilisateur mute");
+                    Ok(false) => {
+                        let mut member = guild_id_val.member(&ctx.http, member.user.id).await?;
+                        let secs = match std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                        {
+                            Ok(d) => match (d.as_secs() as i64).checked_add(safe_duration as i64) {
+                                Some(v) => v,
+                                None => {
+                                    error!("Overflow timestamp mute (cas improbable)");
+                                    return Ok(());
+                                }
+                            },
+                            Err(e) => {
+                                error!(error = %e, "Erreur horloge systeme pour le calcul du mute");
+                                return Ok(());
+                            }
+                        };
+                        let datetime = match time::OffsetDateTime::from_unix_timestamp(secs) {
+                            Ok(dt) => dt,
+                            Err(e) => {
+                                error!(error = %e, "Timestamp invalide pour le mute");
+                                return Ok(());
+                            }
+                        };
+                        let timeout = serenity::model::Timestamp::from(datetime);
+                        member
+                            .disable_communication_until_datetime(&ctx.http, timeout)
+                            .await?;
+                        info!(user = %msg.author.name, duration_secs = mute_duration_secs, "Utilisateur mute");
+                    }
+                }
             }
             if let Err(e) = msg.delete(&ctx.http).await {
                 warn!(error = %e, message_id = %msg.id, "Echec suppression message apres mute automod");

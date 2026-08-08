@@ -72,20 +72,35 @@ pub(crate) async fn handle_unmute_button(
         reply_ephemeral(ctx, component, "Identifiant du membre invalide.").await;
         return;
     };
-    match guild_id.member(&ctx.http, UserId::new(user_id)).await {
-        Ok(mut member) => match member.enable_communication(&ctx.http).await {
-            Ok(()) => {
-                info!(review_id, user_id, moderator = %component.user.name, "Membre demute depuis carte AutoMod");
-                reply_ephemeral(ctx, component, "✅ Timeout levé.").await;
-            }
+    match crate::modules::moderation::role_mute::remove(ctx, guild_id, UserId::new(user_id)).await {
+        Ok(true) => {
+            info!(review_id, user_id, moderator = %component.user.name, "Membre demute depuis carte AutoMod");
+            reply_ephemeral(ctx, component, "✅ Role de mute retiré.").await;
+        }
+        Ok(false) => match guild_id.member(&ctx.http, UserId::new(user_id)).await {
+            Ok(mut member) => match member.enable_communication(&ctx.http).await {
+                Ok(()) => {
+                    info!(review_id, user_id, moderator = %component.user.name, "Membre demute depuis carte AutoMod");
+                    reply_ephemeral(ctx, component, "✅ Timeout levé.").await;
+                }
+                Err(error) => {
+                    warn!(%error, review_id, user_id, "Echec demute depuis carte AutoMod");
+                    reply_ephemeral(ctx, component, "Échec du démute : vérifie la hiérarchie des rôles et la permission Modérer les membres.").await;
+                }
+            },
             Err(error) => {
-                warn!(%error, review_id, user_id, "Echec demute depuis carte AutoMod");
-                reply_ephemeral(ctx, component, "Échec du démute : vérifie la hiérarchie des rôles et la permission Modérer les membres.").await;
+                warn!(%error, review_id, user_id, "Membre introuvable pour demute");
+                reply_ephemeral(ctx, component, "Membre introuvable sur le serveur.").await;
             }
         },
         Err(error) => {
-            warn!(%error, review_id, user_id, "Membre introuvable pour demute");
-            reply_ephemeral(ctx, component, "Membre introuvable sur le serveur.").await;
+            warn!(%error, review_id, user_id, "Echec retrait role de mute");
+            reply_ephemeral(
+                ctx,
+                component,
+                "Échec du démute : vérifie la hiérarchie des rôles.",
+            )
+            .await;
         }
     }
 }

@@ -351,11 +351,19 @@ pub(crate) async fn apply_member_sanction(
                 let (Some(gid), Ok(uid)) = (guild_id, user_id_str.parse::<u64>()) else {
                     return false;
                 };
-                let Ok(mut member) = gid
-                    .member(&ctx.http, serenity::model::id::UserId::new(uid))
+                let user_id = serenity::model::id::UserId::new(uid);
+                match crate::modules::moderation::role_mute::apply(ctx, gid, user_id, mute_secs)
                     .await
-                else {
-                    return false; // membre introuvable (deja parti)
+                {
+                    Ok(true) => return true,
+                    Err(e) => {
+                        tracing::warn!(error = %e, user_id = %user_id, "Vote AutoMod : echec role de mute");
+                        return false;
+                    }
+                    Ok(false) => {}
+                }
+                let Ok(mut member) = gid.member(&ctx.http, user_id).await else {
+                    return false;
                 };
                 let until = (std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)

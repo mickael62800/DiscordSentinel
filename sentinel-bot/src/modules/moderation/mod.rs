@@ -11,6 +11,7 @@ pub mod reason_templates;
 mod redis_events;
 pub mod risk_check;
 mod risky_buttons;
+pub mod role_mute;
 
 use std::sync::Arc;
 use std::time::Instant;

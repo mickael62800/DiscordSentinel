@@ -43,12 +43,10 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 
     let mut published = 0u32;
     for role in &expired {
-        // Guard top-level enabled : si la guild a desactive le module
-        // temp_roles, on ne publie pas l'event (le role expire reste
-        // en DB, le bot le retirera quand le module sera reactive).
-        if !crate::common::is_worker_enabled(pool, &role.guild_id, "temp_roles").await {
-            continue;
-        }
+        // `temp_roles` est une infrastructure partagee (roles communautaires,
+        // sanctions, sursis). Une expiration deja enregistree doit toujours
+        // etre executee : la bloquer sur un toggle de module laisserait un
+        // membre mute indefiniment.
         let payload = serde_json::json!({
             "event": "temp_role_expire",
             "data": {
