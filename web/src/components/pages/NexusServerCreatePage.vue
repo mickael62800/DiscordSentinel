@@ -251,9 +251,9 @@ watch(selectedGuildId, loadTemplates, { immediate: true });
 
           <label class="nc-field">
             <span>Cœurs processeur</span>
-            <input v-model.number="cpuLimit" type="number" min="0.5" max="32" step="0.5" />
+            <input v-model.number="cpuLimit" type="number" min="0.5" max="6" step="0.5" />
             <small class="nc-note">
-              Plafond, pas une réservation. Minecraft n'exploite quasiment qu'un
+              Plafond (0.5 à 6 cœurs). Minecraft n'exploite quasiment qu'un
               cœur : 2 suffisent. Palworld est multithreadé : 4 sont utiles.
             </small>
           </label>

@@ -428,8 +428,8 @@ impl ManageGameServersUseCase for ManageGameServersService {
             allocated_memory_mb: memory,
             // Borne le plafond CPU demande : au-dela, c'est l'host qu'on met
             // en danger. En dessous de 0.5 coeur, un serveur de jeu ne tourne
-            // simplement pas.
-            cpu_limit: cmd.cpu_limit.map(|c| c.clamp(0.5, 32.0)),
+            // simplement pas. Plafond max strict : 6 coeurs.
+            cpu_limit: cmd.cpu_limit.map(|c| c.clamp(0.5, 6.0)),
             owner_user_id: cmd.owner_user_id.clone(),
             idle_shutdown_days: None,
             initial_config: cmd.initial_config,
