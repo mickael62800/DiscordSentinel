@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use sentinel_core::domain::services::audit::role_card::{
-    clamp_role_log_window, visible_movements, RoleMovement,
+    clamp_role_log_window, RoleMovement,
 };
 use serenity::all::{
     ChannelId, Context, CreateEmbed, CreateMessage, EditMessage, Member, MessageId, RoleId,
@@ -129,29 +129,45 @@ fn resolve_channel(cfg: &HashMap<String, String>) -> Option<ChannelId> {
 }
 
 fn build_embed(member: &Member, movements: &[RoleMovement], window: u64) -> CreateEmbed {
-    let total = movements.len();
-    // Affiche les MAX_LINES plus recents (ordre chronologique conserve).
-    let (hidden, shown) = visible_movements(movements, MAX_LINES);
-    let mut body = String::new();
-    if hidden > 0 {
-        body.push_str(&format!("… ({hidden} mouvements plus anciens)\n"));
-    }
-    for (added, role) in shown {
+    let mut added_roles: Vec<&str> = Vec::new();
+    let mut removed_roles: Vec<&str> = Vec::new();
+
+    for (added, role) in movements {
         if *added {
-            body.push_str(&format!("➕ <@&{role}>\n"));
+            added_roles.push(role);
         } else {
-            body.push_str(&format!("➖ <@&{role}>\n"));
+            removed_roles.push(role);
         }
     }
-    if body.is_empty() {
-        body.push('-');
-    }
+
+    let added_body = if added_roles.is_empty() {
+        "Aucun".to_string()
+    } else {
+        added_roles
+            .iter()
+            .take(MAX_LINES / 2)
+            .map(|r| format!("➕ <@&{r}>"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    let removed_body = if removed_roles.is_empty() {
+        "Aucun".to_string()
+    } else {
+        removed_roles
+            .iter()
+            .take(MAX_LINES / 2)
+            .map(|r| format!("➖ <@&{r}>"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
 
     let minutes = window / 60;
     crate::shared::embeds::info_embed("🎭 Rôles modifiés")
         .field("Membre", format!("<@{}>", member.user.id), true)
         .field("ID", member.user.id.to_string(), true)
-        .field(format!("Changements ({total})"), body, false)
+        .field("➕ Rôles ajoutés", added_body, true)
+        .field("➖ Rôles retirés", removed_body, true)
         .thumbnail(member.user.face())
         .timestamp(serenity::model::Timestamp::now())
         .footer(serenity::builder::CreateEmbedFooter::new(format!(
