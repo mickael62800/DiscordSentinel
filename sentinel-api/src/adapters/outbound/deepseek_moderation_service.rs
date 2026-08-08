@@ -38,8 +38,8 @@ impl DeepSeekModerationAdapter {
     }
 
     pub fn from_env() -> Self {
-        let api_key = std::env::var("DEEPSEEK_API_KEY")
-            .or_else(|_| std::env::var("DEEPSEEK_MODERATION_API_KEY"))
+        let api_key = std::env::var("DEEPSEEK_MODERATION_API_KEY")
+            .or_else(|_| std::env::var("DEEPSEEK_API_KEY"))
             .ok();
         let model = std::env::var("DEEPSEEK_MODERATION_MODEL").ok();
         let endpoint = std::env::var("DEEPSEEK_MODERATION_ENDPOINT").ok();
