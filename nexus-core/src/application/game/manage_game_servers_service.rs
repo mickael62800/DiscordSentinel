@@ -181,6 +181,12 @@ impl ManageGameServersService {
         for (k, v) in overrides {
             env.insert(k.clone(), v.clone());
         }
+        if template.slug == "palworld" {
+            if let Some(host_port) = server.host_port {
+                env.insert("PUBLIC_PORT".to_string(), host_port.to_string());
+                env.insert("PORT".to_string(), template.container_port.to_string());
+            }
+        }
         if template.supports_rcon && cfg.rcon_enabled {
             if let Some(pwd) = &server.rcon_password {
                 env.insert("ENABLE_RCON".to_string(), "true".to_string());
