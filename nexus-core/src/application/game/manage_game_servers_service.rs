@@ -166,7 +166,15 @@ impl ManageGameServersService {
             .as_object()
             .map(|m| {
                 m.iter()
-                    .map(|(k, v)| (k.clone(), v.as_str().map(String::from).unwrap_or_default()))
+                    .map(|(k, v)| {
+                        let val_str = match v {
+                            serde_json::Value::String(s) => s.clone(),
+                            serde_json::Value::Number(n) => n.to_string(),
+                            serde_json::Value::Bool(b) => b.to_string(),
+                            _ => v.as_str().map(String::from).unwrap_or_default(),
+                        };
+                        (k.clone(), val_str)
+                    })
                     .collect()
             })
             .unwrap_or_default();
@@ -314,7 +322,15 @@ impl ManageGameServersService {
             .as_object()
             .map(|m| {
                 m.iter()
-                    .map(|(k, v)| (k.clone(), v.as_str().map(String::from).unwrap_or_default()))
+                    .map(|(k, v)| {
+                        let val_str = match v {
+                            serde_json::Value::String(s) => s.clone(),
+                            serde_json::Value::Number(n) => n.to_string(),
+                            serde_json::Value::Bool(b) => b.to_string(),
+                            _ => v.as_str().map(String::from).unwrap_or_default(),
+                        };
+                        (k.clone(), val_str)
+                    })
                     .collect()
             })
             .unwrap_or_default();
