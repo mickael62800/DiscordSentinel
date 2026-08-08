@@ -51,7 +51,10 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
     // Rate impose par le raid + etat courant des salons : on ne restaure un
     // salon que s'il porte ENCORE le rate impose (sinon un modo l'a change
     // manuellement pendant la fenetre -> on respecte sa valeur).
-    let imposed_rate = data.get("imposed_rate").and_then(|v| v.as_u64()).unwrap_or(0) as u16;
+    let imposed_rate = data
+        .get("imposed_rate")
+        .and_then(|v| v.as_u64())
+        .unwrap_or(0) as u16;
     let current = guild_id.channels(&ctx.http).await.ok();
 
     let mut restored = 0usize;

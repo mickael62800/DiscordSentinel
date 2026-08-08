@@ -31,7 +31,10 @@ pub async fn get_config(
     State(state): State<AppState>,
     Path((guild_id, bot_name)): Path<(String, String)>,
 ) -> Result<Json<HashMap<String, String>>, ApiError> {
-    let entries = state.bot_config_repo.get_config(&guild_id, &bot_name).await?;
+    let entries = state
+        .bot_config_repo
+        .get_config(&guild_id, &bot_name)
+        .await?;
     Ok(Json(
         entries
             .into_iter()

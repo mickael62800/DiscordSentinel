@@ -24,10 +24,7 @@ impl PgLfgRepository {
     /// Une requete par annonce (N+1) serait invisible avec trois annonces et
     /// catastrophique avec cinquante — et cette section est celle qu'on
     /// consulte le plus souvent.
-    async fn load_interests(
-        &self,
-        ids: &[Uuid],
-    ) -> Result<Vec<(Uuid, LfgInterest)>, DomainError> {
+    async fn load_interests(&self, ids: &[Uuid]) -> Result<Vec<(Uuid, LfgInterest)>, DomainError> {
         if ids.is_empty() {
             return Ok(vec![]);
         }
@@ -230,14 +227,13 @@ impl LfgRepository for PgLfgRepository {
     }
 
     async fn remove_interest(&self, id: Uuid, user_id: &str) -> Result<bool, DomainError> {
-        let res = sqlx::query(
-            "DELETE FROM community_lfg_interest WHERE lfg_id = $1 AND user_id = $2",
-        )
-        .bind(id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        let res =
+            sqlx::query("DELETE FROM community_lfg_interest WHERE lfg_id = $1 AND user_id = $2")
+                .bind(id)
+                .bind(user_id)
+                .execute(&self.pool)
+                .await
+                .map_err(pg_err)?;
         Ok(res.rows_affected() > 0)
     }
 

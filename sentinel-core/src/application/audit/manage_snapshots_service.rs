@@ -134,7 +134,11 @@ impl ManageSnapshotsUseCase for ManageSnapshotsService {
                 }
             }
             if hourly_retention > 0 {
-                if let Err(e) = self.repo.cleanup_hourly(guild_id, hourly_retention as i32).await {
+                if let Err(e) = self
+                    .repo
+                    .cleanup_hourly(guild_id, hourly_retention as i32)
+                    .await
+                {
                     tracing::warn!(error = %e, guild = %guild_id, "retention hourly echec");
                 }
             }

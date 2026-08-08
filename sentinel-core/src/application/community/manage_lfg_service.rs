@@ -65,7 +65,12 @@ impl ManageLfgService {
 
         cmd.description = cmd
             .description
-            .map(|d| d.trim().chars().take(MAX_DESCRIPTION_CHARS).collect::<String>())
+            .map(|d| {
+                d.trim()
+                    .chars()
+                    .take(MAX_DESCRIPTION_CHARS)
+                    .collect::<String>()
+            })
             .filter(|d| !d.is_empty());
 
         cmd.author_name = cmd.author_name.trim().to_string();
@@ -140,12 +145,7 @@ impl ManageLfgUseCase for ManageLfgService {
         Ok(())
     }
 
-    async fn join(
-        &self,
-        id: Uuid,
-        user_id: &str,
-        username: &str,
-    ) -> Result<LfgPost, DomainError> {
+    async fn join(&self, id: Uuid, user_id: &str, username: &str) -> Result<LfgPost, DomainError> {
         let post = self.reload(id).await?;
 
         // Se manifester sur une annonce close ou expiree ne mene nulle part :

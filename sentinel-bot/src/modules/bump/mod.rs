@@ -10,6 +10,7 @@
 
 use std::time::Duration;
 
+mod api_client;
 mod command;
 
 use serenity::all::{CommandInteraction, CreateCommand};
@@ -36,7 +37,9 @@ use serenity::prelude::*;
 use tracing::{debug, info, warn};
 
 use crate::shared::api_client::BaseApiClient;
-use crate::shared::heartbeat::ApiClientKey;
+use crate::shared::grpc_client::GrpcClientKey;
+
+use api_client::BumpApi;
 
 pub const MODULE_BOT_NAME: &str = "bump-bot";
 
@@ -76,41 +79,19 @@ fn message_facts(msg: &Message) -> BumpMessageFacts {
     }
 }
 
-#[derive(serde::Serialize)]
-struct RecordBumpBody {
-    username: String,
-    channel_id: String,
-    provider: String,
-}
-
-#[derive(serde::Deserialize, Default)]
-struct BumpRewardResp {
-    #[serde(default)]
-    rewarded: bool,
-    #[serde(default)]
-    reward: i64,
-    #[serde(default)]
-    weekly_count: i64,
-    /// Role VIP a poser (None si feature off ou seuil pas atteint).
-    #[serde(default)]
-    vip_role_id: Option<String>,
-    /// True uniquement au bump qui debloque le VIP (annonce one-shot).
-    #[serde(default)]
-    vip_just_unlocked: bool,
-}
-
 /// Appele a chaque EDITION de message. Certains bots de bump (DiscordL)
 /// repondent d'abord un message VIDE a l'interaction `/bump`, puis l'editent
 /// pour y ajouter l'embed de resultat. On ne voit donc rien au MESSAGE_CREATE :
 /// il faut re-lire le message a l'edition, quand l'embed est enfin present.
-pub async fn on_message_update(
-    ctx: &Context,
-    event: &serenity::model::event::MessageUpdateEvent,
-) {
+pub async fn on_message_update(ctx: &Context, event: &serenity::model::event::MessageUpdateEvent) {
     // Du contenu exploitable vient-il d'apparaitre a l'edition ? Un embed
     // (Disboard, DiscordL, French GG, SpaceBump...) OU du texte (Discadia
     // confirme en texte simple). Sans l'un ou l'autre, rien a detecter.
-    let has_embeds = event.embeds.as_ref().map(|e| !e.is_empty()).unwrap_or(false);
+    let has_embeds = event
+        .embeds
+        .as_ref()
+        .map(|e| !e.is_empty())
+        .unwrap_or(false);
     let has_content = event
         .content
         .as_ref()
@@ -234,13 +215,14 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         return;
     }
 
-    let api = {
+    let grpc = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
+        match data.get::<GrpcClientKey>() {
+            Some(g) => g.clone(),
             None => return,
         }
     };
+    let bump_api = BumpApi::new(grpc);
 
     // Nom d'affichage du bumpeur (best-effort).
     let username = msg
@@ -254,13 +236,14 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         })
         .unwrap_or_default();
 
-    let body = RecordBumpBody {
-        username,
-        channel_id: msg.channel_id.to_string(),
-        provider: provider.key.to_string(),
-    };
-    let resp: BumpRewardResp = match api
-        .post_json(&format!("/api/bump/{}/{}", guild_id, bumper_id), &body)
+    let resp = match bump_api
+        .record_bump(
+            &guild_id,
+            &bumper_id.to_string(),
+            &username,
+            &msg.channel_id.to_string(),
+            provider.key,
+        )
         .await
     {
         Ok(r) => r,
@@ -306,31 +289,17 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
     let content = format!(
         "🎉 Merci <@{}> pour le **{}** ({}) ! **+{} coins** ({} #{} de la semaine)",
-        bumper_id, provider.action.label(), provider.display, resp.reward, provider.action.label(), resp.weekly_count
+        bumper_id,
+        provider.action.label(),
+        provider.display,
+        resp.reward,
+        provider.action.label(),
+        resp.weekly_count
     );
     if let Err(e) = msg.channel_id.say(&ctx.http, content).await {
         warn!(error = %e, "Echec annonce recompense bump");
     }
     info!(guild_id, user = %bumper_id, provider = provider.key, reward = resp.reward, "Bump recompense");
-}
-
-#[derive(serde::Deserialize)]
-struct DueReminder {
-    guild_id: String,
-    channel_id: String,
-    #[serde(default = "default_provider")]
-    provider: String,
-}
-
-fn default_provider() -> String {
-    "disboard".to_string()
-}
-
-/// Etat d'un provider renvoye par `/api/bump/{guild}/status`.
-#[derive(serde::Deserialize)]
-struct BumpStatus {
-    provider: String,
-    ready_at: chrono::DateTime<chrono::Utc>,
 }
 
 /// Rafraichit la carte de statut des bumps de chaque guild : un message unique
@@ -367,11 +336,14 @@ async fn refresh_all_cards(ctx: &Context) {
 /// defile en direct cote Discord). La carte est EDITEE en place (ref memorisee
 /// dans `STATUS_CARDS`).
 pub(crate) async fn refresh_guild_card(ctx: &Context, guild_id: u64) -> CardRefresh {
-    let api = {
+    let grpc = {
         let data = ctx.data.read().await;
-        data.get::<ApiClientKey>().cloned()
+        data.get::<GrpcClientKey>().cloned()
     };
-    let Some(api) = api else { return CardRefresh::Disabled };
+    let Some(grpc) = grpc else {
+        return CardRefresh::Disabled;
+    };
+    let bump_api = BumpApi::new(grpc);
 
     let gid = guild_id.to_string();
     let cfg =
@@ -388,10 +360,7 @@ pub(crate) async fn refresh_guild_card(ctx: &Context, guild_id: u64) -> CardRefr
 
     // Etats connus (cooldown en cours), indexes par provider. Une plateforme
     // jamais bumpee n'a PAS de ligne ici -> elle est simplement "dispo".
-    let statuses: Vec<BumpStatus> = api
-        .get_json(&format!("/api/bump/{gid}/status"))
-        .await
-        .unwrap_or_default();
+    let statuses = bump_api.guild_status(&gid).await.unwrap_or_default();
     let ready_by_provider: std::collections::HashMap<&str, chrono::DateTime<chrono::Utc>> =
         statuses
             .iter()
@@ -447,13 +416,20 @@ pub(crate) async fn refresh_guild_card(ctx: &Context, guild_id: u64) -> CardRefr
     // Edite la carte existante (meme salon), sinon en poste une nouvelle.
     let edited = match cards.get(&guild_id).copied() {
         Some((c, m)) if c == channel_id => ch
-            .edit_message(&ctx.http, MessageId::new(m), EditMessage::new().embed(embed.clone()))
+            .edit_message(
+                &ctx.http,
+                MessageId::new(m),
+                EditMessage::new().embed(embed.clone()),
+            )
             .await
             .is_ok(),
         _ => false,
     };
     if !edited {
-        if let Ok(msg) = ch.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
+        if let Ok(msg) = ch
+            .send_message(&ctx.http, CreateMessage::new().embed(embed))
+            .await
+        {
             cards.insert(guild_id, (channel_id, msg.id.get()));
         }
     }
@@ -488,15 +464,13 @@ pub fn spawn_background(ctx: Context) {
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(60)).await;
-            let api = {
+            let grpc = {
                 let data = ctx.data.read().await;
-                data.get::<ApiClientKey>().cloned()
+                data.get::<GrpcClientKey>().cloned()
             };
-            let Some(api) = api else { continue };
-            let due: Vec<DueReminder> = api
-                .get_json("/api/bump/due-reminders")
-                .await
-                .unwrap_or_default();
+            let Some(grpc) = grpc else { continue };
+            let bump_api = BumpApi::new(grpc);
+            let due = bump_api.due_reminders().await.unwrap_or_default();
             for d in due {
                 let provider = provider_by_key(&d.provider).unwrap_or(&DISBOARD);
                 if let Ok(cid) = d.channel_id.parse::<u64>() {
@@ -539,12 +513,7 @@ pub fn spawn_background(ctx: Context) {
                 }
                 // Best-effort : on marque envoye meme si le post echoue, pour ne
                 // pas spammer le rappel a chaque tick.
-                let _ = api
-                    .post_json::<_, serde_json::Value>(
-                        &format!("/api/bump/{}/reminder-sent", d.guild_id),
-                        &serde_json::json!({ "provider": d.provider }),
-                    )
-                    .await;
+                let _ = bump_api.mark_reminder_sent(&d.guild_id, &d.provider).await;
             }
         }
     });

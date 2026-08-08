@@ -91,7 +91,9 @@ impl ManageAnnouncementsService {
             return Err(DomainError::ValidationError("max 25 salons".into()));
         }
         if cmd.name.chars().count() > 100 {
-            return Err(DomainError::ValidationError("name trop long (max 100)".into()));
+            return Err(DomainError::ValidationError(
+                "name trop long (max 100)".into(),
+            ));
         }
         if cmd.content_text.chars().count() > 4000 {
             return Err(DomainError::ValidationError(

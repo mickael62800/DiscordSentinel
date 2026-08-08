@@ -20,10 +20,8 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::bootstrap::state::ModerationState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
-use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::bootstrap::state::ModerationState;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
 use sentinel_core::domain::entities::moderation::review::automod::NewAutomodReview;
@@ -34,6 +32,8 @@ use sentinel_core::domain::entities::system::discord_ids::MessageId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
 use sentinel_core::domain::enums::system::role::Role;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
 
 use super::dto::AutomodReviewDto;
 use super::dto::ReviewVoteDto;
@@ -226,8 +226,14 @@ pub struct ResolveReviewBody {
 /// HTTP par le bot. Seules les vraies sanctions de membre sont tracees
 /// (prevention/warn/mute/ban) ; "delete"/"ignore" ne sont pas des sanctions.
 /// Best-effort : un echec est logge mais ne fait pas echouer la resolution.
-async fn log_review_sanction(
-    state: &ModerationState,
+pub(crate) async fn log_review_sanction(
+    moderation_uc: &std::sync::Arc<
+        dyn sentinel_core::ports::inbound::moderation::manage_moderation::ManageModerationUseCase,
+    >,
+    bot_config_repo: &std::sync::Arc<
+        dyn sentinel_core::ports::outbound::system::bot_config_repository::BotConfigRepository,
+    >,
+    broadcaster: &std::sync::Arc<crate::adapters::outbound::ws::broadcaster::EventBroadcaster>,
     review: &AutomodReview,
     applied_action: &str,
     moderator_id: &str,
@@ -270,8 +276,7 @@ async fn log_review_sanction(
     // Duree du mute depuis la config guild (pour le rappel d'expiration + l'historique).
     let duration = if applied_action == "mute" {
         sentinel_core::domain::entities::system::bot_config::cfg_str(
-            &state
-                .bot_config_repo
+            &bot_config_repo
                 .get_config(
                     review.guild_id.as_str(),
                     sentinel_core::domain::entities::system::bot_names::AUTOMOD_BOT,
@@ -305,7 +310,7 @@ async fn log_review_sanction(
     // via `log_action` (SANS strike : l'incident a déjà compté son strike lors
     // du mute auto). Sinon, chemin nominal avec strike.
     let logged = if skip_strike {
-        match state.moderation_uc.log_action(cmd).await {
+        match moderation_uc.log_action(cmd).await {
             Ok(action) => LoggedModerationAction {
                 action,
                 strike: None,
@@ -317,7 +322,7 @@ async fn log_review_sanction(
             }
         }
     } else {
-        match state.moderation_uc.log_action_with_strike(cmd).await {
+        match moderation_uc.log_action_with_strike(cmd).await {
             Ok(l) => l,
             Err(e) => {
                 // Compteur "logs manquants" : si non nul en prod, on active l'outbox
@@ -334,7 +339,7 @@ async fn log_review_sanction(
 
     // Memes broadcasts que l'endpoint /api/moderation/actions, pour que le
     // journal web et les notifications de strike restent a jour.
-    state.broadcaster.broadcast(
+    broadcaster.broadcast(
         "moderation_action",
         serde_json::json!({
             "action_type": applied_action,
@@ -347,7 +352,7 @@ async fn log_review_sanction(
     );
     if let Some(sr) = &logged.strike {
         if sr.should_trigger_escalation_broadcast() {
-            state.broadcaster.broadcast(
+            broadcaster.broadcast(
                 "strike_added",
                 serde_json::json!({
                     "guild_id": review.guild_id.as_str(),
@@ -411,7 +416,9 @@ pub async fn resolve_review(
     // meme requete que la resolution (le bot n'a plus a faire un 2e appel
     // HTTP -> plus de fenetre "resolu mais non logge" cote bot).
     log_review_sanction(
-        &state,
+        &state.moderation_uc,
+        &state.bot_config_repo,
+        &state.broadcaster,
         &review,
         &body.applied_action,
         &body.resolved_by_id,

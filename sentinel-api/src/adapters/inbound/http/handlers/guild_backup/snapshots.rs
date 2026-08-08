@@ -8,20 +8,19 @@
 //! Phase 1 (backbone) : STOCKAGE seul. La capture Discord (production du
 //! `GuildSnapshot`) et la restauration effective sont cote bot (phase 2).
 
+use axum::extract::{Path, State};
 use axum::Extension;
 use axum::Json;
-use axum::extract::{Path, State};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::bootstrap::state::GuildBackupState;
 use crate::adapters::inbound::http::validation;
+use crate::bootstrap::state::GuildBackupState;
 use axum::http::StatusCode;
 use sentinel_core::domain::entities::guild_backup::snapshot::GuildSnapshot;
 use sentinel_core::ports::inbound::guild_backup::manage_snapshots::{SnapshotId, SnapshotSummary};
-
 
 #[derive(Debug, Serialize)]
 pub struct StoredSnapshotDto {
@@ -139,7 +138,10 @@ pub async fn rename_snapshot(
     let id = parse_id(&snapshot_id)?;
     // On charge d'abord pour connaitre le guild_id (RBAC) et distinguer 404.
     state.guild_snapshots_uc.get_snapshot(id).await?;
-    state.guild_snapshots_uc.rename_snapshot(id, &body.label).await?;
+    state
+        .guild_snapshots_uc
+        .rename_snapshot(id, &body.label)
+        .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 

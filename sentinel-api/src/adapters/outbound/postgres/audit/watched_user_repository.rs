@@ -2,10 +2,10 @@ use crate::adapters::outbound::postgres::pg_err;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use sentinel_core::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 use sentinel_core::domain::entities::audit::watched_user::classify_risk_level;
 use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 
 pub struct PgWatchedUserRepository {
     pool: PgPool,

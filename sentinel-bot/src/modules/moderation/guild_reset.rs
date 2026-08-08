@@ -45,7 +45,10 @@ pub async fn handle_guild_reset_event(ctx: &Context, payload: &str) {
     // sans le secret. En dev (API_KEY vide) la signature n'est pas exigee.
     let secret = std::env::var("API_KEY").unwrap_or_default();
     if !secret.is_empty() {
-        let guild_id_str = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or_default();
+        let guild_id_str = data
+            .get("guild_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or_default();
         let expected = sign_guild_reset(&secret, guild_id_str, unban, unmute, remove_roles);
         let got = data.get("sig").and_then(|v| v.as_str()).unwrap_or_default();
         if got.is_empty() || got != expected {

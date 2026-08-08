@@ -5,9 +5,9 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_err;
-use sentinel_core::ports::outbound::community::bump_repository::BumpRepository;
 use sentinel_core::domain::entities::community::bump::{BumpState, DueReminder};
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::bump_repository::BumpRepository;
 
 pub struct PgBumpRepository {
     pool: PgPool,
@@ -159,12 +159,14 @@ impl BumpRepository for PgBumpRepository {
         .map_err(pg_err)?;
         Ok(rows
             .into_iter()
-            .map(|(provider, channel_id, last_bump_at, cooldown_minutes)| BumpState {
-                provider,
-                channel_id,
-                last_bump_at,
-                cooldown_minutes: cooldown_minutes as i64,
-            })
+            .map(
+                |(provider, channel_id, last_bump_at, cooldown_minutes)| BumpState {
+                    provider,
+                    channel_id,
+                    last_bump_at,
+                    cooldown_minutes: cooldown_minutes as i64,
+                },
+            )
             .collect())
     }
 }

@@ -7,11 +7,11 @@ use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::bootstrap::state::ModerationState;
-use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::Json;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
 
 pub async fn list_infractions(
     State(state): State<ModerationState>,

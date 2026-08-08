@@ -307,9 +307,7 @@ impl DiscordApi for DiscordApiService {
             .get("id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .ok_or_else(|| {
-                DomainError::Internal("Discord create_channel: reponse sans id".into())
-            })
+            .ok_or_else(|| DomainError::Internal("Discord create_channel: reponse sans id".into()))
     }
 
     /// Supprime un salon / une categorie. Supprimer une categorie ne supprime

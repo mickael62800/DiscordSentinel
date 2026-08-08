@@ -77,10 +77,10 @@ fn analysis_to_proto_no_action() {
 
 // ── RPC handler tests avec mock AnalyzeMessageUseCase ──
 
-use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
-use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use async_trait::async_trait;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -107,14 +107,16 @@ impl AnalyzeMessageUseCase for MockAnalyzeUc {
         &self,
         _guild_id: &str,
         _flood_count: i32,
-    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::FloodDecision, DomainError>
+    {
         unimplemented!()
     }
     async fn evaluate_attachments(
         &self,
         _: &str,
         _: Vec<String>,
-    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError> {
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::AttachmentDecision, DomainError>
+    {
         unimplemented!()
     }
     async fn evaluate_caps(

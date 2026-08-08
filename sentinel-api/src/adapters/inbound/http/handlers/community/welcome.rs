@@ -1,12 +1,12 @@
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::bootstrap::state::CommunityState;
-use sentinel_core::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
-use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
-use sentinel_core::domain::entities::community::age_check::AgeCheckDecision;
 use axum::extract::State;
 use axum::Json;
+use sentinel_core::domain::entities::community::age_check::AgeCheckDecision;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
+use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use serde::Deserialize;
 use serde::Serialize;
 

@@ -8,8 +8,8 @@ use axum::Json;
 use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::bootstrap::state::ModerationState;
 use crate::adapters::inbound::http::validation;
+use crate::bootstrap::state::ModerationState;
 
 use super::dto::DiscussionChannelDto;
 use super::dto::DiscussionMessageDto;
@@ -64,8 +64,8 @@ pub async fn open_discussion(
     Path(review_id): Path<String>,
     Json(body): Json<OpenDiscussionBody>,
 ) -> Result<Json<DiscussionChannelDto>, ApiError> {
-    use sentinel_core::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand;
     use sentinel_core::domain::entities::moderation::review::automod::ModeratorFacts;
+    use sentinel_core::ports::inbound::moderation::manage_automod_reviews::OpenDiscussionCommand;
 
     let id = validation::parse_uuid("review_id", &review_id).map_err(ApiError)?;
 

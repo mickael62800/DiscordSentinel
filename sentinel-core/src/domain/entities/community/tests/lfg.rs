@@ -26,7 +26,9 @@ fn post(slots: i32, interesses: usize, ouvert: bool, expire_a: i64) -> LfgPost {
         is_open: ouvert,
         expires_at: t(expire_a),
         created_at: t(0),
-        interested: (0..interesses).map(|i| interest(&format!("u{i}"))).collect(),
+        interested: (0..interesses)
+            .map(|i| interest(&format!("u{i}")))
+            .collect(),
     }
 }
 

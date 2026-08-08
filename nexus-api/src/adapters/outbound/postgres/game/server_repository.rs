@@ -4,11 +4,11 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
+use nexus_core::domain::entities::game::server::{GameServer, GameServerStatus};
+use nexus_core::domain::errors::DomainError;
 use nexus_core::ports::outbound::game::game_server_repository::{
     GameServerRepository, GameServerRuntimeUpdate, NewGameServer, TemplateUsage,
 };
-use nexus_core::domain::entities::game::server::{GameServer, GameServerStatus};
-use nexus_core::domain::errors::DomainError;
 
 pub struct PgGameServerRepository {
     pool: PgPool,
@@ -103,7 +103,7 @@ const SELECT_COLS: &str = "id, guild_id, template_id, name, status, container_id
 impl GameServerRepository for PgGameServerRepository {
     async fn create(&self, new: NewGameServer) -> Result<GameServer, DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_ctx("tx begin"))?;
-        
+
         let row: ServerRow = sqlx::query_as(&format!(
             "INSERT INTO game_servers \
                  (guild_id, template_id, name, allocated_memory_mb, cpu_limit, owner_user_id, idle_shutdown_days) \
@@ -120,7 +120,7 @@ impl GameServerRepository for PgGameServerRepository {
         .fetch_one(&mut *tx)
         .await
         .map_err(pg_ctx("create game_server"))?;
-        
+
         for (key, value) in &new.initial_config {
             sqlx::query(
                 "INSERT INTO game_server_configs (server_id, config_key, config_value, updated_by) \
@@ -134,7 +134,7 @@ impl GameServerRepository for PgGameServerRepository {
             .await
             .map_err(pg_ctx("create game_server_configs"))?;
         }
-        
+
         tx.commit().await.map_err(pg_ctx("tx commit"))?;
         GameServer::try_from(row)
     }
@@ -434,13 +434,11 @@ impl GameServerRepository for PgGameServerRepository {
     }
 
     async fn mark_ip_revealed(&self, id: Uuid) -> Result<(), DomainError> {
-        sqlx::query(
-            "UPDATE game_servers SET ip_revealed = true, updated_at = NOW() WHERE id = $1",
-        )
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_ctx("mark_ip_revealed"))?;
+        sqlx::query("UPDATE game_servers SET ip_revealed = true, updated_at = NOW() WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_ctx("mark_ip_revealed"))?;
         Ok(())
     }
 

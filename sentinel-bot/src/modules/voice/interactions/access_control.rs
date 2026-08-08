@@ -415,8 +415,7 @@ async fn ban_duration_presets(ctx: &Context, component: &ComponentInteraction) -
     };
     let raw =
         crate::shared::api_client::BaseApiClient::config_or(&cfg, "voice_ban_preset_secs", "");
-    let parsed =
-        sentinel_core::domain::entities::system::config_parsers::parse_u64_csv(&raw);
+    let parsed = sentinel_core::domain::entities::system::config_parsers::parse_u64_csv(&raw);
     if parsed.len() == 3 && parsed.iter().all(|&v| v > 0) {
         [parsed[0], parsed[1], parsed[2]]
     } else {

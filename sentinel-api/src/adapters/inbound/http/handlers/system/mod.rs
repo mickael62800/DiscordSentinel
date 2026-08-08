@@ -1,4 +1,3 @@
-pub mod admin_rotation;
 pub mod alert_rules;
 pub mod bot_config;
 pub mod bot_persistence;
@@ -12,12 +11,12 @@ pub mod lockdown;
 pub mod models_status;
 pub mod nexus_access;
 pub mod oauth;
+pub mod public_site;
 pub mod quarantine;
 pub mod security;
 pub mod server_events;
 pub mod slowmode;
 pub mod tickets;
-pub mod public_site;
 
 // Glob re-export du fichier `info.rs` (l'ancien `system.rs` au root)
 // pour preserver `handlers::system::get_system_info` via son ancien path.

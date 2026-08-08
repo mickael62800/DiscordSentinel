@@ -43,7 +43,9 @@ impl ManageServerEventsUseCase for ManageServerEventsService {
         severity: Option<String>,
         limit: Option<i64>,
     ) -> Result<Vec<ServerEvent>, DomainError> {
-        let limit = limit.unwrap_or(100).clamp(1, crate::application::validation::PAGE_LIMIT_MAX);
+        let limit = limit
+            .unwrap_or(100)
+            .clamp(1, crate::application::validation::PAGE_LIMIT_MAX);
         self.repo
             .list(&ServerEventFilter {
                 action_prefix,

@@ -19,10 +19,10 @@ use std::time::Instant;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::bootstrap::state::SystemState;
 use crate::adapters::outbound::system::host_metrics::{
     collect_disks, parse_redis_info, DiskInfo, RedisMetrics,
 };
+use crate::bootstrap::state::SystemState;
 use axum::extract::{Extension, State};
 use axum::Json;
 use redis::AsyncCommands;
@@ -205,11 +205,7 @@ pub async fn get_system_info(
     };
 
     // ── 3. Taille BDD PostgreSQL + health check (via le port SystemProbe) ──
-    let db_size_bytes: i64 = state
-        .system_probe
-        .database_size_bytes()
-        .await
-        .unwrap_or(-1);
+    let db_size_bytes: i64 = state.system_probe.database_size_bytes().await.unwrap_or(-1);
     let postgres_responding = db_size_bytes >= 0;
     let db_size_mb = if db_size_bytes > 0 {
         (db_size_bytes / 1024 / 1024) as u64

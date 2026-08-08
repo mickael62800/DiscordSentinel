@@ -15,10 +15,10 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
-use sentinel_core::ports::inbound::audit::manage_watched_users::UserDossier;
 use sentinel_core::domain::entities::audit::watched_user::WatchedUser;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
+use sentinel_core::ports::inbound::audit::manage_watched_users::UserDossier;
 use test_helpers::build_test_state_watched_users;
 
 // ══════════════════════════════════════════════════════════

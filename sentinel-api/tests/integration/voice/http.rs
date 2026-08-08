@@ -16,9 +16,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::inbound::community::manage_voice_channels::*;
 use sentinel_core::domain::entities::community::voice_channel::*;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::community::manage_voice_channels::*;
 
 use test_helpers::build_test_state;
 

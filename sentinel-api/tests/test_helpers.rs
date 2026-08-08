@@ -23,7 +23,6 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::adapters::outbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::adapters::outbound::discord_api::DiscordApi;
 use sentinel_api::adapters::outbound::discord_api::DiscordApiService;
 use sentinel_api::adapters::outbound::discord_api::DiscordChannel;
@@ -31,6 +30,33 @@ use sentinel_api::adapters::outbound::discord_api::DiscordMember;
 use sentinel_api::adapters::outbound::discord_api::DiscordUser;
 use sentinel_api::adapters::outbound::discord_api::UserGuild;
 use sentinel_api::adapters::outbound::job_client::JobClient;
+use sentinel_api::adapters::outbound::ws::broadcaster::EventBroadcaster;
+use sentinel_core::domain::entities::ai::image_analysis::*;
+use sentinel_core::domain::entities::ai::message_analysis::*;
+use sentinel_core::domain::entities::audit::audit_log::*;
+use sentinel_core::domain::entities::audit::dashboard_stats::*;
+use sentinel_core::domain::entities::audit::security_event::*;
+use sentinel_core::domain::entities::audit::user_activity::*;
+use sentinel_core::domain::entities::audit::user_stats::*;
+use sentinel_core::domain::entities::audit::watched_user::*;
+use sentinel_core::domain::entities::community::daily_activity::*;
+use sentinel_core::domain::entities::community::guild_member::*;
+use sentinel_core::domain::entities::community::level::*;
+use sentinel_core::domain::entities::community::role_panel::*;
+use sentinel_core::domain::entities::community::voice_channel::*;
+use sentinel_core::domain::entities::moderation::action::applied::*;
+use sentinel_core::domain::entities::moderation::action::sanction_reminder::*;
+use sentinel_core::domain::entities::moderation::action::strikes::*;
+use sentinel_core::domain::entities::moderation::infraction::*;
+use sentinel_core::domain::entities::moderation::user_note::*;
+use sentinel_core::domain::entities::system::analytics::*;
+use sentinel_core::domain::entities::system::bot_config::*;
+use sentinel_core::domain::entities::system::discord_role::*;
+use sentinel_core::domain::entities::system::guild::*;
+use sentinel_core::domain::entities::system::log_entry::*;
+use sentinel_core::domain::entities::system::rule::*;
+use sentinel_core::domain::entities::system::ticket::*;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::ai::analyze_image::*;
 use sentinel_core::ports::inbound::ai::analyze_message::*;
 use sentinel_core::ports::inbound::audit::manage_audit_logs::*;
@@ -65,32 +91,6 @@ use sentinel_core::ports::outbound::moderation::review_repository::*;
 use sentinel_core::ports::outbound::system::bot_config_repository::*;
 use sentinel_core::ports::outbound::system::guild_repository::*;
 use sentinel_core::ports::outbound::system::log_repository::*;
-use sentinel_core::domain::entities::ai::image_analysis::*;
-use sentinel_core::domain::entities::ai::message_analysis::*;
-use sentinel_core::domain::entities::audit::audit_log::*;
-use sentinel_core::domain::entities::audit::dashboard_stats::*;
-use sentinel_core::domain::entities::audit::security_event::*;
-use sentinel_core::domain::entities::audit::user_activity::*;
-use sentinel_core::domain::entities::audit::user_stats::*;
-use sentinel_core::domain::entities::audit::watched_user::*;
-use sentinel_core::domain::entities::community::daily_activity::*;
-use sentinel_core::domain::entities::community::guild_member::*;
-use sentinel_core::domain::entities::community::level::*;
-use sentinel_core::domain::entities::community::role_panel::*;
-use sentinel_core::domain::entities::community::voice_channel::*;
-use sentinel_core::domain::entities::moderation::action::applied::*;
-use sentinel_core::domain::entities::moderation::action::sanction_reminder::*;
-use sentinel_core::domain::entities::moderation::action::strikes::*;
-use sentinel_core::domain::entities::moderation::infraction::*;
-use sentinel_core::domain::entities::moderation::user_note::*;
-use sentinel_core::domain::entities::system::analytics::*;
-use sentinel_core::domain::entities::system::bot_config::*;
-use sentinel_core::domain::entities::system::discord_role::*;
-use sentinel_core::domain::entities::system::guild::*;
-use sentinel_core::domain::entities::system::log_entry::*;
-use sentinel_core::domain::entities::system::rule::*;
-use sentinel_core::domain::entities::system::ticket::*;
-use sentinel_core::domain::errors::DomainError;
 
 // ══════════════════════════════════════════════════════════
 // Stub Use Cases (inbound)
@@ -486,9 +486,7 @@ impl sentinel_core::ports::inbound::community::manage_events::ManageEventsUseCas
 }
 
 #[async_trait]
-impl sentinel_core::ports::inbound::community::manage_lfg::ManageLfgUseCase
-    for StubCommunityLife
-{
+impl sentinel_core::ports::inbound::community::manage_lfg::ManageLfgUseCase for StubCommunityLife {
     async fn list(
         &self,
         _: &str,
@@ -548,10 +546,8 @@ impl sentinel_core::ports::inbound::community::manage_polls::ManagePollsUseCase
         &self,
         _: Uuid,
         _: Option<&str>,
-    ) -> Result<
-        sentinel_core::ports::inbound::community::manage_polls::PollWithVote,
-        DomainError,
-    > {
+    ) -> Result<sentinel_core::ports::inbound::community::manage_polls::PollWithVote, DomainError>
+    {
         pas_cable("les sondages")
     }
     async fn create(
@@ -584,10 +580,8 @@ impl sentinel_core::ports::inbound::community::manage_spotlight::ManageSpotlight
         &self,
         _: &str,
         _: Option<&str>,
-    ) -> Result<
-        Option<sentinel_core::domain::entities::community::spotlight::Spotlight>,
-        DomainError,
-    > {
+    ) -> Result<Option<sentinel_core::domain::entities::community::spotlight::Spotlight>, DomainError>
+    {
         Ok(None)
     }
     async fn list(
@@ -601,8 +595,7 @@ impl sentinel_core::ports::inbound::community::manage_spotlight::ManageSpotlight
     async fn designate(
         &self,
         _: sentinel_core::domain::entities::community::spotlight::UpsertSpotlightCommand,
-    ) -> Result<sentinel_core::domain::entities::community::spotlight::Spotlight, DomainError>
-    {
+    ) -> Result<sentinel_core::domain::entities::community::spotlight::Spotlight, DomainError> {
         pas_cable("le membre du mois")
     }
     async fn delete(&self, _: Uuid) -> Result<(), DomainError> {
@@ -1558,7 +1551,6 @@ impl ManageMembersUseCase for StubMembers {
     }
 }
 
-
 // ── Stubs pour les nouveaux repos ──
 
 pub struct StubUserActivityRepo;
@@ -2034,7 +2026,6 @@ impl PendingActionRepository for StubPendingActionRepo {
     }
 }
 
-
 // ── Stubs Tamagotchi / Systeme securite ──
 
 pub struct StubGuildSnapshots;
@@ -2073,10 +2064,8 @@ impl sentinel_core::ports::inbound::guild_backup::manage_snapshots::ManageGuildS
     async fn get_snapshot(
         &self,
         _: sentinel_core::ports::inbound::guild_backup::manage_snapshots::SnapshotId,
-    ) -> Result<
-        sentinel_core::domain::entities::guild_backup::snapshot::GuildSnapshot,
-        DomainError,
-    > {
+    ) -> Result<sentinel_core::domain::entities::guild_backup::snapshot::GuildSnapshot, DomainError>
+    {
         unimplemented!()
     }
     async fn delete_snapshot(
@@ -2114,39 +2103,6 @@ impl sentinel_core::ports::inbound::guild_backup::manage_pending_role_grants::Ma
         unimplemented!()
     }
     async fn clear_guild(&self, _: &str) -> Result<u64, DomainError> {
-        unimplemented!()
-    }
-}
-
-
-pub struct StubRotation;
-#[async_trait]
-impl sentinel_core::ports::inbound::system::manage_rotation::ManageRotationUseCase
-    for StubRotation
-{
-    async fn get_state(
-        &self,
-        _: &str,
-    ) -> Result<sentinel_core::domain::entities::system::admin_rotation::RotationState, DomainError>
-    {
-        unimplemented!()
-    }
-    async fn save_state(
-        &self,
-        _: sentinel_core::domain::entities::system::admin_rotation::RotationState,
-    ) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn record_served(&self, _: &str, _: &str) -> Result<(), DomainError> {
-        unimplemented!()
-    }
-    async fn served_entries(
-        &self,
-        _: &str,
-    ) -> Result<
-        Vec<sentinel_core::domain::entities::system::admin_rotation::ServedEntry>,
-        DomainError,
-    > {
         unimplemented!()
     }
 }
@@ -2295,11 +2251,7 @@ impl sentinel_core::ports::inbound::community::manage_bump::ManageBumpUseCase fo
     {
         Ok(vec![])
     }
-    async fn mark_reminder_sent(
-        &self,
-        _: &str,
-        _: Option<String>,
-    ) -> Result<(), DomainError> {
+    async fn mark_reminder_sent(&self, _: &str, _: Option<String>) -> Result<(), DomainError> {
         Ok(())
     }
     async fn guild_status(
@@ -2476,8 +2428,10 @@ impl sentinel_core::ports::outbound::system::docker_host::DockerHost for StubDoc
     async fn list_containers(
         &self,
         _: bool,
-    ) -> Result<Vec<sentinel_core::domain::entities::system::docker_host::ContainerSummary>, DomainError>
-    {
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::system::docker_host::ContainerSummary>,
+        DomainError,
+    > {
         Ok(vec![])
     }
     async fn start_container(&self, _: &str) -> Result<(), DomainError> {
@@ -2515,8 +2469,10 @@ impl sentinel_core::ports::outbound::system::docker_host::DockerHost for StubDoc
     }
     async fn list_networks(
         &self,
-    ) -> Result<Vec<sentinel_core::domain::entities::system::docker_host::NetworkSummary>, DomainError>
-    {
+    ) -> Result<
+        Vec<sentinel_core::domain::entities::system::docker_host::NetworkSummary>,
+        DomainError,
+    > {
         Ok(vec![])
     }
     async fn prune_containers(
@@ -2558,12 +2514,7 @@ pub struct StubLockdown;
 impl sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCase
     for StubLockdown
 {
-    async fn activate(
-        &self,
-        _: &str,
-        _: serde_json::Value,
-        _: i64,
-    ) -> Result<(), DomainError> {
+    async fn activate(&self, _: &str, _: serde_json::Value, _: i64) -> Result<(), DomainError> {
         Ok(())
     }
     async fn deactivate(&self, _: &str) -> Result<(), DomainError> {
@@ -2629,10 +2580,8 @@ impl sentinel_core::ports::inbound::system::manage_server_events::ManageServerEv
         _: Option<String>,
         _: Option<String>,
         _: Option<i64>,
-    ) -> Result<
-        Vec<sentinel_core::domain::entities::system::server_event::ServerEvent>,
-        DomainError,
-    > {
+    ) -> Result<Vec<sentinel_core::domain::entities::system::server_event::ServerEvent>, DomainError>
+    {
         Ok(vec![])
     }
 }
@@ -2664,7 +2613,6 @@ impl sentinel_core::ports::inbound::community::manage_monthly_ranking::ManageMon
         Ok(())
     }
 }
-
 
 pub struct StubSursis;
 #[async_trait]
@@ -2727,7 +2675,13 @@ impl sentinel_core::ports::inbound::community::manage_sponsorships::ManageSponso
     async fn list_sponsorships(&self, _: &str) -> Result<Vec<Sponsorship>, DomainError> {
         Ok(vec![])
     }
-    async fn create_temp_role(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+    async fn create_temp_role(
+        &self,
+        _: &str,
+        _: &str,
+        _: &str,
+        _: &str,
+    ) -> Result<(), DomainError> {
         Ok(())
     }
     async fn list_temp_roles(&self, _: &str) -> Result<Vec<TempRole>, DomainError> {
@@ -2759,8 +2713,9 @@ fn base_state() -> AppState {
     // Les autres stubs ci-dessous sont hoistes pour la meme raison : un
     // handler migre lit le sous-etat, le test seede l'etat plat.
     let broadcaster = Arc::new(EventBroadcaster::new());
-    let bot_config_repo: Arc<dyn sentinel_core::ports::outbound::system::bot_config_repository::BotConfigRepository> =
-        Arc::new(StubBotConfigRepo);
+    let bot_config_repo: Arc<
+        dyn sentinel_core::ports::outbound::system::bot_config_repository::BotConfigRepository,
+    > = Arc::new(StubBotConfigRepo);
     let guild_snapshots_uc: Arc<dyn sentinel_core::ports::inbound::guild_backup::manage_snapshots::ManageGuildSnapshotsUseCase> =
         Arc::new(StubGuildSnapshots);
     let pending_role_grants_uc: Arc<dyn sentinel_core::ports::inbound::guild_backup::manage_pending_role_grants::ManagePendingRoleGrantsUseCase> =
@@ -2911,7 +2866,6 @@ fn base_state() -> AppState {
         tickets_uc: Arc::new(StubTickets),
         system_logs_uc: Arc::new(StubSystemLogs),
         server_events_uc: Arc::new(StubServerEvents),
-        rotation_uc: Arc::new(StubRotation),
         reset_guild_uc: Arc::new(
             sentinel_core::application::system::reset_guild_service::ResetGuildService::new(
                 Arc::new(StubGuildResetRepo),
@@ -2953,7 +2907,8 @@ fn base_state() -> AppState {
     AppState {
         audit,
         community,
-        system,        ai,
+        system,
+        ai,
         moderation,
         guild_backup,
         log_repo: log_repo.clone(),

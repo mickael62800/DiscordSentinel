@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool, QueryBuilder};
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::community::idea_repository::{IdeaFilters, IdeaRepository};
 use sentinel_core::domain::entities::community::idea::{Idea, IdeaMessage};
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::idea_repository::{IdeaFilters, IdeaRepository};
 
 pub struct PgIdeaRepository {
     pool: PgPool,
@@ -117,7 +117,10 @@ impl IdeaRepository for PgIdeaRepository {
             // `%` et `_` du terme sont echappes pour rester litteraux.
             let pattern = format!(
                 "%{}%",
-                search.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
+                search
+                    .replace('\\', "\\\\")
+                    .replace('%', "\\%")
+                    .replace('_', "\\_")
             );
             qb.push(" AND (title ILIKE ")
                 .push_bind(pattern.clone())

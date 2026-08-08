@@ -100,13 +100,13 @@ fn ticket_detail_to_proto_includes_ticket_and_messages() {
 
 // ── RPC tests avec mock ──
 
+use async_trait::async_trait;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::system::manage_tickets::AssignTicketCommand;
 use sentinel_core::ports::inbound::system::manage_tickets::CreateTicketCommand;
 use sentinel_core::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
 use sentinel_core::ports::inbound::system::manage_tickets::ReplyTicketCommand;
 use sentinel_core::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
-use async_trait::async_trait;
-use sentinel_core::domain::errors::DomainError;
 use std::sync::Arc;
 use std::sync::Mutex;
 #[derive(Default)]

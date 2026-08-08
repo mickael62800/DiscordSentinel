@@ -5,8 +5,10 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use crate::shared::api_client::BaseApiClient;
+use crate::shared::grpc_client::GrpcClientKey;
 use crate::shared::heartbeat::ApiClientKey;
 
+use super::super::api_client::{ApiClient, ReviewFacts};
 use super::super::review;
 use super::cards::{archive_discussion_channel, reply_ephemeral};
 use super::labels::action_label;
@@ -26,13 +28,14 @@ pub(crate) async fn handle_finalize_button(
         .guild_id
         .map(|g| g.to_string())
         .unwrap_or_default();
-    let api = {
+    let (api, grpc) = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
-            None => return,
+        match (data.get::<ApiClientKey>(), data.get::<GrpcClientKey>()) {
+            (Some(a), Some(g)) => (a.clone(), g.clone()),
+            _ => return,
         }
     };
+    let review_api = ApiClient::new(grpc);
     let config = api
         .get_guild_config_for(&guild_id, super::super::MODULE_BOT_NAME)
         .await
@@ -43,30 +46,11 @@ pub(crate) async fn handle_finalize_button(
         .filter(|x| *x > 0);
 
     // Faits Discord -> la regle can_finalize_review est appliquee cote core
-    // (full hexa). Un non-admin recevra une erreur 403 a l'etape /resolve.
-    let facts = moderator_facts(component, None, admin_role_id);
+    // (full hexa). Un non-admin recevra une erreur (PermissionDenied) au resolve.
+    let facts: ReviewFacts = moderator_facts(component, None, admin_role_id).into();
 
     // Recupere la review (verdict + cible + infraction) depuis l'API.
-    #[derive(serde::Deserialize)]
-    struct ReviewDto {
-        channel_id: String,
-        message_id: String,
-        user_id: String,
-        #[serde(default)]
-        user_name: String,
-        #[serde(default)]
-        content_preview: String,
-        #[serde(default)]
-        reason: String,
-        #[serde(default)]
-        incident_count: i32,
-        decided_action: Option<String>,
-        status: String,
-    }
-    let review: ReviewDto = match api
-        .get_json(&format!("/api/automod/reviews/{review_id}"))
-        .await
-    {
+    let review = match review_api.get_review(&review_id).await {
         Ok(r) => r,
         Err(e) => {
             warn!(error = %e, review_id, "Echec fetch review (finalize)");
@@ -92,18 +76,14 @@ pub(crate) async fn handle_finalize_button(
         .unwrap_or_else(|| "ignore".to_string());
 
     // Persiste la resolution cote API (source discord) + faits du demandeur.
-    let resolve_body = serde_json::json!({
-        "applied_action": decided,
-        "resolved_by_id": component.user.id.to_string(),
-        "resolved_by_name": component.user.name,
-        "source": "discord",
-        "is_admin": facts.0,
-        "has_admin_role": facts.4,
-    });
-    if let Err(e) = api
-        .post_json::<_, serde_json::Value>(
-            &format!("/api/automod/reviews/{review_id}/resolve"),
-            &resolve_body,
+    // La sanction de membre est journalisee cote serveur dans le meme appel.
+    if let Err(e) = review_api
+        .resolve_review(
+            &review_id,
+            &decided,
+            &component.user.id.to_string(),
+            &component.user.name,
+            facts,
         )
         .await
     {
@@ -216,7 +196,7 @@ pub(crate) async fn handle_finalize_button(
     }
 
     // Archive le salon de discussion lie (s'il existe) : l'affaire est close.
-    archive_discussion_channel(ctx, &api, &review_id, &review.user_id).await;
+    archive_discussion_channel(ctx, &review_api, &review_id, &review.user_id).await;
 
     // Edite la carte : finalise. On conserve les infos utiles (membre +
     // infraction) pour garder une carte close lisible.

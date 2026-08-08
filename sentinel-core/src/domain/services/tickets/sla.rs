@@ -139,7 +139,10 @@ mod tests {
 
     #[test]
     fn effective_threshold_absent_falls_back_to_default() {
-        assert_eq!(effective_threshold(None, DEFAULT_SLA_ESCALATION_MINUTES), 60);
+        assert_eq!(
+            effective_threshold(None, DEFAULT_SLA_ESCALATION_MINUTES),
+            60
+        );
         assert_eq!(effective_threshold(None, DEFAULT_INACTIVE_CLOSE_DAYS), 7);
     }
 

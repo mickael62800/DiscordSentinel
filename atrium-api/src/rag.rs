@@ -214,12 +214,20 @@ impl RagService {
             .join("\n\n"))
     }
 
-    pub async fn search_chunks(&self, question: &str, limit: u32) -> Result<Vec<(String, String, f64)>, String> {
+    pub async fn search_chunks(
+        &self,
+        question: &str,
+        limit: u32,
+    ) -> Result<Vec<(String, String, f64)>, String> {
         if question.trim().is_empty() {
             return Ok(vec![]);
         }
         let vector = vector_literal(&self.embeddings.embed(question).await?);
-        let max = if limit == 0 { MAX_RESULTS } else { i64::from(limit).min(20) };
+        let max = if limit == 0 {
+            MAX_RESULTS
+        } else {
+            i64::from(limit).min(20)
+        };
         let results = sqlx::query_as::<_, SearchResult>(
             "SELECT c.content, d.title, d.source_url, 1 - (c.embedding <=> $1::vector) AS similarity \
              FROM atrium_knowledge_chunks c JOIN atrium_knowledge_documents d ON d.id = c.document_id \
@@ -231,7 +239,13 @@ impl RagService {
         Ok(results
             .into_iter()
             .filter(|item| item.similarity >= MIN_SIMILARITY)
-            .map(|item| (item.source_url.unwrap_or_default(), item.content, item.similarity))
+            .map(|item| {
+                (
+                    item.source_url.unwrap_or_default(),
+                    item.content,
+                    item.similarity,
+                )
+            })
             .collect())
     }
 }

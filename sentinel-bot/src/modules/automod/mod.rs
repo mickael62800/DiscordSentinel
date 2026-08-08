@@ -357,10 +357,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
 /// Re-analyse un message EDITE : un membre peut poster un contenu benin puis
 /// l'editer en phishing/insulte/pub -> sans ca, jamais detecte.
-pub async fn on_message_update(
-    ctx: &Context,
-    event: &serenity::model::event::MessageUpdateEvent,
-) {
+pub async fn on_message_update(ctx: &Context, event: &serenity::model::event::MessageUpdateEvent) {
     // Vraie edition de contenu uniquement (ignore les updates d'embed/pins).
     if event.edited_timestamp.is_none() {
         return;

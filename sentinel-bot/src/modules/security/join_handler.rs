@@ -13,9 +13,8 @@ use super::api_client::{MemberPayload, RecentJoinEntry};
 use super::detectors::captcha::{self, CaptchaPending};
 use super::detectors::raid_analyzer::JoinInfo;
 use super::{
-    CaptchaPendingKey, LockdownKey, QuarantineKey,
-    RaidDetectorKey, RaidSuggestGuardKey, RecentJoinsKey, SecurityApiKey, SecurityConfigKey,
-    SlowmodeKey,
+    CaptchaPendingKey, LockdownKey, QuarantineKey, RaidDetectorKey, RaidSuggestGuardKey,
+    RecentJoinsKey, SecurityApiKey, SecurityConfigKey, SlowmodeKey,
 };
 
 /// Declenche a chaque nouveau membre qui rejoint un serveur.
@@ -365,18 +364,21 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
             // `kick_expired_quarantine` puisse la kicker meme si le bot
             // redemarre. Le tracker RAM reste source de verite pour les
             // roles a restaurer (la persistance ne couvre que le timer).
-            if let Some(base) = data.get::<ApiClientKey>() {
+            if let Some(sec_api) = data.get::<super::SecurityApiKey>() {
                 let captcha_timeout = data
                     .get::<SecurityConfigKey>()
                     .map(|c| c.captcha_timeout_secs)
                     .unwrap_or(300);
-                let body = serde_json::json!({
-                    "guild_id": guild_id.to_string(),
-                    "user_id": user.id.to_string(),
-                    "timeout_secs": captcha_timeout as i64,
-                });
-                base.post_fire_and_forget("/api/security/quarantine", &body)
-                    .await;
+                if let Err(e) = sec_api
+                    .mark_quarantine(
+                        &guild_id.to_string(),
+                        &user.id.to_string(),
+                        captcha_timeout as i64,
+                    )
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec persistance quarantaine (best-effort)");
+                }
             }
 
             if decision.send_captcha {

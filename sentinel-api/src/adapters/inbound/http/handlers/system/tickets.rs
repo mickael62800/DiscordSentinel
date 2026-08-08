@@ -18,13 +18,13 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::bootstrap::state::SystemState;
 use crate::adapters::inbound::http::validation;
+use crate::bootstrap::state::SystemState;
+use sentinel_core::domain::enums::system::ticket_status::TicketStatus;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::system::manage_tickets::AssignTicketCommand;
 use sentinel_core::ports::inbound::system::manage_tickets::ReplyTicketCommand;
 use sentinel_core::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
-use sentinel_core::domain::enums::system::ticket_status::TicketStatus;
-use sentinel_core::domain::errors::DomainError;
 
 pub async fn list_tickets(
     State(state): State<SystemState>,
@@ -307,8 +307,7 @@ pub async fn bulk_delete_tickets(
             .superadmin_user_ids
             .iter()
             .any(|id| id == &ctx.discord_user_id);
-        if !is_superadmin {
-        }
+        if !is_superadmin {}
     }
 
     let has_filter = params.author_id.is_some() || params.from.is_some() || params.to.is_some();

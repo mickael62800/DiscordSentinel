@@ -5,7 +5,6 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::super::pg_err_ctx;
-use sentinel_core::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 use sentinel_core::domain::entities::moderation::review::automod::AutomodReview;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::DiscussionMessage;
@@ -15,6 +14,7 @@ use sentinel_core::domain::entities::moderation::review::automod::NewAutomodRevi
 use sentinel_core::domain::entities::moderation::review::automod::NewDiscussionChannel;
 use sentinel_core::domain::entities::moderation::review::automod::ReviewVote;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 
 const TBL: &str = "automod_reviews";
 fn pg_err(e: sqlx::Error) -> DomainError {

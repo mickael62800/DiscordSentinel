@@ -6,11 +6,11 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::moderation::strike_repository::StrikeRepository;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeConfig;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeThreshold;
 use sentinel_core::domain::entities::moderation::action::strikes::UserStrike;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::moderation::strike_repository::StrikeRepository;
 
 pub struct PgStrikeRepository {
     pool: PgPool,

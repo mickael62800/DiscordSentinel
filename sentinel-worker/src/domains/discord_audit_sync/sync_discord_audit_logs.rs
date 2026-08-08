@@ -316,4 +316,3 @@ struct DiscordUser {
 fn _ensure_chrono_used() -> Option<DateTime<Utc>> {
     None
 }
-

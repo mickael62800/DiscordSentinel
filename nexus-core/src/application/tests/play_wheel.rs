@@ -33,12 +33,7 @@ impl WheelRepository for MockWheelRepo {
     }
     /// Le mock decrit un joueur qui n'a pas encore tire quand le claim est
     /// possible : les deux informations decrivent le meme etat.
-    async fn has_claimed_recently(
-        &self,
-        _g: &str,
-        _u: &str,
-        _h: i64,
-    ) -> Result<bool, DomainError> {
+    async fn has_claimed_recently(&self, _g: &str, _u: &str, _h: i64) -> Result<bool, DomainError> {
         Ok(!self.claim_ok)
     }
     async fn log_spin(&self, spin: &WheelSpin) -> Result<(), DomainError> {
@@ -74,7 +69,11 @@ impl WheelRepository for MockWheelRepo {
             self.logged.lock().unwrap().push(spin.clone());
             if let Some(w_repo) = self.wallet_repo.lock().unwrap().as_ref() {
                 if let Some(mutat) = mutation {
-                    w_repo.saved.lock().unwrap().push((wallet.clone(), mutat.clone()));
+                    w_repo
+                        .saved
+                        .lock()
+                        .unwrap()
+                        .push((wallet.clone(), mutat.clone()));
                 }
             }
         }
@@ -107,7 +106,10 @@ impl WalletRepository for MockWalletRepo {
         wallet: &Wallet,
         mutation: &WalletMutation,
     ) -> Result<(), DomainError> {
-        self.saved.lock().unwrap().push((wallet.clone(), mutation.clone()));
+        self.saved
+            .lock()
+            .unwrap()
+            .push((wallet.clone(), mutation.clone()));
         Ok(())
     }
     async fn transfer_atomic(
@@ -134,7 +136,10 @@ impl WalletRepository for MockWalletRepo {
     }
 }
 
-fn service(claim_ok: bool, initial_coins: i64) -> (PlayWheelService, Arc<MockWheelRepo>, Arc<MockWalletRepo>) {
+fn service(
+    claim_ok: bool,
+    initial_coins: i64,
+) -> (PlayWheelService, Arc<MockWheelRepo>, Arc<MockWalletRepo>) {
     let wheel = Arc::new(MockWheelRepo {
         claim_ok,
         ..Default::default()
@@ -145,7 +150,11 @@ fn service(claim_ok: bool, initial_coins: i64) -> (PlayWheelService, Arc<MockWhe
     });
     *wheel.wallet_repo.lock().unwrap() = Some(wallet.clone());
     (
-        PlayWheelService::new(wheel.clone(), wallet.clone(), Arc::new(crate::application::economy_config::EmptyBotConfigRepository)),
+        PlayWheelService::new(
+            wheel.clone(),
+            wallet.clone(),
+            Arc::new(crate::application::economy_config::EmptyBotConfigRepository),
+        ),
         wheel,
         wallet,
     )
@@ -206,7 +215,14 @@ async fn wallet_mutation_matches_payout_sign_and_balance() {
             assert!(saved.is_empty(), "blanche : aucune mutation wallet");
             assert_eq!(res.balance_after, 1000);
         }
-        assert_eq!(saved.iter().map(|s| s.1.balance_after).next_back().unwrap_or(1000), res.balance_after);
+        assert_eq!(
+            saved
+                .iter()
+                .map(|s| s.1.balance_after)
+                .next_back()
+                .unwrap_or(1000),
+            res.balance_after
+        );
     }
 }
 

@@ -60,7 +60,12 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         .map(|p| p.manage_guild() || p.administrator())
         .unwrap_or(false);
     if !allowed {
-        respond(ctx, command, "Reserve au staff (permission Gerer le serveur).").await;
+        respond(
+            ctx,
+            command,
+            "Reserve au staff (permission Gerer le serveur).",
+        )
+        .await;
         return;
     }
 

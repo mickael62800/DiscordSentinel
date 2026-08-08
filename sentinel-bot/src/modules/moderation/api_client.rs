@@ -6,6 +6,7 @@ use crate::shared::api_client::BaseApiClient;
 use crate::shared::grpc_client::SentinelGrpcClient;
 
 use sentinel_proto::moderation::v1 as proto_mod;
+use sentinel_proto::sursis::v1 as proto_sursis;
 
 /// Action de moderation envoyee au backend.
 #[derive(Debug, Serialize)]
@@ -167,6 +168,39 @@ pub struct TargetRiskFacts {
 pub struct TargetRiskDecision {
     pub risky: bool,
     pub reason: Option<String>,
+}
+
+/// Vue bot d'un « ban en sursis » (sous-ensemble consomme).
+#[derive(Debug, Clone)]
+pub struct SursisData {
+    pub id: String,
+    pub user_id: String,
+    pub saved_roles: Vec<String>,
+    /// Echeance (RFC3339) affichee dans le panneau modo.
+    pub expires_at: String,
+}
+
+impl From<proto_sursis::Sursis> for SursisData {
+    fn from(s: proto_sursis::Sursis) -> Self {
+        Self {
+            id: s.id,
+            user_id: s.user_id,
+            saved_roles: s.saved_roles,
+            expires_at: s.expires_at,
+        }
+    }
+}
+
+/// Parametres de mise en sursis (le bot fournit les roles sauvegardes + salon).
+pub struct CreateSursisParams<'a> {
+    pub guild_id: &'a str,
+    pub user_id: &'a str,
+    pub username: &'a str,
+    pub moderator_id: &'a str,
+    pub moderator_name: &'a str,
+    pub reason: &'a str,
+    pub saved_roles: Vec<String>,
+    pub channel_id: Option<String>,
 }
 
 /// Client API de la moderation.
@@ -532,6 +566,42 @@ impl ApiClient {
         };
         let resp = crate::grpc_call!(self.grpc, moderation, add_note, req)?;
         Ok(resp.id)
+    }
+
+    // ── Ban en sursis (gRPC SursisService) ──
+
+    /// Enregistre une mise en sursis (le delai d'appel est lu cote serveur).
+    pub async fn create_sursis(&self, p: CreateSursisParams<'_>) -> Result<SursisData, String> {
+        let req = proto_sursis::CreateSursisRequest {
+            guild_id: p.guild_id.to_string(),
+            user_id: p.user_id.to_string(),
+            username: p.username.to_string(),
+            moderator_id: p.moderator_id.to_string(),
+            moderator_name: p.moderator_name.to_string(),
+            reason: p.reason.to_string(),
+            saved_roles: p.saved_roles,
+            channel_id: p.channel_id,
+        };
+        let s = crate::grpc_call!(self.grpc, sursis, create_sursis, req)?;
+        Ok(s.into())
+    }
+
+    /// Recupere un sursis par son id (`NotFound` -> `Err`).
+    pub async fn get_sursis(&self, id: &str) -> Result<SursisData, String> {
+        let req = proto_sursis::GetSursisRequest { id: id.to_string() };
+        let s = crate::grpc_call!(self.grpc, sursis, get_sursis, req)?;
+        Ok(s.into())
+    }
+
+    /// Resout un sursis ("gracie" | "banni"). Retourne `claimed` (true = ce
+    /// resolve a bien fait la transition ; false = deja resolu -> ne rien refaire).
+    pub async fn resolve_sursis(&self, id: &str, status: &str) -> Result<bool, String> {
+        let req = proto_sursis::ResolveSursisRequest {
+            id: id.to_string(),
+            status: status.to_string(),
+        };
+        let resp = crate::grpc_call!(self.grpc, sursis, resolve_sursis, req)?;
+        Ok(resp.claimed)
     }
 
     // ── Pending Actions (mode apprenti) ──

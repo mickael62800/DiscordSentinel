@@ -7,15 +7,17 @@
 
 use serenity::all::{
     ButtonStyle, CommandInteraction, CommandOptionType, ComponentInteraction, Context,
-    CreateButton, CreateCommand, CreateCommandOption, CreateEmbedFooter,
-    CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateInteractionResponseMessage, EditMember,
+    CreateButton, CreateCommand, CreateCommandOption, CreateEmbedFooter, CreateInteractionResponse,
+    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, EditMember,
 };
 use serenity::model::id::{RoleId, UserId};
 use tracing::{info, warn};
 
 use crate::shared::discord_helpers::{option_str, option_user, reply_ephemeral, require_guild_id};
+use crate::shared::grpc_client::GrpcClientKey;
 use crate::shared::heartbeat::ApiClientKey;
+
+use super::super::api_client::{ApiClient, CreateSursisParams, SursisData};
 
 pub const SURSIS_PARDON_PREFIX: &str = "mod_sursis_pardon_";
 pub const SURSIS_BAN_PREFIX: &str = "mod_sursis_ban_";
@@ -29,8 +31,7 @@ pub fn register() -> CreateCommand {
                 .required(true),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison")
-                .required(false),
+            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison").required(false),
         )
 }
 
@@ -38,7 +39,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Garde de permission (le default_member_permissions du register est
     // reecrivable par un admin de guilde -> on re-verifie cote code, comme /ban).
     if !super::has_mod_permission(command, serenity::all::Permissions::BAN_MEMBERS) {
-        reply_ephemeral(ctx, command, "❌ Permission BAN_MEMBERS requise pour /ban-sursis.").await;
+        reply_ephemeral(
+            ctx,
+            command,
+            "❌ Permission BAN_MEMBERS requise pour /ban-sursis.",
+        )
+        .await;
         warn!(user = %command.user.name, "Tentative /ban-sursis sans permission");
         return;
     }
@@ -121,9 +127,10 @@ pub async fn apply_sursis(
     let guild = serenity::model::id::GuildId::new(gid_u64);
 
     // Config : role Sursis (requis).
-    let (sursis_role, base) = {
+    let (sursis_role, base, grpc) = {
         let data = ctx.data.read().await;
         let base = data.get::<ApiClientKey>().cloned()?;
+        let grpc = data.get::<GrpcClientKey>().cloned()?;
         let cfg = base
             .get_guild_config_for(guild_id, crate::modules::moderation::MODULE_BOT_NAME)
             .await
@@ -132,8 +139,9 @@ pub async fn apply_sursis(
             .get("sursis_role_id")
             .and_then(|v| v.parse::<u64>().ok())
             .filter(|&n| n > 0);
-        (role, base)
+        (role, base, grpc)
     };
+    let mod_api = ApiClient::new(base, grpc);
     // Role Sursis non configure -> l'appelant peut retomber sur un ban dur.
     let sursis_role = RoleId::new(sursis_role?);
 
@@ -162,7 +170,8 @@ pub async fn apply_sursis(
     let context = format!(
         "⏳ **Ban en sursis** — sans appel accepté, le bannissement sera **automatique** à l'échéance.\n**Raison :** {reason}"
     );
-    let intro = super::appeal::guidelines_embed(ctx, guild_id, target.get(), None, Some(&context)).await;
+    let intro =
+        super::appeal::guidelines_embed(ctx, guild_id, target.get(), None, Some(&context)).await;
     let channel = crate::modules::moderation::create_appeal_channel(
         ctx,
         guild_id,
@@ -174,31 +183,24 @@ pub async fn apply_sursis(
     .await;
 
     // Enregistre le sursis (delai depuis la config cote API).
-    let body = serde_json::json!({
-        "user_id": target.to_string(),
-        "username": target_name,
-        "moderator_id": moderator_id,
-        "moderator_name": moderator_name,
-        "reason": reason,
-        "saved_roles": saved_roles,
-        "channel_id": channel.map(|c| c.to_string()),
-    });
-    let created: Option<serde_json::Value> = base
-        .post_json(&format!("/api/moderation/{guild_id}/sursis"), &body)
+    let created = mod_api
+        .create_sursis(CreateSursisParams {
+            guild_id,
+            user_id: &target.to_string(),
+            username: target_name,
+            moderator_id,
+            moderator_name,
+            reason,
+            saved_roles,
+            channel_id: channel.map(|c| c.to_string()),
+        })
         .await
         .ok();
-    let sursis_id = created
-        .as_ref()
-        .and_then(|v| v.get("id"))
-        .and_then(|v| v.as_str())
-        .unwrap_or_default()
-        .to_string();
+    let sursis_id = created.as_ref().map(|s| s.id.clone()).unwrap_or_default();
     let expires_at = created
         .as_ref()
-        .and_then(|v| v.get("expires_at"))
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .to_string();
+        .map(|s| s.expires_at.clone())
+        .unwrap_or_default();
 
     // Poste les boutons modo dans le salon (maintenant qu'on a l'id).
     if let (Some(channel), false) = (channel, sursis_id.is_empty()) {
@@ -243,7 +245,10 @@ pub async fn apply_sursis(
             txt.push_str(&format!("\n➡️ Ton salon d'appel : <#{c}>"));
         }
         let _ = dm
-            .send_message(&ctx.http, serenity::builder::CreateMessage::new().content(txt))
+            .send_message(
+                &ctx.http,
+                serenity::builder::CreateMessage::new().content(txt),
+            )
             .await;
     }
 
@@ -253,8 +258,8 @@ pub async fn apply_sursis(
 
 // ── Boutons ──
 
-async fn get_sursis(base: &crate::shared::api_client::BaseApiClient, id: &str) -> Option<serde_json::Value> {
-    base.get_json(&format!("/api/moderation/sursis/{id}")).await.ok()
+async fn get_sursis(mod_api: &ApiClient, id: &str) -> Option<SursisData> {
+    mod_api.get_sursis(id).await.ok()
 }
 
 /// Bouton « Gracier » : restaure les roles + leve le sursis.
@@ -262,46 +267,48 @@ pub async fn handle_pardon(ctx: &Context, component: &ComponentInteraction) {
     if !super::appeal::ensure_moderator(ctx, component).await {
         return;
     }
-    let Some(id) = component.data.custom_id.strip_prefix(SURSIS_PARDON_PREFIX).map(str::to_string) else {
+    let Some(id) = component
+        .data
+        .custom_id
+        .strip_prefix(SURSIS_PARDON_PREFIX)
+        .map(str::to_string)
+    else {
         return;
     };
     let _ = component
         .create_response(
             &ctx.http,
-            CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true)),
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
         )
         .await;
 
-    let base = {
+    let mod_api = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>().cloned() {
-            Some(b) => b,
-            None => return,
+        match (
+            data.get::<ApiClientKey>().cloned(),
+            data.get::<GrpcClientKey>().cloned(),
+        ) {
+            (Some(base), Some(grpc)) => ApiClient::new(base, grpc),
+            _ => return,
         }
     };
-    let Some(sursis) = get_sursis(&base, &id).await else {
+    let Some(sursis) = get_sursis(&mod_api, &id).await else {
         followup(ctx, component, "Sursis introuvable.").await;
         return;
     };
-    let Some(guild_id) = component.guild_id else { return };
-    let user_id = sursis.get("user_id").and_then(|v| v.as_str()).unwrap_or_default();
-    let Ok(uid) = user_id.parse::<u64>() else { return };
+    let Some(guild_id) = component.guild_id else {
+        return;
+    };
+    let Ok(uid) = sursis.user_id.parse::<u64>() else {
+        return;
+    };
 
     // Claim d'abord : ne restaure les roles / n'agit que si CE clic a bien leve
     // le sursis (garde d'etat). Sinon (deja banni/gracie par une action
     // concurrente ou un double-clic), on s'abstient.
-    let resolved = base
-        .post_json::<_, serde_json::Value>(
-            &format!("/api/moderation/sursis/{id}/resolve"),
-            &serde_json::json!({ "status": "gracie" }),
-        )
-        .await
-        .ok();
-    let claimed = resolved
-        .as_ref()
-        .and_then(|v| v.get("claimed"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let claimed = mod_api.resolve_sursis(&id, "gracie").await.unwrap_or(false);
     if !claimed {
         followup(ctx, component, "⚠️ Ce sursis a déjà été traité.").await;
         return;
@@ -309,18 +316,27 @@ pub async fn handle_pardon(ctx: &Context, component: &ComponentInteraction) {
     // Restaure les roles sauvegardes.
     if let Ok(mut member) = guild_id.member(&ctx.http, UserId::new(uid)).await {
         let roles: Vec<RoleId> = sursis
-            .get("saved_roles")
-            .and_then(|v| v.as_array())
-            .map(|a| a.iter().filter_map(|v| v.as_str()?.parse::<u64>().ok().map(RoleId::new)).collect())
-            .unwrap_or_default();
+            .saved_roles
+            .iter()
+            .filter_map(|r| r.parse::<u64>().ok().map(RoleId::new))
+            .collect();
         let _ = member.edit(&ctx.http, EditMember::new().roles(roles)).await;
     }
     if let Ok(dm) = UserId::new(uid).create_dm_channel(&ctx.http).await {
         let _ = dm
-            .send_message(&ctx.http, serenity::builder::CreateMessage::new().content("✅ Ton appel a été accepté : tes accès sont rétablis."))
+            .send_message(
+                &ctx.http,
+                serenity::builder::CreateMessage::new()
+                    .content("✅ Ton appel a été accepté : tes accès sont rétablis."),
+            )
             .await;
     }
-    followup(ctx, component, "♻️ Membre gracié : rôles restaurés, sursis levé. Salon supprimé…").await;
+    followup(
+        ctx,
+        component,
+        "♻️ Membre gracié : rôles restaurés, sursis levé. Salon supprimé…",
+    )
+    .await;
     let _ = component.channel_id.delete(&ctx.http).await;
     info!(sursis = %id, "Sursis gracie");
 }
@@ -330,50 +346,55 @@ pub async fn handle_ban_now(ctx: &Context, component: &ComponentInteraction) {
     if !super::appeal::ensure_moderator(ctx, component).await {
         return;
     }
-    let Some(id) = component.data.custom_id.strip_prefix(SURSIS_BAN_PREFIX).map(str::to_string) else {
+    let Some(id) = component
+        .data
+        .custom_id
+        .strip_prefix(SURSIS_BAN_PREFIX)
+        .map(str::to_string)
+    else {
         return;
     };
     let _ = component
         .create_response(
             &ctx.http,
-            CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true)),
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
         )
         .await;
 
-    let base = {
+    let mod_api = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>().cloned() {
-            Some(b) => b,
-            None => return,
+        match (
+            data.get::<ApiClientKey>().cloned(),
+            data.get::<GrpcClientKey>().cloned(),
+        ) {
+            (Some(base), Some(grpc)) => ApiClient::new(base, grpc),
+            _ => return,
         }
     };
-    let Some(sursis) = get_sursis(&base, &id).await else {
+    let Some(sursis) = get_sursis(&mod_api, &id).await else {
         followup(ctx, component, "Sursis introuvable.").await;
         return;
     };
-    let Some(guild_id) = component.guild_id else { return };
-    let user_id = sursis.get("user_id").and_then(|v| v.as_str()).unwrap_or_default();
-    let Ok(uid) = user_id.parse::<u64>() else { return };
+    let Some(guild_id) = component.guild_id else {
+        return;
+    };
+    let Ok(uid) = sursis.user_id.parse::<u64>() else {
+        return;
+    };
 
     // Claim d'abord : ne bannit que si CE clic a bien resolu le sursis (garde
     // d'etat -> pas de re-ban sur double-clic ni si deja gracie).
-    let resolved = base
-        .post_json::<_, serde_json::Value>(
-            &format!("/api/moderation/sursis/{id}/resolve"),
-            &serde_json::json!({ "status": "banni" }),
-        )
-        .await
-        .ok();
-    let claimed = resolved
-        .as_ref()
-        .and_then(|v| v.get("claimed"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
+    let claimed = mod_api.resolve_sursis(&id, "banni").await.unwrap_or(false);
     if !claimed {
         followup(ctx, component, "⚠️ Ce sursis a déjà été traité.").await;
         return;
     }
-    if let Err(e) = guild_id.ban_with_reason(&ctx.http, UserId::new(uid), 0, "Ban en sursis confirmé").await {
+    if let Err(e) = guild_id
+        .ban_with_reason(&ctx.http, UserId::new(uid), 0, "Ban en sursis confirmé")
+        .await
+    {
         warn!(error = %e, "Echec ban depuis sursis");
     }
     followup(ctx, component, "🔨 Membre banni. Salon supprimé…").await;
@@ -385,7 +406,9 @@ async fn followup(ctx: &Context, component: &ComponentInteraction, msg: &str) {
     let _ = component
         .create_followup(
             &ctx.http,
-            CreateInteractionResponseFollowup::new().content(msg).ephemeral(true),
+            CreateInteractionResponseFollowup::new()
+                .content(msg)
+                .ephemeral(true),
         )
         .await;
 }

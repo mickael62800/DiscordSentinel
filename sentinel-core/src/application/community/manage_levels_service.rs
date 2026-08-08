@@ -37,10 +37,7 @@ pub struct ManageLevelsService {
 }
 
 impl ManageLevelsService {
-    pub fn new(
-        repo: Arc<dyn LevelRepository>,
-        bot_config: Arc<dyn BotConfigRepository>,
-    ) -> Self {
+    pub fn new(repo: Arc<dyn LevelRepository>, bot_config: Arc<dyn BotConfigRepository>) -> Self {
         Self {
             repo,
             bot_config,
@@ -176,13 +173,23 @@ impl ManageLevelsUseCase for ManageLevelsService {
         let config = self.load_config(&guild_id).await;
 
         if !config_bool(&config, "enabled", false) {
-            return Ok(skipped_result(&guild_id, &user_id, &cmd.username, XpSource::Text));
+            return Ok(skipped_result(
+                &guild_id,
+                &user_id,
+                &cmd.username,
+                XpSource::Text,
+            ));
         }
 
         // Cooldown anti-farm (texte uniquement, comme l'ancien bot).
         let cooldown_secs = config_u64(&config, "xp_cooldown_secs", 60);
         if !self.try_claim_text(&guild_id, &user_id, cooldown_secs) {
-            return Ok(skipped_result(&guild_id, &user_id, &cmd.username, XpSource::Text));
+            return Ok(skipped_result(
+                &guild_id,
+                &user_id,
+                &cmd.username,
+                XpSource::Text,
+            ));
         }
 
         // Streak server-side (depuis l'etat persiste).
@@ -272,7 +279,12 @@ impl ManageLevelsUseCase for ManageLevelsService {
         let config = self.load_config(&guild_id).await;
 
         if !config_bool(&config, "enabled", false) {
-            return Ok(skipped_result(&guild_id, &user_id, &cmd.username, XpSource::Voice));
+            return Ok(skipped_result(
+                &guild_id,
+                &user_id,
+                &cmd.username,
+                XpSource::Voice,
+            ));
         }
 
         let xp_per_minute = config_u64(&config, "xp_per_voice_minute", 5) as f64;
@@ -287,7 +299,12 @@ impl ManageLevelsUseCase for ManageLevelsService {
         let base_voice = (cmd.seconds as f64 / 60.0) * xp_per_minute;
         let amount = calc::calc_xp_amount(base_voice, channel_mult, role_mult, 1.0, 0.0, 10_000.0);
         if amount <= 0 {
-            return Ok(skipped_result(&guild_id, &user_id, &cmd.username, XpSource::Voice));
+            return Ok(skipped_result(
+                &guild_id,
+                &user_id,
+                &cmd.username,
+                XpSource::Voice,
+            ));
         }
 
         let add = self

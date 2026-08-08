@@ -111,9 +111,7 @@ pub struct CreateLfgDto {
 ///
 /// Toutes les ecritures passent par la : sans identite, on ne sait ni a qui
 /// attribuer l'annonce, ni qui a le droit d'y toucher.
-fn require_ctx(
-    user: &Option<Extension<WebUser>>,
-) -> Result<&WebUser, ApiError> {
+fn require_ctx(user: &Option<Extension<WebUser>>) -> Result<&WebUser, ApiError> {
     user.as_ref()
         .map(|Extension(c)| c)
         .ok_or_else(|| ApiError(DomainError::Forbidden("auth Discord requise".into())))
@@ -144,7 +142,6 @@ pub async fn list_lfg(
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<LfgDto>>, ApiError> {
-
     let posts = state
         .lfg_uc
         .list(
@@ -294,7 +291,11 @@ pub async fn public_lfg(
     // pas pouvoir exposer les annonces fermees a un visiteur.
     let posts = state
         .lfg_uc
-        .list(&guild_id, true, clamp_limit(q.limit, DEFAULT_LIMIT, MAX_LIMIT))
+        .list(
+            &guild_id,
+            true,
+            clamp_limit(q.limit, DEFAULT_LIMIT, MAX_LIMIT),
+        )
         .await?;
 
     Ok(Json(

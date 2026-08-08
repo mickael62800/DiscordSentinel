@@ -48,7 +48,10 @@ impl ManageDatasetUseCase for ManageDatasetService {
             from: query.from,
             to: query.to,
             min_length: i64::from(query.min_length.unwrap_or(1).max(0)),
-            limit: query.limit.unwrap_or(200).clamp(1, crate::application::validation::BATCH_LIMIT_MAX),
+            limit: query
+                .limit
+                .unwrap_or(200)
+                .clamp(1, crate::application::validation::BATCH_LIMIT_MAX),
             offset: query.offset.unwrap_or(0).max(0),
         };
         self.repo.list_messages(&bounded).await

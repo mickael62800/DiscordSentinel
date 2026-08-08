@@ -236,10 +236,7 @@ mod tests {
     #[tokio::test]
     async fn store_rejects_empty_label() {
         let (svc, _) = service();
-        let err = svc
-            .store_snapshot(snapshot("g1", "   "))
-            .await
-            .unwrap_err();
+        let err = svc.store_snapshot(snapshot("g1", "   ")).await.unwrap_err();
         assert!(matches!(err, DomainError::ValidationError(_)));
     }
 

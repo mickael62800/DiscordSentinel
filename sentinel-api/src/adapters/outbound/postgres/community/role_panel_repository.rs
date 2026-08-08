@@ -3,12 +3,12 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::community::role_panel_repository::RolePanelRepository;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
 use sentinel_core::domain::entities::community::role_panel::RolePanel;
 use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
 use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::role_panel_repository::RolePanelRepository;
 
 pub struct PgRolePanelRepository {
     pool: PgPool,

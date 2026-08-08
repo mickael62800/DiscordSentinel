@@ -12,12 +12,12 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::bootstrap::state::CommunityState;
-use sentinel_core::ports::inbound::community::manage_confessions::{
-    CreateConfessionCommand, CreateReplyCommand, CreateReportCommand,
-};
 use axum::Extension;
 use sentinel_core::domain::entities::community::confession::{ConfessionConfig, ReportStatus};
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::community::manage_confessions::{
+    CreateConfessionCommand, CreateReplyCommand, CreateReportCommand,
+};
 
 #[derive(serde::Deserialize)]
 pub struct ListConfessionsQuery {
@@ -225,9 +225,7 @@ pub async fn list_confessions(
         .list(&guild_id, limit, include_deleted)
         .await?;
     Ok(Json(
-        list.into_iter()
-            .map(|c| confession_dto(c, false))
-            .collect(),
+        list.into_iter().map(|c| confession_dto(c, false)).collect(),
     ))
 }
 

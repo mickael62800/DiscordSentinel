@@ -34,11 +34,7 @@ impl ReadPresenceUseCase for ReadPresenceService {
         // Un instantane perime est ecarte ici plutot que masque par le front :
         // sinon chaque client (site, bot, une future application) devrait
         // reimplementer le meme seuil, et l'un des trois se tromperait.
-        Ok(self
-            .repo
-            .voice(guild_id)
-            .await?
-            .filter(|p| p.is_fresh(now)))
+        Ok(self.repo.voice(guild_id).await?.filter(|p| p.is_fresh(now)))
     }
 
     async fn text_activity(

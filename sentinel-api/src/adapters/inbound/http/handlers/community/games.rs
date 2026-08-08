@@ -106,7 +106,9 @@ fn guild(state: &AppState) -> Result<&str, ApiError> {
     Ok(&state.guild_id)
 }
 
-fn client(state: &AppState) -> Result<&crate::adapters::outbound::nexus_games::NexusGamesClient, ApiError> {
+fn client(
+    state: &AppState,
+) -> Result<&crate::adapters::outbound::nexus_games::NexusGamesClient, ApiError> {
     if !state.nexus_games.is_configured() {
         return Err(ApiError(DomainError::NotImplemented(
             "plateforme de jeux non configuree".into(),
@@ -121,7 +123,12 @@ fn client(state: &AppState) -> Result<&crate::adapters::outbound::nexus_games::N
 /// coins et apparait dans le classement. Le laisser au client permettrait de
 /// s'y afficher sous le nom de quelqu'un d'autre.
 async fn display_name(state: &AppState, guild_id: &str, user_id: &str) -> String {
-    match state.community.members_uc.get_member(guild_id, user_id).await {
+    match state
+        .community
+        .members_uc
+        .get_member(guild_id, user_id)
+        .await
+    {
         Ok(m) => m.display_name.unwrap_or(m.username),
         Err(_) => String::new(),
     }

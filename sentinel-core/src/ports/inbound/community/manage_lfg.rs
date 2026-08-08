@@ -19,23 +19,12 @@ pub trait ManageLfgUseCase: Send + Sync {
 
     /// Fermeture. `actor_id` doit etre l'auteur, sauf si `is_staff` : sans ce
     /// controle, n'importe qui fermerait l'annonce d'un autre.
-    async fn close(
-        &self,
-        id: Uuid,
-        actor_id: &str,
-        is_staff: bool,
-    ) -> Result<(), DomainError>;
+    async fn close(&self, id: Uuid, actor_id: &str, is_staff: bool) -> Result<(), DomainError>;
 
-    async fn delete(&self, id: Uuid, actor_id: &str, is_staff: bool)
-        -> Result<(), DomainError>;
+    async fn delete(&self, id: Uuid, actor_id: &str, is_staff: bool) -> Result<(), DomainError>;
 
     /// Se manifester. Idempotent.
-    async fn join(
-        &self,
-        id: Uuid,
-        user_id: &str,
-        username: &str,
-    ) -> Result<LfgPost, DomainError>;
+    async fn join(&self, id: Uuid, user_id: &str, username: &str) -> Result<LfgPost, DomainError>;
 
     async fn leave(&self, id: Uuid, user_id: &str) -> Result<LfgPost, DomainError>;
 }

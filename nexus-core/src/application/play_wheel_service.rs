@@ -33,7 +33,8 @@ use crate::ports::outbound::wheel_repository::WheelRepository;
 pub struct PlayWheelService {
     wheel_repo: Arc<dyn WheelRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
-    config_repo: Arc<dyn crate::ports::outbound::system::bot_config_repository::BotConfigRepository>,
+    config_repo:
+        Arc<dyn crate::ports::outbound::system::bot_config_repository::BotConfigRepository>,
 }
 
 impl PlayWheelService {
@@ -55,11 +56,9 @@ impl PlayWheelService {
 #[async_trait]
 impl PlayWheelUseCase for PlayWheelService {
     async fn spin(&self, cmd: PlayWheelCommand) -> Result<PlayWheelResult, DomainError> {
-        let cfg = crate::application::economy_config::load_economy(
-            &self.config_repo,
-            &cmd.guild_id,
-        )
-        .await?;
+        let cfg =
+            crate::application::economy_config::load_economy(&self.config_repo, &cmd.guild_id)
+                .await?;
 
         if !cfg.enabled || !cfg.wheel_enabled {
             return Err(DomainError::Validation(
@@ -197,7 +196,6 @@ impl GetWalletUseCase for PlayWheelService {
         get_or_create_wallet(self.wallet_repo.as_ref(), guild_id, user_id, "").await
     }
 }
-
 
 #[cfg(test)]
 #[path = "tests/play_wheel.rs"]

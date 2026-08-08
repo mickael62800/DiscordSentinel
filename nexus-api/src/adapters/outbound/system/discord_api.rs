@@ -1,7 +1,7 @@
 use async_trait::async_trait;
-use reqwest::Client;
 use nexus_core::domain::errors::DomainError;
 use nexus_core::ports::outbound::system::discord_api_repository::DiscordApiRepository;
+use reqwest::Client;
 
 pub struct ReqwestDiscordApiClient {
     client: Client,

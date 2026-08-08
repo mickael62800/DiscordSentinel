@@ -84,7 +84,9 @@ mod tests {
     fn ban_years_floored_to_one() {
         let now = Utc::now();
         match decide_age_check(17, 18, 30, now) {
-            AgeCheckDecision::Ban { years, unban_at, .. } => {
+            AgeCheckDecision::Ban {
+                years, unban_at, ..
+            } => {
                 assert_eq!(years, 1);
                 assert_eq!(unban_at, now + Duration::days(30));
             }
@@ -96,7 +98,9 @@ mod tests {
     fn ban_days_per_year_floored_to_one() {
         let now = Utc::now();
         match decide_age_check(16, 18, 0, now) {
-            AgeCheckDecision::Ban { years, unban_at, .. } => {
+            AgeCheckDecision::Ban {
+                years, unban_at, ..
+            } => {
                 assert_eq!(years, 2);
                 assert_eq!(unban_at, now + Duration::days(2));
             }

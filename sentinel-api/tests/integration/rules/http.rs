@@ -16,11 +16,11 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::inbound::moderation::manage_rules::CreateRuleCommand;
-use sentinel_core::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
 use sentinel_core::domain::entities::system::rule::Rule;
 use sentinel_core::domain::enums::moderation::flag_type::FlagType;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::moderation::manage_rules::CreateRuleCommand;
+use sentinel_core::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
 use test_helpers::build_test_state_rules;
 
 // ══════════════════════════════════════════════════════════

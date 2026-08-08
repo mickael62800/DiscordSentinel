@@ -195,15 +195,27 @@ mod tests {
     #[test]
     fn streak_multiplier_steps() {
         assert_eq!(
-            streak_multiplier_with(6, DEFAULT_STREAK_BONUS_PER_WEEK, DEFAULT_STREAK_MAX_MULTIPLIER),
+            streak_multiplier_with(
+                6,
+                DEFAULT_STREAK_BONUS_PER_WEEK,
+                DEFAULT_STREAK_MAX_MULTIPLIER
+            ),
             1.0
         );
         assert_eq!(
-            streak_multiplier_with(7, DEFAULT_STREAK_BONUS_PER_WEEK, DEFAULT_STREAK_MAX_MULTIPLIER),
+            streak_multiplier_with(
+                7,
+                DEFAULT_STREAK_BONUS_PER_WEEK,
+                DEFAULT_STREAK_MAX_MULTIPLIER
+            ),
             1.1
         );
         assert_eq!(
-            streak_multiplier_with(100, DEFAULT_STREAK_BONUS_PER_WEEK, DEFAULT_STREAK_MAX_MULTIPLIER),
+            streak_multiplier_with(
+                100,
+                DEFAULT_STREAK_BONUS_PER_WEEK,
+                DEFAULT_STREAK_MAX_MULTIPLIER
+            ),
             1.5
         );
     }

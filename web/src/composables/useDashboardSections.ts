@@ -94,7 +94,6 @@ const ALL_SECTIONS: DashboardSection[] = [
   { key: "security.hub", path: "/security", label: "Menaces & alertes", icon: "zap", requiredBot: "security-bot" },
   { key: "security.automod", path: "/automod", label: "Automod", icon: "shield", requiredBot: "automod-bot" },
 
-  { key: "rotation.dashboard", path: "/rotation-dashboard", label: "Admin tournant", icon: "users", requiredBot: "rotation-bot" },
 
   // Observabilité : journaux métier + système + audit réunis (onglets).
   { key: "logs.system", path: "/system-logs", label: "Logs techniques", icon: "cpu" },
@@ -129,7 +128,6 @@ const GROUP_ORDER: { prefix: string; label: string }[] = [
   { prefix: "moderation", label: "Modération" },
   { prefix: "community", label: "Communauté" },
   { prefix: "security", label: "Sécurité" },
-  { prefix: "rotation", label: "Administration tournante" },
   { prefix: "config", label: "Configuration" },
   { prefix: "logs", label: "Journaux" },
   // ── Univers Nexus ──

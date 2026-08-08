@@ -15,20 +15,27 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use sentinel_proto::ai_dataset::v1::ai_dataset_service_server::AiDatasetServiceServer;
-use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
-use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
-use sentinel_proto::export::v1::export_service_server::ExportServiceServer;
+use sentinel_proto::announcements::v1::announcements_service_server::AnnouncementsServiceServer;
 use sentinel_proto::audit::v1::audit_service_server::AuditServiceServer;
+use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
+use sentinel_proto::automod_review::v1::automod_review_service_server::AutomodReviewServiceServer;
+use sentinel_proto::bump::v1::bump_service_server::BumpServiceServer;
+use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
+use sentinel_proto::confessions::v1::confessions_service_server::ConfessionsServiceServer;
+use sentinel_proto::discord_messages::v1::discord_action_messages_service_server::DiscordActionMessagesServiceServer;
+use sentinel_proto::export::v1::export_service_server::ExportServiceServer;
 use sentinel_proto::guild_backup::v1::guild_backup_service_server::GuildBackupServiceServer;
 use sentinel_proto::ideas::v1::ideas_service_server::IdeasServiceServer;
-use sentinel_proto::purge::v1::purge_service_server::PurgeServiceServer;
 use sentinel_proto::images::v1::images_service_server::ImagesServiceServer;
 use sentinel_proto::members::v1::members_service_server::MembersServiceServer;
 use sentinel_proto::moderation::v1::moderation_service_server::ModerationServiceServer;
 use sentinel_proto::progression::v1::progression_service_server::ProgressionServiceServer;
+use sentinel_proto::purge::v1::purge_service_server::PurgeServiceServer;
 use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsServiceServer;
 use sentinel_proto::security::v1::security_service_server::SecurityServiceServer;
+use sentinel_proto::security_state::v1::security_state_service_server::SecurityStateServiceServer;
 use sentinel_proto::stats::v1::stats_service_server::StatsServiceServer;
+use sentinel_proto::sursis::v1::sursis_service_server::SursisServiceServer;
 use sentinel_proto::tickets::v1::tickets_service_server::TicketsServiceServer;
 use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServiceServer;
 use sentinel_proto::welcome::v1::welcome_service_server::WelcomeServiceServer;
@@ -44,19 +51,26 @@ use tracing::info;
 use crate::adapters::inbound::grpc::ai::automod::AutomodGrpc;
 use crate::adapters::inbound::grpc::ai::dataset::AiDatasetGrpc;
 use crate::adapters::inbound::grpc::ai::images::ImagesGrpc;
+use crate::adapters::inbound::grpc::audit::action_messages::DiscordActionMessagesGrpc;
 use crate::adapters::inbound::grpc::audit::journal::AuditGrpc;
 use crate::adapters::inbound::grpc::audit::security::SecurityGrpc;
 use crate::adapters::inbound::grpc::audit::stats::StatsGrpc;
+use crate::adapters::inbound::grpc::community::announcements::AnnouncementsGrpc;
+use crate::adapters::inbound::grpc::community::bump::BumpGrpc;
+use crate::adapters::inbound::grpc::community::confessions::ConfessionsGrpc;
+use crate::adapters::inbound::grpc::community::ideas::IdeasGrpc;
 use crate::adapters::inbound::grpc::community::members::MembersGrpc;
 use crate::adapters::inbound::grpc::community::progression::ProgressionGrpc;
 use crate::adapters::inbound::grpc::community::roles::RolePanelsGrpc;
 use crate::adapters::inbound::grpc::community::sponsorships::CommunityGrpc;
 use crate::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
-use crate::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
-use crate::adapters::inbound::grpc::community::ideas::IdeasGrpc;
 use crate::adapters::inbound::grpc::guild_backup::snapshots::GuildBackupGrpc;
+use crate::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
 use crate::adapters::inbound::grpc::moderation::purge::PurgeGrpc;
+use crate::adapters::inbound::grpc::moderation::reviews::AutomodReviewGrpc;
+use crate::adapters::inbound::grpc::moderation::sursis::SursisGrpc;
 use crate::adapters::inbound::grpc::system::export::ExportGrpc;
+use crate::adapters::inbound::grpc::system::security_state::SecurityStateGrpc;
 use crate::adapters::inbound::grpc::system::tickets::TicketsGrpc;
 use crate::adapters::inbound::grpc::system::welcome::WelcomeGrpc;
 use crate::adapters::inbound::http::state::AppState;
@@ -130,6 +144,33 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let security = SecurityGrpc {
         uc: state.audit.security_uc.clone(),
     };
+    let security_state = SecurityStateGrpc {
+        quarantine_uc: state.system.quarantine_uc.clone(),
+        slowmode_uc: state.system.slowmode_uc.clone(),
+        lockdown_uc: state.system.lockdown_uc.clone(),
+    };
+    let automod_review = AutomodReviewGrpc {
+        reviews_uc: state.moderation.automod_reviews_uc.clone(),
+        moderation_uc: state.moderation.moderation_uc.clone(),
+        bot_config_repo: state.moderation.bot_config_repo.clone(),
+        broadcaster: state.broadcaster.clone(),
+    };
+    let action_messages = DiscordActionMessagesGrpc {
+        uc: state.audit.discord_action_messages_uc.clone(),
+    };
+    let sursis = SursisGrpc {
+        sursis_uc: state.moderation.sursis_uc.clone(),
+        bot_config_repo: state.moderation.bot_config_repo.clone(),
+    };
+    let bump = BumpGrpc {
+        uc: state.community.bump_uc.clone(),
+    };
+    let confessions = ConfessionsGrpc {
+        uc: state.community.confessions_uc.clone(),
+    };
+    let announcements = AnnouncementsGrpc {
+        uc: state.community.announcements_uc.clone(),
+    };
     let automod = AutomodGrpc {
         uc: state.ai.analyze_uc.clone(),
         broadcaster: state.broadcaster.clone(),
@@ -164,6 +205,13 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let roles_svc = svc!(RolePanelsServiceServer, roles);
     let members_svc = svc!(MembersServiceServer, members);
     let security_svc = svc!(SecurityServiceServer, security);
+    let security_state_svc = svc!(SecurityStateServiceServer, security_state);
+    let automod_review_svc = svc!(AutomodReviewServiceServer, automod_review);
+    let action_messages_svc = svc!(DiscordActionMessagesServiceServer, action_messages);
+    let sursis_svc = svc!(SursisServiceServer, sursis);
+    let bump_svc = svc!(BumpServiceServer, bump);
+    let confessions_svc = svc!(ConfessionsServiceServer, confessions);
+    let announcements_svc = svc!(AnnouncementsServiceServer, announcements);
     let automod_svc = svc!(AutomodServiceServer, automod);
     let voice_svc = svc!(VoiceChannelsServiceServer, voice);
     let images_svc = svc!(ImagesServiceServer, images);
@@ -200,6 +248,27 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .await;
     health_reporter
         .set_serving::<SecurityServiceServer<SecurityGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<SecurityStateServiceServer<SecurityStateGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<AutomodReviewServiceServer<AutomodReviewGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<DiscordActionMessagesServiceServer<DiscordActionMessagesGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<SursisServiceServer<SursisGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<BumpServiceServer<BumpGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<ConfessionsServiceServer<ConfessionsGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<AnnouncementsServiceServer<AnnouncementsGrpc>>()
         .await;
     health_reporter
         .set_serving::<AutomodServiceServer<AutomodGrpc>>()
@@ -276,6 +345,13 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .add_service(roles_svc)
         .add_service(members_svc)
         .add_service(security_svc)
+        .add_service(security_state_svc)
+        .add_service(automod_review_svc)
+        .add_service(action_messages_svc)
+        .add_service(sursis_svc)
+        .add_service(bump_svc)
+        .add_service(confessions_svc)
+        .add_service(announcements_svc)
         .add_service(automod_svc)
         .add_service(voice_svc)
         .add_service(images_svc)

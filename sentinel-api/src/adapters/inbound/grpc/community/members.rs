@@ -12,12 +12,12 @@ use tonic::Response;
 use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
+use sentinel_core::domain::entities::community::guild_member::GuildMember;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::community::manage_members::ManageMembersUseCase;
 use sentinel_core::ports::inbound::community::manage_members::RegisterMemberCommand;
 use sentinel_core::ports::inbound::community::manage_members::SyncMembersCommand;
 use sentinel_core::ports::inbound::community::manage_members::UpdateMemberCommand;
-use sentinel_core::domain::entities::community::guild_member::GuildMember;
-use sentinel_core::domain::errors::DomainError;
 pub struct MembersGrpc {
     pub uc: Arc<dyn ManageMembersUseCase>,
 }

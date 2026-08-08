@@ -17,11 +17,11 @@ use crate::adapters::inbound::http::dto::community::ideas::{
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::bootstrap::state::CommunityState;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::community::manage_ideas::{
     AddIdeaMessageCommand, CreateIdeaCommand, DecideIdeaCommand,
 };
 use sentinel_core::ports::outbound::community::idea_repository::IdeaFilters;
-use sentinel_core::domain::errors::DomainError;
 
 const IDEA_STREAM_KEY: &str = "sentinel:events";
 const IDEA_STREAM_MAXLEN: usize = 10_000;

@@ -5,9 +5,9 @@ use serenity::prelude::*;
 
 use crate::shared::embeds::{critical_embed, info_embed, moderate_embed};
 
+use super::MessageCacheKey;
 use super::{audit_event, watched_users};
 use super::{log, post_to_channel, send_event};
-use super::MessageCacheKey;
 
 /// Formate un contenu de message pour un field embed : tronque a `max`,
 /// neutralise les mentions de masse et les blocs ``` pour eviter le bris de
@@ -88,7 +88,9 @@ pub async fn handle_delete(
     // Qui a supprime ? Discord ne l'indique PAS dans l'event MESSAGE_DELETE :
     // on interroge l'audit log. Absent si l'auteur a supprime son propre
     // message (Discord ne cree pas d'entree dans ce cas).
-    let author_id_u64 = cached.as_ref().and_then(|c| c.author_id.parse::<u64>().ok());
+    let author_id_u64 = cached
+        .as_ref()
+        .and_then(|c| c.author_id.parse::<u64>().ok());
     let deleter = resolve_deleter(ctx, gid, channel_id, author_id_u64).await;
 
     let (mut log_msg, mut details) = match &cached {
@@ -162,11 +164,7 @@ pub async fn handle_delete(
         }
         embed = match &deleter {
             Some((del_id, _)) => embed.field("Supprimé par", format!("<@{del_id}>"), true),
-            None => embed.field(
-                "Supprimé par",
-                "l'auteur lui-même (ou inconnu)",
-                true,
-            ),
+            None => embed.field("Supprimé par", "l'auteur lui-même (ou inconnu)", true),
         };
         embed = embed.timestamp(serenity::model::Timestamp::now());
         post_to_channel(ctx, &gid_str, MESSAGE_LOG_KEYS, embed).await;

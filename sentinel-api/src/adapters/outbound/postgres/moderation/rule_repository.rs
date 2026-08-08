@@ -3,10 +3,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::moderation::rule_repository::RuleRepository;
 use sentinel_core::domain::entities::system::rule::Rule;
 use sentinel_core::domain::enums::moderation::flag_type::FlagType;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::moderation::rule_repository::RuleRepository;
 
 pub struct PgRuleRepository {
     pool: PgPool,

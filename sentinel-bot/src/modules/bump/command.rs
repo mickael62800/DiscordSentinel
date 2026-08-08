@@ -30,8 +30,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .map(|p| p.administrator())
         .unwrap_or(false);
     if !is_admin {
-        let embed =
-            moderate_embed("Erreur").description("Vous n'avez pas la permission **Administrateur**.");
+        let embed = moderate_embed("Erreur")
+            .description("Vous n'avez pas la permission **Administrateur**.");
         crate::shared::discord_helpers::reply_ephemeral_embed(ctx, command, embed).await;
         return;
     }

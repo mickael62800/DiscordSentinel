@@ -1,13 +1,13 @@
-use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use std::sync::{Arc, Mutex};
 
-use crate::domain::entities::coussin::PlayerClass;
-use crate::domain::errors::DomainError;
-use crate::ports::inbound::coussin_profile::{CoussinProfileUseCase, CoussinCombatUseCase};
-use crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository;
-use crate::ports::outbound::coussin_repository::*;
 use crate::application::coussin_service::CoussinService;
 use crate::application::economy_config::EmptyBotConfigRepository;
+use crate::domain::entities::coussin::PlayerClass;
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::coussin_profile::{CoussinCombatUseCase, CoussinProfileUseCase};
+use crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository;
+use crate::ports::outbound::coussin_repository::*;
 
 #[derive(Default)]
 struct MockCooldownRepo {
@@ -16,7 +16,12 @@ struct MockCooldownRepo {
 
 #[async_trait]
 impl CoussinCooldownRepository for MockCooldownRepo {
-    async fn remaining_seconds(&self, _g: &str, _u: &str, _a: &str) -> Result<Option<i64>, DomainError> {
+    async fn remaining_seconds(
+        &self,
+        _g: &str,
+        _u: &str,
+        _a: &str,
+    ) -> Result<Option<i64>, DomainError> {
         Ok(*self.remaining.lock().unwrap())
     }
     async fn arm(&self, _g: &str, _u: &str, _a: &str, _m: i64) -> Result<(), DomainError> {
@@ -32,20 +37,41 @@ struct MockCoussinRepo {
 
 #[async_trait]
 impl CoussinRepository for MockCoussinRepo {
-    async fn list_combat_history(&self, _g: &str, _u: &str, _l: i64) -> Result<Vec<CoussinCombatResult>, DomainError> {
+    async fn list_combat_history(
+        &self,
+        _g: &str,
+        _u: &str,
+        _l: i64,
+    ) -> Result<Vec<CoussinCombatResult>, DomainError> {
         Ok(vec![])
     }
     async fn list_bets(&self, _g: &str, _u: &str, _l: i64) -> Result<Vec<CoussinBet>, DomainError> {
         Ok(vec![])
     }
-    async fn list_primes(&self, _g: &str, _u: &str, _l: i64) -> Result<Vec<CoussinPrime>, DomainError> {
+    async fn list_primes(
+        &self,
+        _g: &str,
+        _u: &str,
+        _l: i64,
+    ) -> Result<Vec<CoussinPrime>, DomainError> {
         Ok(vec![])
     }
-    async fn find_profile(&self, guild_id: &str, user_id: &str) -> Result<Option<CoussinProfile>, DomainError> {
+    async fn find_profile(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<CoussinProfile>, DomainError> {
         let list = self.profiles.lock().unwrap();
-        Ok(list.iter().find(|p| p.guild_id == guild_id && p.user_id == user_id).cloned())
+        Ok(list
+            .iter()
+            .find(|p| p.guild_id == guild_id && p.user_id == user_id)
+            .cloned())
     }
-    async fn list_profiles(&self, _guild_id: &str, _limit: i64) -> Result<Vec<CoussinProfile>, DomainError> {
+    async fn list_profiles(
+        &self,
+        _guild_id: &str,
+        _limit: i64,
+    ) -> Result<Vec<CoussinProfile>, DomainError> {
         Ok(self.profiles.lock().unwrap().clone())
     }
     async fn create_profile(&self, profile: &CoussinProfile) -> Result<(), DomainError> {
@@ -63,7 +89,10 @@ impl CoussinRepository for MockCoussinRepo {
         _cooldown_minutes: i64,
     ) -> Result<(), DomainError> {
         let mut list = self.profiles.lock().unwrap();
-        if let Some(p) = list.iter_mut().find(|p| p.guild_id == guild_id && p.user_id == user_id) {
+        if let Some(p) = list
+            .iter_mut()
+            .find(|p| p.guild_id == guild_id && p.user_id == user_id)
+        {
             p.class = class;
             p.atk = atk;
             p.def = def;
@@ -71,9 +100,17 @@ impl CoussinRepository for MockCoussinRepo {
         }
         Ok(())
     }
-    async fn spend_stat_point(&self, guild_id: &str, user_id: &str, stat: &str) -> Result<CoussinProfile, DomainError> {
+    async fn spend_stat_point(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        stat: &str,
+    ) -> Result<CoussinProfile, DomainError> {
         let mut list = self.profiles.lock().unwrap();
-        let p = list.iter_mut().find(|p| p.guild_id == guild_id && p.user_id == user_id).unwrap();
+        let p = list
+            .iter_mut()
+            .find(|p| p.guild_id == guild_id && p.user_id == user_id)
+            .unwrap();
         p.stat_points -= 1;
         match stat {
             "atk" => p.atk += 5,
@@ -121,7 +158,10 @@ impl CoussinRepository for MockCoussinRepo {
             Ok(false)
         }
     }
-    async fn resolution_snapshot(&self, _id: uuid::Uuid) -> Result<Option<CoussinCombatSnapshot>, DomainError> {
+    async fn resolution_snapshot(
+        &self,
+        _id: uuid::Uuid,
+    ) -> Result<Option<CoussinCombatSnapshot>, DomainError> {
         Ok(None)
     }
     async fn resolve_combat(
@@ -168,7 +208,9 @@ fn sample_profile(guild_id: &str, user_id: &str, username: &str) -> CoussinProfi
 #[tokio::test]
 async fn test_choose_class_success() {
     let repo = Arc::new(MockCoussinRepo::default());
-    repo.create_profile(&sample_profile("g1", "u1", "Player1")).await.unwrap();
+    repo.create_profile(&sample_profile("g1", "u1", "Player1"))
+        .await
+        .unwrap();
 
     let service = CoussinService::new(
         repo.clone(),
@@ -176,14 +218,19 @@ async fn test_choose_class_success() {
         Arc::new(MockCooldownRepo::default()),
     );
 
-    let updated = service.choose_class("g1", "u1", "Player1", "ecraseur").await.unwrap();
+    let updated = service
+        .choose_class("g1", "u1", "Player1", "ecraseur")
+        .await
+        .unwrap();
     assert_eq!(updated.class, PlayerClass::Ecraseur);
 }
 
 #[tokio::test]
 async fn test_train_stat_point() {
     let repo = Arc::new(MockCoussinRepo::default());
-    repo.create_profile(&sample_profile("g1", "u1", "Player1")).await.unwrap();
+    repo.create_profile(&sample_profile("g1", "u1", "Player1"))
+        .await
+        .unwrap();
 
     let service = CoussinService::new(
         repo.clone(),
@@ -199,8 +246,12 @@ async fn test_train_stat_point() {
 #[tokio::test]
 async fn test_challenge_creation() {
     let repo = Arc::new(MockCoussinRepo::default());
-    repo.create_profile(&sample_profile("g1", "u1", "Attacker")).await.unwrap();
-    repo.create_profile(&sample_profile("g1", "u2", "Defender")).await.unwrap();
+    repo.create_profile(&sample_profile("g1", "u1", "Attacker"))
+        .await
+        .unwrap();
+    repo.create_profile(&sample_profile("g1", "u2", "Defender"))
+        .await
+        .unwrap();
 
     let service = CoussinService::new(
         repo.clone(),
@@ -208,7 +259,10 @@ async fn test_challenge_creation() {
         Arc::new(MockCooldownRepo::default()),
     );
 
-    let combat = service.challenge("g1", "chan1", "u1", "Attacker", "u2", "Defender", 50).await.unwrap();
+    let combat = service
+        .challenge("g1", "chan1", "u1", "Attacker", "u2", "Defender", 50)
+        .await
+        .unwrap();
     assert_eq!(combat.attacker_id, "u1");
     assert_eq!(combat.defender_id, "u2");
     assert_eq!(combat.mise, 50);

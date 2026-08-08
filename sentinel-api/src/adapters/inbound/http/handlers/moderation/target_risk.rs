@@ -24,7 +24,6 @@ pub async fn assess_target_risk(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(dto): Json<AssessTargetRiskRequestDto>,
 ) -> Result<Json<TargetRiskDecisionDto>, ApiError> {
-
     let decision = state
         .assess_target_risk_uc
         .assess(AssessTargetRiskCommand {

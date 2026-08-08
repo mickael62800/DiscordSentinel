@@ -7,12 +7,12 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::role_panel_repository::PgRolePanelRepository;
 use sentinel_api::adapters::outbound::postgres::community::welcome_config_repository::PgWelcomeConfigRepository;
-use sentinel_core::ports::outbound::community::role_panel_repository::RolePanelRepository;
-use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
-use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
 use sentinel_core::domain::entities::community::role_panel::AutoRole;
 use sentinel_core::domain::entities::community::role_panel::RolePanel;
 use sentinel_core::domain::entities::community::role_panel::RolePanelEntry;
+use sentinel_core::ports::outbound::community::role_panel_repository::RolePanelRepository;
+use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
@@ -259,4 +259,3 @@ async fn welcome_save_is_upsert() {
     assert!(!got.welcome_enabled);
     assert_eq!(got.welcome_message, "Bonjour!");
 }
-

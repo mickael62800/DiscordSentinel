@@ -50,7 +50,10 @@ impl WalletRepository for MockRepo {
             .lock()
             .unwrap()
             .insert(wallet.user_id.clone(), wallet.clone());
-        self.saved.lock().unwrap().push((wallet.clone(), mutation.clone()));
+        self.saved
+            .lock()
+            .unwrap()
+            .push((wallet.clone(), mutation.clone()));
         Ok(())
     }
     async fn transfer_atomic(
@@ -227,8 +230,14 @@ async fn transfer_rejects_self_transfer() {
 async fn transfer_rejects_non_positive_amount() {
     let repo = Arc::new(MockRepo::default());
     let svc = service(repo.clone());
-    assert!(svc.transfer(transfer_cmd("u1", "u2", 0, None)).await.is_err());
-    assert!(svc.transfer(transfer_cmd("u1", "u2", -5, None)).await.is_err());
+    assert!(svc
+        .transfer(transfer_cmd("u1", "u2", 0, None))
+        .await
+        .is_err());
+    assert!(svc
+        .transfer(transfer_cmd("u1", "u2", -5, None))
+        .await
+        .is_err());
     assert!(repo.transfers.lock().unwrap().is_empty());
 }
 

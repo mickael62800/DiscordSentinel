@@ -277,7 +277,11 @@ fn diag_message_gentil_ne_declenche_rien() {
 #[test]
 fn diag_juron_isole_est_tolere() {
     let r = ScoringService::score(&flags_profanity_seule(), &[]);
-    assert_eq!(r.action, Action::None, "un juron seul ne doit rien declencher");
+    assert_eq!(
+        r.action,
+        Action::None,
+        "un juron seul ne doit rien declencher"
+    );
 }
 
 /// POINT SENSIBLE #1 : une SEULE insulte SUPPRIME deja le message (poids 5 >=
@@ -286,7 +290,11 @@ fn diag_juron_isole_est_tolere() {
 #[test]
 fn diag_une_insulte_isolee_supprime_deja_le_message() {
     let r = ScoringService::score(&make_flags(false, true, false), &[]);
-    assert_eq!(r.action, Action::Delete, "1 insulte = Delete : trop severe pour un cas isole");
+    assert_eq!(
+        r.action,
+        Action::Delete,
+        "1 insulte = Delete : trop severe pour un cas isole"
+    );
 }
 
 /// POINT SENSIBLE #2 : un simple flag spam (repetition, caps-like...) poste

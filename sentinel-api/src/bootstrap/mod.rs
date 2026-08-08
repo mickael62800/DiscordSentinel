@@ -31,7 +31,7 @@ pub mod state;
 mod workers;
 
 pub use app_state::build_app_state;
-pub use state::AppState;
 pub use connections::{connect_pg, connect_redis};
 pub use inference::{build_broadcaster, build_inference};
+pub use state::AppState;
 pub use workers::spawn_security_workers;

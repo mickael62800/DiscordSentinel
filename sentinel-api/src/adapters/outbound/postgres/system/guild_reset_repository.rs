@@ -2,10 +2,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use super::super::pg_err_ctx;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::outbound::system::guild_reset_repository::{
     GuildResetRepository, ResetDiscordContext,
 };
-use sentinel_core::domain::errors::DomainError;
 
 /// Tables a NE JAMAIS effacer lors d'un reset par serveur :
 /// - `guilds` : enregistrement du serveur (reste visible dans le dashboard)

@@ -18,8 +18,8 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::bootstrap::state::AiState;
 use crate::adapters::inbound::http::validation;
+use crate::bootstrap::state::AiState;
 use sentinel_core::domain::entities::ai::ai_job::NewAiJob;
 
 #[derive(Debug, Deserialize)]

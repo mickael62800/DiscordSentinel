@@ -4,15 +4,17 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use crate::shared::api_client::BaseApiClient;
+use crate::shared::grpc_client::GrpcClientKey;
 use crate::shared::heartbeat::ApiClientKey;
 
+use super::super::api_client::{ApiClient, ReviewFacts};
 use super::super::detectors;
 use super::super::review;
 use super::cards::{archive_discussion_channel, reply_ephemeral};
 use super::labels::{action_label, char_to_str};
 use super::render::{
     build_detail_url, moderator_facts, render_history_totals, render_votes, reopen_row,
-    secondary_row, vote_buttons, vote_embed, VoteDto, VOTES_FIELD,
+    secondary_row, vote_buttons, vote_embed, VOTES_FIELD,
 };
 use super::{CLOSE_PREFIX, REOPEN_PREFIX, VOTE_PREFIX};
 
@@ -35,13 +37,14 @@ pub(crate) async fn handle_vote_button(
         .guild_id
         .map(|g| g.to_string())
         .unwrap_or_default();
-    let api = {
+    let (api, grpc) = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
-            None => return,
+        match (data.get::<ApiClientKey>(), data.get::<GrpcClientKey>()) {
+            (Some(a), Some(g)) => (a.clone(), g.clone()),
+            _ => return,
         }
     };
+    let review_api = ApiClient::new(grpc);
     let config = api
         .get_guild_config_for(&guild_id, super::super::MODULE_BOT_NAME)
         .await
@@ -53,18 +56,15 @@ pub(crate) async fn handle_vote_button(
 
     // Faits Discord du votant -> la regle d'acces (is_moderator) est appliquee
     // cote API/domaine (full hexa). Un refus revient en erreur (403).
-    let facts = moderator_facts(component, mod_role_id, None);
-    let body = serde_json::json!({
-        "voter_id": component.user.id.to_string(),
-        "voter_name": component.user.name,
-        "vote_action": vote_action,
-        "is_admin": facts.0,
-        "has_moderate_members": facts.1,
-        "has_manage_messages": facts.2,
-        "has_mod_role": facts.3,
-    });
-    let votes: Vec<VoteDto> = match api
-        .post_json(&format!("/api/automod/reviews/{review_id}/vote"), &body)
+    let facts: ReviewFacts = moderator_facts(component, mod_role_id, None).into();
+    let votes = match review_api
+        .vote(
+            review_id,
+            &component.user.id.to_string(),
+            &component.user.name,
+            vote_action,
+            facts,
+        )
         .await
     {
         Ok(v) => v,
@@ -137,13 +137,14 @@ pub(crate) async fn handle_close_button(
         .guild_id
         .map(|g| g.to_string())
         .unwrap_or_default();
-    let api = {
+    let (api, grpc) = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
-            None => return,
+        match (data.get::<ApiClientKey>(), data.get::<GrpcClientKey>()) {
+            (Some(a), Some(g)) => (a.clone(), g.clone()),
+            _ => return,
         }
     };
+    let review_api = ApiClient::new(grpc);
     let config = api
         .get_guild_config_for(&guild_id, super::super::MODULE_BOT_NAME)
         .await
@@ -152,55 +153,33 @@ pub(crate) async fn handle_close_button(
         .get("vote_mod_role_id")
         .and_then(|v| v.parse::<u64>().ok())
         .filter(|x| *x > 0);
-    let facts = moderator_facts(component, mod_role_id, None);
+    let facts: ReviewFacts = moderator_facts(component, mod_role_id, None).into();
 
-    let body = serde_json::json!({
-        "actor_id": component.user.id.to_string(),
-        "actor_name": component.user.name,
-        "source": "discord",
-        "is_admin": facts.0,
-        "has_moderate_members": facts.1,
-        "has_manage_messages": facts.2,
-        "has_mod_role": facts.3,
-    });
-    if let Err(e) = api
-        .post_json::<_, serde_json::Value>(
-            &format!("/api/automod/reviews/{review_id}/ignore"),
-            &body,
+    // La cloture renvoie directement la carte a jour (membre + infraction) :
+    // plus besoin d'un 2e GET pour reconstruire l'embed.
+    let r = match review_api
+        .ignore_review(
+            &review_id,
+            &component.user.id.to_string(),
+            &component.user.name,
+            facts,
         )
         .await
     {
-        warn!(error = %e, review_id, "Echec clore (ignorer) : non autorise ou deja clos");
-        reply_ephemeral(
-            ctx,
-            component,
-            "Cloture impossible (reserve aux moderateurs, ou deja clos).",
-        )
-        .await;
-        return;
-    }
-
-    // Recupere la review (membre + infraction) pour garder une carte lisible,
-    // et archive le salon de discussion lie.
-    #[derive(serde::Deserialize, Default)]
-    struct ClosedReview {
-        #[serde(default)]
-        user_id: String,
-        #[serde(default)]
-        user_name: String,
-        #[serde(default)]
-        content_preview: String,
-        #[serde(default)]
-        reason: String,
-        #[serde(default)]
-        incident_count: i32,
-    }
-    let r: ClosedReview = api
-        .get_json(&format!("/api/automod/reviews/{review_id}"))
-        .await
-        .unwrap_or_default();
+        Ok(r) => r,
+        Err(e) => {
+            warn!(error = %e, review_id, "Echec clore (ignorer) : non autorise ou deja clos");
+            reply_ephemeral(
+                ctx,
+                component,
+                "Cloture impossible (reserve aux moderateurs, ou deja clos).",
+            )
+            .await;
+            return;
+        }
+    };
     if !r.user_id.is_empty() {
-        archive_discussion_channel(ctx, &api, &review_id, &r.user_id).await;
+        archive_discussion_channel(ctx, &review_api, &review_id, &r.user_id).await;
     }
 
     let mut closed = serenity::builder::CreateEmbed::new()
@@ -253,13 +232,14 @@ pub(crate) async fn handle_reopen_button(
         .guild_id
         .map(|g| g.to_string())
         .unwrap_or_default();
-    let api = {
+    let (api, grpc) = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
-            None => return,
+        match (data.get::<ApiClientKey>(), data.get::<GrpcClientKey>()) {
+            (Some(a), Some(g)) => (a.clone(), g.clone()),
+            _ => return,
         }
     };
+    let review_api = ApiClient::new(grpc);
     let config = api
         .get_guild_config_for(&guild_id, super::super::MODULE_BOT_NAME)
         .await
@@ -272,35 +252,16 @@ pub(crate) async fn handle_reopen_button(
     let discussion_enabled =
         BaseApiClient::config_bool(&config, "discussion_channel_enabled", false);
     let detail_url = build_detail_url(&config, &guild_id);
-    let facts = moderator_facts(component, mod_role_id, None);
+    let facts: ReviewFacts = moderator_facts(component, mod_role_id, None).into();
 
-    #[derive(serde::Deserialize)]
-    struct ReopenedReview {
-        guild_id: String,
-        channel_id: String,
-        message_id: String,
-        user_id: String,
-        user_name: String,
-        content_preview: String,
-        suggested_action: String,
-        score: f64,
-        reason: String,
-        flags: serde_json::Value,
-        voting_deadline: Option<String>,
-    }
-
-    let body = serde_json::json!({
-        "actor_id": component.user.id.to_string(),
-        "actor_name": component.user.name,
-        "deadline_hours": deadline_hours,
-        "source": "discord",
-        "is_admin": facts.0,
-        "has_moderate_members": facts.1,
-        "has_manage_messages": facts.2,
-        "has_mod_role": facts.3,
-    });
-    let review: ReopenedReview = match api
-        .post_json(&format!("/api/automod/reviews/{review_id}/reopen"), &body)
+    let review = match review_api
+        .reopen_review(
+            &review_id,
+            &component.user.id.to_string(),
+            &component.user.name,
+            deadline_hours,
+            facts,
+        )
         .await
     {
         Ok(r) => r,

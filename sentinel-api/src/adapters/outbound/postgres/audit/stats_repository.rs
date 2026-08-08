@@ -3,10 +3,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::audit::stats_repository::StatsRepository;
 use sentinel_core::domain::entities::audit::user_stats::UserStats;
 use sentinel_core::domain::entities::audit::user_stats::VoiceSessionStats;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::audit::stats_repository::StatsRepository;
 
 pub struct PgStatsRepository {
     pool: PgPool,

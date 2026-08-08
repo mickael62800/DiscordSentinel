@@ -170,10 +170,8 @@ async fn scan_and_warn(
         if !crate::common::is_worker_enabled(pool, &t.server, "ticket-bot").await {
             continue;
         }
-        let warn_minutes = effective_threshold(
-            thresholds.get(&t.server).copied(),
-            DEFAULT_SLA_WARN_MINUTES,
-        );
+        let warn_minutes =
+            effective_threshold(thresholds.get(&t.server).copied(), DEFAULT_SLA_WARN_MINUTES);
         let age_minutes = (now - t.created_at).num_minutes();
         if !is_breached(age_minutes, warn_minutes) {
             continue;

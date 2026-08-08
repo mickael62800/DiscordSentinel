@@ -4,6 +4,7 @@ use serenity::prelude::*;
 
 use crate::shared::api_client::BaseApiClient;
 
+use super::super::api_client::{ReviewData, ReviewVote};
 use super::super::detectors;
 use super::labels::action_label;
 use super::{CLOSE_PREFIX, DISCUSSION_PREFIX, REOPEN_PREFIX, VOTE_PREFIX};
@@ -121,7 +122,7 @@ pub(super) fn vote_embed(
     flags: &detectors::DetectionFlags,
     suggested: &str,
     deadline: &chrono::DateTime<chrono::Utc>,
-    votes: &[VoteDto],
+    votes: &[ReviewVote],
 ) -> serenity::builder::CreateEmbed {
     let mut flag_parts = Vec::new();
     if flags.spam {
@@ -174,7 +175,7 @@ pub(super) const VOTES_FIELD: &str = "Votes";
 
 /// Rendu nominatif des votes, groupes par sanction :
 /// `Avertissement (2) : Alice, Bob`.
-pub(super) fn render_votes(votes: &[VoteDto]) -> String {
+pub(super) fn render_votes(votes: &[ReviewVote]) -> String {
     if votes.is_empty() {
         return "_Aucun vote pour l'instant._".to_string();
     }
@@ -203,47 +204,11 @@ pub(super) fn render_votes(votes: &[VoteDto]) -> String {
     }
 }
 
-#[derive(serde::Deserialize)]
-pub(super) struct VoteDto {
-    voter_name: String,
-    vote_action: String,
-}
-
-/// Reponse de POST /api/automod/reviews — champs utiles a la carte agregee.
-#[derive(serde::Deserialize, Default)]
-pub(super) struct ReviewResp {
-    pub(super) id: String,
-    #[serde(default)]
-    pub(super) merged: bool,
-    #[serde(default)]
-    pub(super) guild_id: String,
-    #[serde(default)]
-    pub(super) user_id: String,
-    #[serde(default)]
-    pub(super) channel_id: String,
-    #[serde(default)]
-    pub(super) message_id: String,
-    #[serde(default)]
-    pub(super) content_preview: String,
-    #[serde(default)]
-    pub(super) reason: String,
-    #[serde(default)]
-    pub(super) suggested_action: String,
-    #[serde(default)]
-    pub(super) score: f64,
-    #[serde(default)]
-    pub(super) cumulative_score: f64,
-    #[serde(default)]
-    pub(super) incident_count: i32,
-    #[serde(default)]
-    pub(super) voting_deadline: Option<String>,
-}
-
 /// Construit l'embed d'une carte de vote AGREGEE (plusieurs incidents pour un
 /// meme utilisateur). Affiche score max ET score cumule + nb d'incidents.
 pub(super) fn aggregated_vote_embed(
-    resp: &ReviewResp,
-    votes: &[VoteDto],
+    resp: &ReviewData,
+    votes: &[ReviewVote],
 ) -> serenity::builder::CreateEmbed {
     let deadline_ts = resp
         .voting_deadline

@@ -196,7 +196,9 @@ mod tests {
     #[test]
     fn homoglyph_bilingual_message_ok() {
         // Russe + anglais dans des MOTS separes -> legitime, pas un homoglyphe.
-        assert!(!detect_homoglyphs("\u{041F}\u{0440}\u{0438}\u{0432}\u{0435}\u{0442} guys gg"));
+        assert!(!detect_homoglyphs(
+            "\u{041F}\u{0440}\u{0438}\u{0432}\u{0435}\u{0442} guys gg"
+        ));
     }
 
     // ── Combined detect ──

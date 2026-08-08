@@ -16,9 +16,9 @@ use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_core::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use sentinel_core::domain::entities::system::discord_role::DiscordRole;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 
 // ══════════════════════════════════════════════════════════
 // Mock DiscordRoleRepository

@@ -19,7 +19,8 @@ use std::sync::Arc;
 pub struct CoussinService {
     repo: Arc<dyn CoussinRepository>,
     config_repo: Arc<dyn BotConfigRepository>,
-    cooldowns: Arc<dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository>,
+    cooldowns:
+        Arc<dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository>,
 }
 impl CoussinService {
     pub fn new(
@@ -29,7 +30,11 @@ impl CoussinService {
             dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository,
         >,
     ) -> Self {
-        Self { repo, config_repo, cooldowns }
+        Self {
+            repo,
+            config_repo,
+            cooldowns,
+        }
     }
 
     /// Le jeu est-il ouvert sur ce serveur ?
@@ -62,10 +67,8 @@ impl CoussinProfileUseCase for CoussinService {
         guild_id: &str,
         user_id: &str,
         limit: i64,
-    ) -> Result<
-        Vec<crate::ports::outbound::coussin_repository::CoussinCombatResult>,
-        DomainError,
-    > {
+    ) -> Result<Vec<crate::ports::outbound::coussin_repository::CoussinCombatResult>, DomainError>
+    {
         // Meme borne dure que le classement : une demande absurde ne doit
         // atteindre ni la base ni la reponse HTTP.
         self.repo
@@ -73,7 +76,11 @@ impl CoussinProfileUseCase for CoussinService {
             .await
     }
 
-    async fn ranking(&self, guild_id: &str, limit: i64) -> Result<Vec<CoussinProfile>, DomainError> {
+    async fn ranking(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<CoussinProfile>, DomainError> {
         // Borne dure : protege la reponse HTTP et la base d'une demande
         // absurde (?limit=100000) venant du client.
         let limit = limit.clamp(1, 200);
@@ -122,7 +129,13 @@ impl CoussinProfileUseCase for CoussinService {
             .ok_or_else(|| DomainError::Internal("profil Coussin non cree".into()))
     }
 
-    async fn choose_class(&self, guild_id: &str, user_id: &str, username: &str, class: &str) -> Result<CoussinProfile, DomainError> {
+    async fn choose_class(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        class: &str,
+    ) -> Result<CoussinProfile, DomainError> {
         let cfg = self.open_config(guild_id).await?;
         crate::application::economy_config::ensure_cooldown_over(
             &self.cooldowns,
@@ -133,11 +146,25 @@ impl CoussinProfileUseCase for CoussinService {
         )
         .await?;
         let mut profile = self.profile(guild_id, user_id, username).await?;
-        let class = PlayerClass::parse(class).ok_or_else(|| DomainError::Validation("classe invalide : ecraseur, ressort, piegeur ou couette".into()))?;
+        let class = PlayerClass::parse(class).ok_or_else(|| {
+            DomainError::Validation(
+                "classe invalide : ecraseur, ressort, piegeur ou couette".into(),
+            )
+        })?;
         let stats = cfg.classes.stats(class);
         let (atk, def) = (stats.atk, stats.def);
         let hp_max = crate::domain::entities::coussin::max_hp_with(def, class, &cfg.classes);
-        self.repo.update_class(guild_id, user_id, class, atk, def, hp_max, cfg.class_change_cooldown_minutes).await?;
+        self.repo
+            .update_class(
+                guild_id,
+                user_id,
+                class,
+                atk,
+                def,
+                hp_max,
+                cfg.class_change_cooldown_minutes,
+            )
+            .await?;
         profile.class = class;
         profile.atk = atk;
         profile.def = def;
@@ -146,10 +173,18 @@ impl CoussinProfileUseCase for CoussinService {
         Ok(profile)
     }
 
-    async fn train(&self, guild_id: &str, user_id: &str, username: &str, stat: &str) -> Result<CoussinProfile, DomainError> {
+    async fn train(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        stat: &str,
+    ) -> Result<CoussinProfile, DomainError> {
         self.ensure_open(guild_id).await?;
         self.profile(guild_id, user_id, username).await?;
-        if !matches!(stat, "atk" | "def") { return Err(DomainError::Validation("stat invalide : atk ou def".into())); }
+        if !matches!(stat, "atk" | "def") {
+            return Err(DomainError::Validation("stat invalide : atk ou def".into()));
+        }
         self.repo.spend_stat_point(guild_id, user_id, stat).await
     }
 }
@@ -187,14 +222,29 @@ impl CoussinCombatUseCase for CoussinService {
         }
         let combat = self
             .repo
-            .create_combat(guild_id, channel_id, &attacker, &defender, mise, cfg.combat_cooldown_minutes)
+            .create_combat(
+                guild_id,
+                channel_id,
+                &attacker,
+                &defender,
+                mise,
+                cfg.combat_cooldown_minutes,
+            )
             .await?;
         Ok(combat)
     }
-    async fn accept(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError> { self.repo.accept_combat(id, defender_id).await }
-    async fn refuse(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError> { self.repo.refuse_combat(id, defender_id).await }
+    async fn accept(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError> {
+        self.repo.accept_combat(id, defender_id).await
+    }
+    async fn refuse(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError> {
+        self.repo.refuse_combat(id, defender_id).await
+    }
     async fn resolve(&self, id: uuid::Uuid) -> Result<bool, DomainError> {
-        let snapshot = self.repo.resolution_snapshot(id).await?.ok_or_else(|| DomainError::NotFound(format!("combat {id}")))?;
+        let snapshot = self
+            .repo
+            .resolution_snapshot(id)
+            .await?
+            .ok_or_else(|| DomainError::NotFound(format!("combat {id}")))?;
         // La configuration est lue AVANT de tirer les des : une bagarre qu'on
         // ne saurait pas regler ne doit pas consommer son alea.
         let cfg = load_coussin(&self.config_repo, &snapshot.combat.guild_id).await?;
@@ -211,28 +261,74 @@ impl CoussinCombatUseCase for CoussinService {
             ]
         };
         let result = crate::domain::entities::coussin::resolve_combat(
-            snapshot.attacker.atk, snapshot.attacker.def, snapshot.attacker.class, snapshot.attacker.level,
-            snapshot.defender.atk, snapshot.defender.def, snapshot.defender.class, snapshot.defender.level, &rolls,
+            snapshot.attacker.atk,
+            snapshot.attacker.def,
+            snapshot.attacker.class,
+            snapshot.attacker.level,
+            snapshot.defender.atk,
+            snapshot.defender.def,
+            snapshot.defender.class,
+            snapshot.defender.level,
+            &rolls,
             cfg.combat_rules(),
-        ).map_err(|message| DomainError::Validation(message.into()))?;
-        let winner = match result.attacker_won { Some(true) => Some(snapshot.attacker.user_id.as_str()), Some(false) => Some(snapshot.defender.user_id.as_str()), None => None };
+        )
+        .map_err(|message| DomainError::Validation(message.into()))?;
+        let winner = match result.attacker_won {
+            Some(true) => Some(snapshot.attacker.user_id.as_str()),
+            Some(false) => Some(snapshot.defender.user_id.as_str()),
+            None => None,
+        };
         let attacker_progress = if result.attacker_won.is_some() {
             let won = result.attacker_won == Some(true);
             let xp = snapshot.attacker.xp + if won { cfg.xp_winner } else { cfg.xp_loser };
             let level = crate::domain::entities::coussin::level_for_xp_capped(xp, cfg.max_level);
-            let stat_points = snapshot.attacker.stat_points + (level - snapshot.attacker.level).max(0) * cfg.stat_points_per_level.max(0);
-            Some(CoussinProgress { xp, level, stat_points, title: crate::domain::entities::coussin::title_for_level(level).into() })
-        } else { None };
+            let stat_points = snapshot.attacker.stat_points
+                + (level - snapshot.attacker.level).max(0) * cfg.stat_points_per_level.max(0);
+            Some(CoussinProgress {
+                xp,
+                level,
+                stat_points,
+                title: crate::domain::entities::coussin::title_for_level(level).into(),
+            })
+        } else {
+            None
+        };
 
         let defender_progress = if result.attacker_won.is_some() {
             let won = result.attacker_won == Some(false);
             let xp = snapshot.defender.xp + if won { cfg.xp_winner } else { cfg.xp_loser };
             let level = crate::domain::entities::coussin::level_for_xp_capped(xp, cfg.max_level);
-            let stat_points = snapshot.defender.stat_points + (level - snapshot.defender.level).max(0) * cfg.stat_points_per_level.max(0);
-            Some(CoussinProgress { xp, level, stat_points, title: crate::domain::entities::coussin::title_for_level(level).into() })
-        } else { None };
+            let stat_points = snapshot.defender.stat_points
+                + (level - snapshot.defender.level).max(0) * cfg.stat_points_per_level.max(0);
+            Some(CoussinProgress {
+                xp,
+                level,
+                stat_points,
+                title: crate::domain::entities::coussin::title_for_level(level).into(),
+            })
+        } else {
+            None
+        };
 
-        let resolved = self.repo.resolve_combat(id, winner, rolls[0].0, rolls[0].1, if winner.is_some() { snapshot.combat.mise } else { 0 }, result.attacker_hp, result.defender_hp, cfg.bet_payout_pct, attacker_progress, defender_progress).await?;
+        let resolved = self
+            .repo
+            .resolve_combat(
+                id,
+                winner,
+                rolls[0].0,
+                rolls[0].1,
+                if winner.is_some() {
+                    snapshot.combat.mise
+                } else {
+                    0
+                },
+                result.attacker_hp,
+                result.defender_hp,
+                cfg.bet_payout_pct,
+                attacker_progress,
+                defender_progress,
+            )
+            .await?;
 
         Ok(resolved)
     }

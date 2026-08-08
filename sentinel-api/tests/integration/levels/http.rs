@@ -16,14 +16,14 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_core::domain::entities::community::level::UserLevel;
+use sentinel_core::domain::entities::community::level::XpSource;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::community::manage_levels::AddXpCommand;
 use sentinel_core::ports::inbound::community::manage_levels::AddXpResult;
 use sentinel_core::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use sentinel_core::ports::inbound::community::manage_levels::ResetTarget;
 use sentinel_core::ports::inbound::community::manage_levels::SetUserXpCommand;
-use sentinel_core::domain::entities::community::level::UserLevel;
-use sentinel_core::domain::entities::community::level::XpSource;
-use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_levels;
 
 #[derive(Default)]

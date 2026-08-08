@@ -173,7 +173,10 @@ async fn creneau_vide_recoit_une_formulation_par_defaut() {
     let mut c = cmd();
     c.when_text = "   ".into();
     svc.create(c).await.unwrap();
-    assert_eq!(repo.created.lock().unwrap()[0].when_text, "quand vous voulez");
+    assert_eq!(
+        repo.created.lock().unwrap()[0].when_text,
+        "quand vous voulez"
+    );
 }
 
 #[tokio::test]

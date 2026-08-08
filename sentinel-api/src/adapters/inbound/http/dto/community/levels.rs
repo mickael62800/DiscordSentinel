@@ -1,8 +1,8 @@
-use sentinel_core::ports::inbound::community::manage_levels::AddXpResult;
 use sentinel_core::domain::entities::community::level::xp_progress;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::ports::inbound::community::manage_levels::AddXpResult;
 use serde::Deserialize;
 use serde::Serialize;
 // ── Request DTOs ──

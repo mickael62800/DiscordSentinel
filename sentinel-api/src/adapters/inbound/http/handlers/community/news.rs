@@ -100,7 +100,6 @@ pub async fn list_news(
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<NewsDto>>, ApiError> {
-
     let items = state
         .news_uc
         .list(
@@ -119,7 +118,6 @@ pub async fn create_news(
     Path(guild_id): Path<String>,
     Json(dto): Json<UpsertNewsDto>,
 ) -> Result<Json<NewsDto>, ApiError> {
-
     let cmd = UpsertNewsCommand {
         guild_id,
         title: dto.title,
@@ -202,7 +200,11 @@ pub async fn public_news(
     // brouillons, ni les nouvelles programmees pour plus tard.
     let items = state
         .news_uc
-        .list(&guild_id, true, clamp_limit(q.limit, DEFAULT_LIMIT, MAX_LIMIT))
+        .list(
+            &guild_id,
+            true,
+            clamp_limit(q.limit, DEFAULT_LIMIT, MAX_LIMIT),
+        )
         .await?;
 
     Ok(Json(

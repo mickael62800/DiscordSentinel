@@ -2,29 +2,23 @@
 
 use std::sync::Arc;
 
+use nexus_core::application::coussin_bet_service::CoussinBetService;
+use nexus_core::application::coussin_insurance_service::CoussinInsuranceService;
+use nexus_core::application::coussin_inventory_service::CoussinInventoryService;
+use nexus_core::application::coussin_prime_service::CoussinPrimeService;
+use nexus_core::application::coussin_service::CoussinService;
+use nexus_core::application::coussin_steal_service::CoussinStealService;
 use nexus_core::application::game::manage_game_servers_service::ManageGameServersService;
 use nexus_core::application::game::manage_templates_service::ManageGameTemplatesService;
 use nexus_core::application::play_wheel_service::PlayWheelService;
 use nexus_core::application::wallet_service::WalletService;
-use nexus_core::application::coussin_service::CoussinService;
-use nexus_core::application::coussin_inventory_service::CoussinInventoryService;
-use nexus_core::application::coussin_insurance_service::CoussinInsuranceService;
-use nexus_core::application::coussin_steal_service::CoussinStealService;
-use nexus_core::application::coussin_prime_service::CoussinPrimeService;
-use nexus_core::application::coussin_bet_service::CoussinBetService;
-use nexus_core::ports::inbound::coussin_profile::CoussinProfileUseCase;
-use nexus_core::ports::inbound::coussin_profile::CoussinCombatUseCase;
-use nexus_core::ports::inbound::coussin_inventory::CoussinInventoryUseCase;
-use nexus_core::ports::inbound::coussin_insurance::CoussinInsuranceUseCase;
-use nexus_core::ports::inbound::coussin_steal::CoussinStealUseCase;
-use nexus_core::ports::inbound::coussin_prime::CoussinPrimeUseCase;
 use nexus_core::ports::inbound::coussin_bet::CoussinBetUseCase;
-use nexus_core::ports::outbound::coussin_inventory_repository::CoussinInventoryRepository;
-use nexus_core::ports::outbound::coussin_insurance_repository::CoussinInsuranceRepository;
-use nexus_core::ports::outbound::coussin_steal_repository::CoussinStealRepository;
-use nexus_core::ports::outbound::coussin_prime_repository::CoussinPrimeRepository;
-use nexus_core::ports::outbound::coussin_bet_repository::CoussinBetRepository;
-use nexus_core::ports::outbound::coussin_repository::CoussinRepository;
+use nexus_core::ports::inbound::coussin_insurance::CoussinInsuranceUseCase;
+use nexus_core::ports::inbound::coussin_inventory::CoussinInventoryUseCase;
+use nexus_core::ports::inbound::coussin_prime::CoussinPrimeUseCase;
+use nexus_core::ports::inbound::coussin_profile::CoussinCombatUseCase;
+use nexus_core::ports::inbound::coussin_profile::CoussinProfileUseCase;
+use nexus_core::ports::inbound::coussin_steal::CoussinStealUseCase;
 use nexus_core::ports::inbound::game::manage_game_servers::ManageGameServersUseCase;
 use nexus_core::ports::inbound::game::manage_game_templates::ManageGameTemplatesUseCase;
 use nexus_core::ports::inbound::get_wallet::GetWalletUseCase;
@@ -33,6 +27,12 @@ use nexus_core::ports::inbound::transfer_coins::TransferCoinsUseCase;
 use nexus_core::ports::inbound::wallet_history::GetWalletHistoryUseCase;
 use nexus_core::ports::inbound::wallet_leaderboard::GetWalletLeaderboardUseCase;
 use nexus_core::ports::outbound::casino::game_repository::GameRepository;
+use nexus_core::ports::outbound::coussin_bet_repository::CoussinBetRepository;
+use nexus_core::ports::outbound::coussin_insurance_repository::CoussinInsuranceRepository;
+use nexus_core::ports::outbound::coussin_inventory_repository::CoussinInventoryRepository;
+use nexus_core::ports::outbound::coussin_prime_repository::CoussinPrimeRepository;
+use nexus_core::ports::outbound::coussin_repository::CoussinRepository;
+use nexus_core::ports::outbound::coussin_steal_repository::CoussinStealRepository;
 use nexus_core::ports::outbound::events::EventPublisher;
 use nexus_core::ports::outbound::game::container_runtime::ContainerRuntime;
 use nexus_core::ports::outbound::game::game_audit_repository::GameAuditRepository;
@@ -47,21 +47,21 @@ use nexus_core::ports::outbound::game::rcon_client::RconClient;
 use nexus_core::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use sqlx::postgres::PgPoolOptions;
 
+use crate::adapters::outbound::events::noop_publisher::NoopEventPublisher;
+use crate::adapters::outbound::events::redis_publisher::RedisEventPublisher;
 use crate::adapters::outbound::game_runtime::docker_runtime::{
     make_docker_client, DockerContainerRuntime,
 };
 use crate::adapters::outbound::game_runtime::noop_runtime::NoopContainerRuntime;
-use crate::adapters::outbound::game_runtime::rcon_minecraft::MinecraftRconClient;
-use crate::adapters::outbound::events::noop_publisher::NoopEventPublisher;
-use crate::adapters::outbound::events::redis_publisher::RedisEventPublisher;
+use crate::adapters::outbound::game_runtime::rcon_pooled::PooledRconClient;
 use crate::adapters::outbound::game_runtime::redis_port_allocator::RedisPortAllocator;
 use crate::adapters::outbound::postgres::casino::game_repository::PgGameRepository;
-use crate::adapters::outbound::postgres::coussin_repository::PgCoussinRepository;
-use crate::adapters::outbound::postgres::coussin_inventory_repository::PgCoussinInventoryRepository;
-use crate::adapters::outbound::postgres::coussin_insurance_repository::PgCoussinInsuranceRepository;
-use crate::adapters::outbound::postgres::coussin_steal_repository::PgCoussinStealRepository;
-use crate::adapters::outbound::postgres::coussin_prime_repository::PgCoussinPrimeRepository;
 use crate::adapters::outbound::postgres::coussin_bet_repository::PgCoussinBetRepository;
+use crate::adapters::outbound::postgres::coussin_insurance_repository::PgCoussinInsuranceRepository;
+use crate::adapters::outbound::postgres::coussin_inventory_repository::PgCoussinInventoryRepository;
+use crate::adapters::outbound::postgres::coussin_prime_repository::PgCoussinPrimeRepository;
+use crate::adapters::outbound::postgres::coussin_repository::PgCoussinRepository;
+use crate::adapters::outbound::postgres::coussin_steal_repository::PgCoussinStealRepository;
 use crate::adapters::outbound::postgres::game::audit_repository::PgGameAuditRepository;
 use crate::adapters::outbound::postgres::game::config_repository::PgGameServerConfigRepository;
 use crate::adapters::outbound::postgres::game::player_session_repository::PgPlayerSessionRepository;
@@ -108,7 +108,8 @@ pub struct AppState {
     pub game_repo: Arc<dyn GameRepository>,
     /// Publie les evenements consommes par le bot (salons de session).
     pub events: Arc<dyn EventPublisher>,
-    pub discord_api: Arc<dyn nexus_core::ports::outbound::system::discord_api_repository::DiscordApiRepository>,
+    pub discord_api:
+        Arc<dyn nexus_core::ports::outbound::system::discord_api_repository::DiscordApiRepository>,
     /// Si Some, toutes les routes /api exigent `Authorization: Bearer <key>`.
     pub api_key: Option<String>,
     /// Si Some et non vide, `/metrics` exige `Authorization: Bearer <token>`.
@@ -151,24 +152,60 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
     let wheel_repo = Arc::new(PgWheelRepository::new(pool.clone()));
     let wallet_repo = Arc::new(PgWalletRepository::new(pool.clone()));
     let wheel_cases: Arc<dyn nexus_core::ports::inbound::wheel_cases::ManageWheelCasesUseCase> =
-        Arc::new(nexus_core::application::wheel_cases_service::WheelCasesService::new(wheel_repo.clone()));
-    let service = Arc::new(PlayWheelService::new(wheel_repo, wallet_repo.clone(), bot_config_repo.clone()));
+        Arc::new(
+            nexus_core::application::wheel_cases_service::WheelCasesService::new(
+                wheel_repo.clone(),
+            ),
+        );
+    let service = Arc::new(PlayWheelService::new(
+        wheel_repo,
+        wallet_repo.clone(),
+        bot_config_repo.clone(),
+    ));
     let wallet_service = Arc::new(WalletService::new(wallet_repo, bot_config_repo.clone()));
     let coussin_cooldowns: Arc<dyn nexus_core::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository> =
         Arc::new(crate::adapters::outbound::postgres::coussin_cooldown_repository::PgCoussinCooldownRepository::new(pool.clone()));
     let coussin_repo: Arc<dyn CoussinRepository> = Arc::new(PgCoussinRepository::new(pool.clone()));
-    let coussin_profile: Arc<dyn CoussinProfileUseCase> = Arc::new(CoussinService::new(coussin_repo, bot_config_repo.clone(), coussin_cooldowns.clone()));
-    let coussin_combat: Arc<dyn CoussinCombatUseCase> = Arc::new(CoussinService::new(Arc::new(PgCoussinRepository::new(pool.clone())), bot_config_repo.clone(), coussin_cooldowns.clone()));
-    let coussin_inventory_repo: Arc<dyn CoussinInventoryRepository> = Arc::new(PgCoussinInventoryRepository::new(pool.clone()));
-    let coussin_inventory: Arc<dyn CoussinInventoryUseCase> = Arc::new(CoussinInventoryService::new(coussin_inventory_repo, bot_config_repo.clone()));
-    let coussin_insurance_repo: Arc<dyn CoussinInsuranceRepository> = Arc::new(PgCoussinInsuranceRepository::new(pool.clone()));
-    let coussin_insurance: Arc<dyn CoussinInsuranceUseCase> = Arc::new(CoussinInsuranceService::new(coussin_insurance_repo, bot_config_repo.clone()));
-    let coussin_steal_repo: Arc<dyn CoussinStealRepository> = Arc::new(PgCoussinStealRepository::new(pool.clone()));
-    let coussin_steal: Arc<dyn CoussinStealUseCase> = Arc::new(CoussinStealService::new(coussin_steal_repo, bot_config_repo.clone()));
-    let coussin_prime_repo: Arc<dyn CoussinPrimeRepository> = Arc::new(PgCoussinPrimeRepository::new(pool.clone()));
-    let coussin_prime: Arc<dyn CoussinPrimeUseCase> = Arc::new(CoussinPrimeService::new(coussin_prime_repo, bot_config_repo.clone(), coussin_cooldowns.clone()));
-    let coussin_bet_repo: Arc<dyn CoussinBetRepository> = Arc::new(PgCoussinBetRepository::new(pool.clone()));
-    let coussin_bet: Arc<dyn CoussinBetUseCase> = Arc::new(CoussinBetService::new(coussin_bet_repo, bot_config_repo.clone(), coussin_cooldowns.clone()));
+    let coussin_profile: Arc<dyn CoussinProfileUseCase> = Arc::new(CoussinService::new(
+        coussin_repo,
+        bot_config_repo.clone(),
+        coussin_cooldowns.clone(),
+    ));
+    let coussin_combat: Arc<dyn CoussinCombatUseCase> = Arc::new(CoussinService::new(
+        Arc::new(PgCoussinRepository::new(pool.clone())),
+        bot_config_repo.clone(),
+        coussin_cooldowns.clone(),
+    ));
+    let coussin_inventory_repo: Arc<dyn CoussinInventoryRepository> =
+        Arc::new(PgCoussinInventoryRepository::new(pool.clone()));
+    let coussin_inventory: Arc<dyn CoussinInventoryUseCase> = Arc::new(
+        CoussinInventoryService::new(coussin_inventory_repo, bot_config_repo.clone()),
+    );
+    let coussin_insurance_repo: Arc<dyn CoussinInsuranceRepository> =
+        Arc::new(PgCoussinInsuranceRepository::new(pool.clone()));
+    let coussin_insurance: Arc<dyn CoussinInsuranceUseCase> = Arc::new(
+        CoussinInsuranceService::new(coussin_insurance_repo, bot_config_repo.clone()),
+    );
+    let coussin_steal_repo: Arc<dyn CoussinStealRepository> =
+        Arc::new(PgCoussinStealRepository::new(pool.clone()));
+    let coussin_steal: Arc<dyn CoussinStealUseCase> = Arc::new(CoussinStealService::new(
+        coussin_steal_repo,
+        bot_config_repo.clone(),
+    ));
+    let coussin_prime_repo: Arc<dyn CoussinPrimeRepository> =
+        Arc::new(PgCoussinPrimeRepository::new(pool.clone()));
+    let coussin_prime: Arc<dyn CoussinPrimeUseCase> = Arc::new(CoussinPrimeService::new(
+        coussin_prime_repo,
+        bot_config_repo.clone(),
+        coussin_cooldowns.clone(),
+    ));
+    let coussin_bet_repo: Arc<dyn CoussinBetRepository> =
+        Arc::new(PgCoussinBetRepository::new(pool.clone()));
+    let coussin_bet: Arc<dyn CoussinBetUseCase> = Arc::new(CoussinBetService::new(
+        coussin_bet_repo,
+        bot_config_repo.clone(),
+        coussin_cooldowns.clone(),
+    ));
 
     // ── Game Portal : repos Postgres ──
     let game_server_repo: Arc<dyn GameServerRepository> =
@@ -208,12 +245,11 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         Arc::new(NoopContainerRuntime)
     };
 
-    let rcon_client: Arc<dyn RconClient> = Arc::new(MinecraftRconClient::new());
+    let rcon_client: Arc<dyn RconClient> = Arc::new(PooledRconClient::default());
 
     // Le client redis ne se connecte pas a l'open (lazy) : une URL par defaut
     // ne coute rien tant que l'allocation de port n'est pas sollicitee.
-    let redis_url =
-        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
+    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
     let redis_client = redis::Client::open(redis_url.as_str())
         .map_err(|e| format!("REDIS_URL invalide ({redis_url}): {e}"))?;
     let port_allocator: Arc<dyn PortAllocator> = Arc::new(RedisPortAllocator::new(redis_client));
@@ -236,8 +272,11 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
     };
 
     let discord_token = std::env::var("NEXUS_DISCORD_TOKEN").unwrap_or_default();
-    let discord_api: Arc<dyn nexus_core::ports::outbound::system::discord_api_repository::DiscordApiRepository> =
-        Arc::new(crate::adapters::outbound::system::discord_api::ReqwestDiscordApiClient::new(discord_token));
+    let discord_api: Arc<
+        dyn nexus_core::ports::outbound::system::discord_api_repository::DiscordApiRepository,
+    > = Arc::new(
+        crate::adapters::outbound::system::discord_api::ReqwestDiscordApiClient::new(discord_token),
+    );
 
     // ── Game Portal : use cases ──
     let game_servers_uc: Arc<dyn ManageGameServersUseCase> = Arc::new(ManageGameServersService {
@@ -254,7 +293,9 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         ManageGameTemplatesService::new(game_template_repo.clone(), bot_config_repo.clone()),
     );
 
-    let api_key = std::env::var("NEXUS_API_KEY").ok().filter(|k| !k.is_empty());
+    let api_key = std::env::var("NEXUS_API_KEY")
+        .ok()
+        .filter(|k| !k.is_empty());
     let metrics_token = std::env::var("NEXUS_METRICS_TOKEN")
         .ok()
         .filter(|t| !t.is_empty());
@@ -267,9 +308,7 @@ pub async fn build_state() -> Result<AppState, Box<dyn std::error::Error>> {
         .filter(|g| !g.is_empty());
     match &guild_id {
         Some(g) => tracing::info!(guild_id = %g, "mono-serveur : verrou actif"),
-        None => tracing::warn!(
-            "PUBLIC_GUILD_ID absente — toutes les guildes sont acceptees"
-        ),
+        None => tracing::warn!("PUBLIC_GUILD_ID absente — toutes les guildes sont acceptees"),
     }
     if api_key.is_none() {
         tracing::warn!("NEXUS_API_KEY absente — API SANS auth (dev uniquement)");

@@ -140,11 +140,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     // le verdict. Le gate `suspicious_files_enabled` local evite un appel inutile
     // quand la detection est desactivee.
     if detector_config.suspicious_files_enabled && !msg.attachments.is_empty() {
-        let filenames: Vec<String> = msg
-            .attachments
-            .iter()
-            .map(|a| a.filename.clone())
-            .collect();
+        let filenames: Vec<String> = msg.attachments.iter().map(|a| a.filename.clone()).collect();
 
         let (base_opt, grpc_opt) = {
             let data = ctx.data.read().await;
@@ -487,9 +483,8 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         if adaptive_enabled {
             // Seuil >= 1 (un 0 activerait le slowmode des le 1er message) ;
             // secondes bornees a la limite Discord (21600).
-            let threshold =
-                (BaseApiClient::config_u64(&config, "adaptive_slowmode_threshold", 15).max(1))
-                    as usize;
+            let threshold = (BaseApiClient::config_u64(&config, "adaptive_slowmode_threshold", 15)
+                .max(1)) as usize;
             let slowmode_secs = BaseApiClient::config_u64(&config, "adaptive_slowmode_seconds", 5)
                 .clamp(1, 21600) as u16;
 

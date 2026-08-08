@@ -6,9 +6,12 @@ description = "API HTTP (axum) de la plateforme jeux Nexus — adapters + bootst
 
 [dependencies]
 nexus-core = { path = "../nexus-core" }
+nexus-proto = { path = "../nexus-proto" }
+tonic = { workspace = true }
 platform-common-api = { workspace = true }
 axum = { version = "0.8", features = ["multipart"] }
 tokio = { workspace = true }
+tokio-stream = "0.1"
 # Pile de middlewares HTTP — memes features que sentinel-api, pour que les
 # deux APIs offrent les memes garanties (CORS, compression, limite de corps,
 # request-id, trace). Nexus pilote Docker : il ne peut pas etre moins protege.
@@ -19,6 +22,7 @@ tracing-subscriber = { workspace = true }
 sqlx = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+async-stream = "0.3"
 async-trait = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }

@@ -3,11 +3,11 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::community::level_repository::LevelRepository;
 use sentinel_core::domain::entities::community::level::UserLevel;
 use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::domain::entities::community::progression_calc::StreakState;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::level_repository::LevelRepository;
 
 pub struct PgLevelRepository {
     pool: PgPool,

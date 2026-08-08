@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::community::embed_repository::EmbedRepository;
 use sentinel_core::domain::entities::community::embed::{Embed, EmbedField};
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::embed_repository::EmbedRepository;
 
 pub struct PgEmbedRepository {
     pool: PgPool,

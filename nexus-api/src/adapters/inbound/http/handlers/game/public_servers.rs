@@ -61,11 +61,7 @@ pub async fn public_servers(
     }
 
     let servers = state.game_servers_uc.list_for_guild(&guild_id).await?;
-    let templates = state
-        .game_template_repo
-        .list()
-        .await
-        .unwrap_or_default();
+    let templates = state.game_template_repo.list().await.unwrap_or_default();
 
     let out = servers
         .into_iter()

@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package nexus.game.v1;
+
+service GameServerService {
+  // Stream les logs d'un serveur conteneurisé en temps réel (Streaming gRPC).
+  rpc StreamLogs(StreamLogsRequest) returns (stream LogChunk);
+
+  // Stream les statistiques de ressources d'un serveur en temps réel.
+  rpc StreamStats(StreamStatsRequest) returns (stream ContainerStatsResponse);
+
+  // Exécute une commande RCON sur le serveur.
+  rpc ExecuteRcon(ExecuteRconRequest) returns (ExecuteRconResponse);
+}
+
+message StreamLogsRequest {
+  string server_id = 1;
+  uint32 tail_lines = 2;
+  bool follow = 3;
+}
+
+message LogChunk {
+  string server_id = 1;
+  string line = 2;
+  int64 timestamp_epoch_ms = 3;
+}
+
+message StreamStatsRequest {
+  string server_id = 1;
+}
+
+message ContainerStatsResponse {
+  string server_id = 1;
+  double cpu_percentage = 2;
+  uint64 memory_used_bytes = 3;
+  uint64 memory_limit_bytes = 4;
+  uint64 network_rx_bytes = 5;
+  uint64 network_tx_bytes = 6;
+}
+
+message ExecuteRconRequest {
+  string server_id = 1;
+  string command = 2;
+}
+
+message ExecuteRconResponse {
+  string server_id = 1;
+  string response = 2;
+  bool success = 3;
+}

@@ -56,11 +56,12 @@ pub async fn list_messages(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(q): Query<ListMessagesQuery>,
 ) -> Result<Json<ListMessagesResponse>, ApiError> {
-
     // Securite DoS : borne le limit. Sans plafond, un limit absent devient
     // `LIMIT NULL` en Postgres (= toute la table de messages) et un grand limit
     // rapatrie un volume enorme -> risque OOM. Defaut 500, max 2000.
-    let limit = Some(crate::adapters::inbound::http::helpers::normalize_in(q.limit, 500, 1, 2000));
+    let limit = Some(crate::adapters::inbound::http::helpers::normalize_in(
+        q.limit, 500, 1, 2000,
+    ));
     let offset = Some(q.offset.unwrap_or(0).max(0));
 
     let page = state
@@ -112,7 +113,6 @@ pub async fn bulk_delete(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<BulkDeleteDto>,
 ) -> Result<Json<BulkDeleteResponse>, ApiError> {
-
     let deleted = state
         .dataset_uc
         .bulk_delete(BulkDeleteCommand {

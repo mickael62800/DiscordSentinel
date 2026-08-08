@@ -714,14 +714,14 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     if let Some(ref welcome_msg) = welcome_posted {
         if let Ok(action_uuid) = uuid::Uuid::parse_str(&ticket_id) {
             let data = ctx.data.read().await;
-            if let Some(api) = data.get::<crate::shared::heartbeat::ApiClientKey>() {
-                let api_clone = std::sync::Arc::clone(api);
+            if let Some(grpc) = data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+                let grpc = std::sync::Arc::clone(grpc);
                 let guild_str = guild_id.to_string();
                 let ch_str = channel.id.to_string();
                 let msg_str = welcome_msg.id.to_string();
                 drop(data);
                 crate::sync::register_action_message(
-                    &api_clone,
+                    &grpc,
                     action_uuid,
                     crate::sync::kinds::TICKET,
                     &guild_str,

@@ -64,7 +64,9 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             continue;
         }
         let escalation_minutes = sentinel_core::domain::services::tickets::sla::effective_threshold(
-            sla_configs.get(&ticket.server).map(|c| c.escalation_minutes),
+            sla_configs
+                .get(&ticket.server)
+                .map(|c| c.escalation_minutes),
             DEFAULT_SLA_ESCALATION_MINUTES,
         );
 

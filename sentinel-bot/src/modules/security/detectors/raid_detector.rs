@@ -3,4 +3,5 @@
 
 use serenity::model::id::GuildId;
 
-pub type RaidDetector = sentinel_core::domain::services::security::raid_detector::RaidDetector<GuildId>;
+pub type RaidDetector =
+    sentinel_core::domain::services::security::raid_detector::RaidDetector<GuildId>;

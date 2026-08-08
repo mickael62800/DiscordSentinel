@@ -93,9 +93,7 @@ pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
     ));
     data.insert::<ConfigKey>(audit_config);
     data.insert::<WatchedUserIdsKey>(Arc::new(DashSet::new()));
-    data.insert::<role_card::RoleCardTrackerKey>(Arc::new(
-        role_card::RoleCardTracker::default(),
-    ));
+    data.insert::<role_card::RoleCardTrackerKey>(Arc::new(role_card::RoleCardTracker::default()));
 }
 
 // ── Commands registration ──
@@ -182,7 +180,9 @@ pub async fn detect_anomaly(
     let thresholds = anomaly_thresholds_for(ctx, guild_id).await;
     let (base, window_secs) = {
         let data = ctx.data.read().await;
-        let base = data.get::<crate::shared::grpc_client::GrpcClientKey>()?.clone();
+        let base = data
+            .get::<crate::shared::grpc_client::GrpcClientKey>()?
+            .clone();
         let window_secs = data
             .get::<ConfigKey>()
             .map(|c| c.anomaly_window_secs)
@@ -318,7 +318,10 @@ pub async fn log_admin_command(
     if !enabled {
         return;
     }
-    let channel_id = match config.get("command_log_channel_id").and_then(|v| v.parse::<u64>().ok()) {
+    let channel_id = match config
+        .get("command_log_channel_id")
+        .and_then(|v| v.parse::<u64>().ok())
+    {
         Some(id) if id > 0 => id,
         _ => return,
     };
@@ -334,7 +337,10 @@ pub async fn log_admin_command(
         .color(0x5865F2)
         .timestamp(serenity::model::Timestamp::now());
     let msg = serenity::builder::CreateMessage::new().embed(embed);
-    if let Err(e) = ChannelId::new(channel_id).send_message(&ctx.http, msg).await {
+    if let Err(e) = ChannelId::new(channel_id)
+        .send_message(&ctx.http, msg)
+        .await
+    {
         warn!(error = %e, "Echec log commande admin");
     }
 }

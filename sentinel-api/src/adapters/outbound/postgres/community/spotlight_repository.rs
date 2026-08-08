@@ -3,9 +3,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::adapters::outbound::postgres::pg_err;
-use sentinel_core::domain::entities::community::spotlight::{
-    Spotlight, UpsertSpotlightCommand,
-};
+use sentinel_core::domain::entities::community::spotlight::{Spotlight, UpsertSpotlightCommand};
 use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::outbound::community::spotlight_repository::SpotlightRepository;
 

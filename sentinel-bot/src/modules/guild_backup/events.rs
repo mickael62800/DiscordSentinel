@@ -107,7 +107,10 @@ async fn on_capture_requested(ctx: &Context, data: &serde_json::Value) {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_string())
         .unwrap_or_else(|| {
-            format!("Sauvegarde du {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"))
+            format!(
+                "Sauvegarde du {}",
+                chrono::Utc::now().format("%Y-%m-%d %H:%M")
+            )
         });
 
     let (Some(api), Some(grpc)) = (api(ctx).await, grpc(ctx).await) else {
@@ -140,14 +143,20 @@ async fn on_capture_requested(ctx: &Context, data: &serde_json::Value) {
             );
             enforce_quota(&grpc, &gid, config.snapshot_quota()).await;
         }
-        Err(e) => warn!(guild = %gid, error = %e, "guild_backup(event): stockage capture impossible"),
+        Err(e) => {
+            warn!(guild = %gid, error = %e, "guild_backup(event): stockage capture impossible")
+        }
     }
 }
 
 /// Elaguer les snapshots au-dela du quota configure (les plus anciens d'abord).
 /// Best-effort : chaque echec est logge sans interrompre. NB: l'API applique
 /// aussi son propre quota — celui-ci ne fait que resserrer si plus petit.
-async fn enforce_quota(grpc: &Arc<crate::shared::grpc_client::SentinelGrpcClient>, guild_id: &str, quota: u64) {
+async fn enforce_quota(
+    grpc: &Arc<crate::shared::grpc_client::SentinelGrpcClient>,
+    guild_id: &str,
+    quota: u64,
+) {
     if quota == 0 {
         return;
     }
@@ -166,7 +175,9 @@ async fn enforce_quota(grpc: &Arc<crate::shared::grpc_client::SentinelGrpcClient
     list.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     for stale in list.into_iter().skip(quota as usize) {
         match api_client::delete_snapshot(grpc, &stale.id).await {
-            Ok(()) => info!(guild = %guild_id, snapshot_id = %stale.id, "guild_backup(event): snapshot elague (quota)"),
+            Ok(()) => {
+                info!(guild = %guild_id, snapshot_id = %stale.id, "guild_backup(event): snapshot elague (quota)")
+            }
             Err(e) => {
                 warn!(guild = %guild_id, snapshot_id = %stale.id, error = %e, "guild_backup(event): elagage impossible")
             }
@@ -229,8 +240,12 @@ async fn on_restore_requested(ctx: &Context, data: &serde_json::Value) {
     // Persiste les re-attributions pour les membres absents (re-rolises au retour).
     if !report.pending_grants.is_empty() {
         match api_client::save_pending_roles(&grpc, &gid, &report.pending_grants).await {
-            Ok(n) => info!(guild = %gid, saved = n, "guild_backup(event): pending-roles enregistres"),
-            Err(e) => warn!(guild = %gid, error = %e, "guild_backup(event): enregistrement pending-roles impossible"),
+            Ok(n) => {
+                info!(guild = %gid, saved = n, "guild_backup(event): pending-roles enregistres")
+            }
+            Err(e) => {
+                warn!(guild = %gid, error = %e, "guild_backup(event): enregistrement pending-roles impossible")
+            }
         }
     }
 

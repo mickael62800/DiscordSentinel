@@ -24,7 +24,9 @@ impl ManageSystemLogsService {
 #[async_trait]
 impl ManageSystemLogsUseCase for ManageSystemLogsService {
     async fn list_logs(&self, filters: SystemLogFilters) -> Result<Vec<LogEntry>, DomainError> {
-        let limit = filters.limit.clamp(1, crate::application::validation::BATCH_LIMIT_MAX);
+        let limit = filters
+            .limit
+            .clamp(1, crate::application::validation::BATCH_LIMIT_MAX);
         self.repo
             .find_filtered(
                 filters.category.as_deref(),

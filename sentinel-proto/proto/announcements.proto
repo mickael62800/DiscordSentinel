@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package sentinel.announcements.v1;
+
+// Service announcements : callbacks internes du bot apres publication d'une
+// annonce programmee (resultat par salon + clics de boutons). Wrappe la partie
+// « report » de `ManageAnnouncementsUseCase` (la preparation/planification reste
+// cote worker/API). Ces deux RPC remplacent les endpoints HTTP
+// `/api/announcements/internal/...`.
+service AnnouncementsService {
+  // Apres publication par le bot : resultat de chaque salon (+ next_run_at cote serveur).
+  rpc RecordRunResult(RecordRunResultRequest) returns (AnnouncementsAck);
+  // Clic sur un bouton interactif d'une annonce.
+  rpc RecordButtonClick(RecordButtonClickRequest) returns (AnnouncementsAck);
+}
+
+message AnnouncementsAck {}
+
+message ChannelPostResult {
+  string channel_id = 1;
+  optional string message_id = 2;
+  bool success = 3;
+  optional string error = 4;
+}
+
+message RecordRunResultRequest {
+  // UUID du run.
+  string run_id = 1;
+  repeated ChannelPostResult channels_posted = 2;
+}
+
+message RecordButtonClickRequest {
+  // UUID de l'annonce.
+  string announcement_id = 1;
+  // UUID du run (optionnel).
+  optional string run_id = 2;
+  string user_id = 3;
+  optional string user_name = 4;
+  string button_custom_id = 5;
+  optional string button_label = 6;
+}

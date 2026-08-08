@@ -23,10 +23,14 @@ impl ManageEmbedsService {
             return Err(DomainError::ValidationError("Le nom est requis".into()));
         }
         if input.name.chars().count() > 100 {
-            return Err(DomainError::ValidationError("Nom trop long (max 100)".into()));
+            return Err(DomainError::ValidationError(
+                "Nom trop long (max 100)".into(),
+            ));
         }
         if input.title.chars().count() > 256 {
-            return Err(DomainError::ValidationError("Titre trop long (max 256)".into()));
+            return Err(DomainError::ValidationError(
+                "Titre trop long (max 256)".into(),
+            ));
         }
         if input.description.chars().count() > 4000 {
             return Err(DomainError::ValidationError(
@@ -139,7 +143,11 @@ impl ManageEmbedsUseCase for ManageEmbedsService {
                 "L'embed est vide : ajoute au moins un titre, une description, une image ou un champ".into(),
             ));
         }
-        Ok(RenderedEmbedPost::from_embed(&e, channel_id.to_string(), None))
+        Ok(RenderedEmbedPost::from_embed(
+            &e,
+            channel_id.to_string(),
+            None,
+        ))
     }
 
     async fn prepare_edit(&self, id: Uuid) -> Result<RenderedEmbedPost, DomainError> {

@@ -16,8 +16,7 @@ pub trait ManageSpotlightUseCase: Send + Sync {
 
     async fn list(&self, guild_id: &str, limit: i64) -> Result<Vec<Spotlight>, DomainError>;
 
-    async fn designate(&self, cmd: UpsertSpotlightCommand)
-        -> Result<Spotlight, DomainError>;
+    async fn designate(&self, cmd: UpsertSpotlightCommand) -> Result<Spotlight, DomainError>;
 
     async fn delete(&self, id: Uuid) -> Result<(), DomainError>;
 }

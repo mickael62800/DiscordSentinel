@@ -345,24 +345,14 @@ async fn handle_ticket_closed_from_web(ctx: &Context, action_id: &str) {
     };
 
     // 1. Recupere le mapping discord_action_messages pour cet action_id.
-    let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
-        Some(a) => a.clone(),
-        None => return,
+    let grpc = {
+        let data = ctx.data.read().await;
+        match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
+            None => return,
+        }
     };
-    drop(data);
-
-    #[derive(serde::Deserialize)]
-    struct Mapping {
-        kind: String,
-        guild_id: String,
-        channel_id: String,
-        message_id: String,
-    }
-    let mappings: Vec<Mapping> = match api
-        .get_json(&format!("/api/discord-messages/{action_id}"))
-        .await
-    {
+    let mappings = match crate::sync::list_action_messages(&grpc, action_id).await {
         Ok(list) => list,
         Err(e) => {
             warn!(error = %e, action_id, "Echec fetch mapping discord_action_messages");
@@ -610,7 +600,8 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
             if let Some(id) = ticket::extract_ticket_id_from_topic(topic) {
                 if id == ticket_id {
                     let data_lock = ctx.data.read().await;
-                    if let Some(grpc) = data_lock.get::<crate::shared::grpc_client::GrpcClientKey>() {
+                    if let Some(grpc) = data_lock.get::<crate::shared::grpc_client::GrpcClientKey>()
+                    {
                         let api = ApiClient::new(grpc.clone());
                         if let Ok(detail) = api.get_ticket(ticket_id).await {
                             if let Some(last_msg) = detail.messages.last() {

@@ -7,8 +7,6 @@ use serenity::model::permissions::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info};
 
-use crate::shared::heartbeat::ApiClientKey;
-
 /// Phase 5G — Serialise un PermissionOverwrite vers JSON pour persistance.
 fn serialize_overwrite(channel_id: u64, ow: &Option<PermissionOverwrite>) -> serde_json::Value {
     match ow {
@@ -144,14 +142,17 @@ impl LockdownManager {
             .iter()
             .map(|(ch, ow)| serialize_overwrite(*ch, ow))
             .collect();
-        if let Some(base) = ctx.data.read().await.get::<ApiClientKey>() {
-            let body = serde_json::json!({
-                "guild_id": guild_id.to_string(),
-                "saved_states": saved_states_json,
-                "duration_secs": persist_duration_secs,
-            });
-            base.post_fire_and_forget("/api/security/lockdown", &body)
-                .await;
+        if let Some(sec_api) = ctx.data.read().await.get::<super::super::SecurityApiKey>() {
+            if let Err(e) = sec_api
+                .mark_lockdown(
+                    &guild_id.to_string(),
+                    serde_json::Value::Array(saved_states_json),
+                    persist_duration_secs as i64,
+                )
+                .await
+            {
+                tracing::warn!(error = %e, "Echec persistance lockdown (best-effort)");
+            }
         }
 
         self.active.insert(guild_id, (Instant::now(), saved_states));

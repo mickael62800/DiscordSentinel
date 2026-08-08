@@ -17,9 +17,9 @@ use crate::adapters::outbound::postgres::audit::watched_user_repository::PgWatch
 use crate::adapters::outbound::postgres::community::daily_activity_repository::PgDailyActivityRepository;
 use crate::adapters::outbound::postgres::community::discord_role_repository::PgDiscordRoleRepository;
 use crate::adapters::outbound::postgres::community::level_repository::PgLevelRepository;
-use crate::adapters::outbound::postgres::community::sponsorship_repository::PgSponsorshipRepository;
 use crate::adapters::outbound::postgres::community::member_repository::PgMemberRepository;
 use crate::adapters::outbound::postgres::community::role_panel_repository::PgRolePanelRepository;
+use crate::adapters::outbound::postgres::community::sponsorship_repository::PgSponsorshipRepository;
 use crate::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository;
 use crate::adapters::outbound::postgres::community::voice_channel_repository::PgVoiceChannelRepository;
 use crate::adapters::outbound::postgres::community::welcome_config_repository::PgWelcomeConfigRepository;
@@ -36,6 +36,7 @@ use crate::adapters::outbound::postgres::system::bot_config_repository::PgBotCon
 use crate::adapters::outbound::postgres::system::guild_repository::PgGuildRepository;
 use crate::adapters::outbound::postgres::system::ticket_repository::PgTicketRepository;
 use crate::adapters::outbound::redis_cache::RedisCache;
+use crate::config::AppConfig;
 use sentinel_core::application::ai::analyze_image_service::AnalyzeImageService;
 use sentinel_core::application::ai::analyze_message_service::AnalyzeMessageService;
 use sentinel_core::application::audit::manage_audit_logs_service::ManageAuditLogsService;
@@ -54,7 +55,6 @@ use sentinel_core::application::moderation::manage_rules_service::ManageRulesSer
 use sentinel_core::application::moderation::manage_strikes_service::ManageStrikesService;
 use sentinel_core::application::system::export_service::ExportService;
 use sentinel_core::application::system::manage_tickets_service::ManageTicketsService;
-use crate::config::AppConfig;
 
 /// Construit l'etat complet de l'application (tous les repos + services).
 /// Consomme le pool et le client Redis (via clones).
@@ -141,10 +141,13 @@ pub async fn build_app_state(
             pg_pool.clone(),
         ),
     );
-    let dataset_uc: Arc<dyn sentinel_core::ports::inbound::ai::manage_dataset::ManageDatasetUseCase> =
-        Arc::new(
-            sentinel_core::application::ai::manage_dataset_service::ManageDatasetService::new(dataset_repo),
-        );
+    let dataset_uc: Arc<
+        dyn sentinel_core::ports::inbound::ai::manage_dataset::ManageDatasetUseCase,
+    > = Arc::new(
+        sentinel_core::application::ai::manage_dataset_service::ManageDatasetService::new(
+            dataset_repo,
+        ),
+    );
 
     // File de jobs IA : repo Postgres (SQL ai_jobs) + use case (validation
     // job_type/guild_id). Le handler ne fait que parse/map.
@@ -153,10 +156,13 @@ pub async fn build_app_state(
             pg_pool.clone(),
         ),
     );
-    let ai_jobs_uc: Arc<dyn sentinel_core::ports::inbound::ai::manage_ai_jobs::ManageAiJobsUseCase> =
-        Arc::new(
-            sentinel_core::application::ai::manage_ai_jobs_service::ManageAiJobsService::new(ai_job_repo),
-        );
+    let ai_jobs_uc: Arc<
+        dyn sentinel_core::ports::inbound::ai::manage_ai_jobs::ManageAiJobsUseCase,
+    > = Arc::new(
+        sentinel_core::application::ai::manage_ai_jobs_service::ManageAiJobsService::new(
+            ai_job_repo,
+        ),
+    );
 
     let rules_uc = Arc::new(ManageRulesService::new(rule_repo.clone(), cache.clone()));
     let infractions_uc = Arc::new(ManageInfractionsService::new(infraction_repo.clone()));
@@ -188,13 +194,11 @@ pub async fn build_app_state(
     // membre du mois, nouvelles du site. Quatre concepts distincts mais un
     // seul public : la page de l'espace membre.
     let lfg_uc = Arc::new(
-        sentinel_core::application::community::manage_lfg_service::ManageLfgService::new(
-            Arc::new(
-                crate::adapters::outbound::postgres::community::lfg_repository::PgLfgRepository::new(
-                    pg_pool.clone(),
-                ),
+        sentinel_core::application::community::manage_lfg_service::ManageLfgService::new(Arc::new(
+            crate::adapters::outbound::postgres::community::lfg_repository::PgLfgRepository::new(
+                pg_pool.clone(),
             ),
-        ),
+        )),
     );
     let polls_uc = Arc::new(
         sentinel_core::application::community::manage_polls_service::ManagePollsService::new(
@@ -317,7 +321,9 @@ pub async fn build_app_state(
             moderation_repo.clone(),
         )
         .with_audit_logs_uc(audit_logs_uc.clone()
-            as Arc<dyn sentinel_core::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase>),
+            as Arc<
+                dyn sentinel_core::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase,
+            >),
     );
     // Note : la creation de moderation_uc est differee plus bas pour pouvoir
     // injecter strikes_uc via with_strikes_uc (log_action_with_strike).
@@ -344,13 +350,36 @@ pub async fn build_app_state(
     let analytics_repo = Arc::new(PgAnalyticsRepository::new(pg_pool.clone()));
     let daily_activity_repo = Arc::new(PgDailyActivityRepository::new(pg_pool.clone()));
     let level_repo = Arc::new(PgLevelRepository::new(pg_pool.clone()));
-    let levels_uc = Arc::new(ManageLevelsService::new(level_repo, bot_config_repo.clone()));
+    let levels_uc = Arc::new(ManageLevelsService::new(
+        level_repo,
+        bot_config_repo.clone(),
+    ));
     let announcement_repo = Arc::new(crate::adapters::outbound::postgres::community::announcement_repository::PgAnnouncementRepository::new(pg_pool.clone()));
     let announcements_uc: Arc<dyn sentinel_core::ports::inbound::community::manage_announcements::ManageAnnouncementsUseCase> = Arc::new(sentinel_core::application::community::manage_announcements_service::ManageAnnouncementsService::new(announcement_repo, bot_config_repo.clone()));
-    let embed_repo = Arc::new(crate::adapters::outbound::postgres::community::embed_repository::PgEmbedRepository::new(pg_pool.clone()));
-    let embeds_uc: Arc<dyn sentinel_core::ports::inbound::community::manage_embeds::ManageEmbedsUseCase> = Arc::new(sentinel_core::application::community::manage_embeds_service::ManageEmbedsService::new(embed_repo));
-    let idea_repo = Arc::new(crate::adapters::outbound::postgres::community::idea_repository::PgIdeaRepository::new(pg_pool.clone()));
-    let ideas_uc: Arc<dyn sentinel_core::ports::inbound::community::manage_ideas::ManageIdeasUseCase> = Arc::new(sentinel_core::application::community::manage_ideas_service::ManageIdeasService::new(idea_repo));
+    let embed_repo = Arc::new(
+        crate::adapters::outbound::postgres::community::embed_repository::PgEmbedRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let embeds_uc: Arc<
+        dyn sentinel_core::ports::inbound::community::manage_embeds::ManageEmbedsUseCase,
+    > = Arc::new(
+        sentinel_core::application::community::manage_embeds_service::ManageEmbedsService::new(
+            embed_repo,
+        ),
+    );
+    let idea_repo = Arc::new(
+        crate::adapters::outbound::postgres::community::idea_repository::PgIdeaRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let ideas_uc: Arc<
+        dyn sentinel_core::ports::inbound::community::manage_ideas::ManageIdeasUseCase,
+    > = Arc::new(
+        sentinel_core::application::community::manage_ideas_service::ManageIdeasService::new(
+            idea_repo,
+        ),
+    );
     let confession_repo = Arc::new(crate::adapters::outbound::postgres::community::confession_repository::PgConfessionRepository::new(pg_pool.clone()));
     let confessions_uc: Arc<
         dyn sentinel_core::ports::inbound::community::manage_confessions::ManageConfessionsUseCase,
@@ -461,7 +490,6 @@ pub async fn build_app_state(
         ),
     );
 
-
     // Sauvegarde / restauration de serveur (guild_backup) : repo + use case.
     let snapshot_repo: Arc<dyn sentinel_core::ports::outbound::guild_backup::snapshot_repository::SnapshotRepository> =
         Arc::new(
@@ -489,37 +517,29 @@ pub async fn build_app_state(
             ),
         );
 
-    // Administrateur tournant : repo + use case.
-    let rotation_repo: Arc<dyn sentinel_core::ports::outbound::system::admin_rotation_repository::AdminRotationRepository> =
-        Arc::new(crate::adapters::outbound::postgres::system::admin_rotation_repository::PgAdminRotationRepository::new(pg_pool.clone()));
-    let rotation_uc: Arc<
-        dyn sentinel_core::ports::inbound::system::manage_rotation::ManageRotationUseCase,
+    // Bans IP (panel securite) : repo DB + file-shim host + reader fail2ban.
+    let ip_ban_repo: Arc<
+        dyn sentinel_core::ports::outbound::system::ip_ban_repository::IpBanRepository,
     > = Arc::new(
-        sentinel_core::application::system::manage_rotation_service::ManageRotationService::new(
-            rotation_repo.clone(),
+        crate::adapters::outbound::postgres::system::ip_ban_repository::PgIpBanRepository::new(
+            pg_pool.clone(),
         ),
     );
-
-    // Bans IP (panel securite) : repo DB + file-shim host + reader fail2ban.
-    let ip_ban_repo: Arc<dyn sentinel_core::ports::outbound::system::ip_ban_repository::IpBanRepository> =
-        Arc::new(
-            crate::adapters::outbound::postgres::system::ip_ban_repository::PgIpBanRepository::new(
-                pg_pool.clone(),
-            ),
-        );
-    let host_ban_queue: Arc<dyn sentinel_core::ports::outbound::system::host_ban_queue::HostBanQueue> =
-        Arc::new(crate::adapters::outbound::host_security::ban_queue::FileBanQueue::new());
+    let host_ban_queue: Arc<
+        dyn sentinel_core::ports::outbound::system::host_ban_queue::HostBanQueue,
+    > = Arc::new(crate::adapters::outbound::host_security::ban_queue::FileBanQueue::new());
     let fail2ban_reader: Arc<
         dyn sentinel_core::ports::outbound::system::host_ban_queue::Fail2banStatusReader,
     > = Arc::new(crate::adapters::outbound::host_security::fail2ban::Fail2banFileReader::new());
-    let ip_bans_uc: Arc<dyn sentinel_core::ports::inbound::system::manage_ip_bans::ManageIpBansUseCase> =
-        Arc::new(
-            sentinel_core::application::system::manage_ip_bans_service::ManageIpBansService::new(
-                ip_ban_repo,
-                host_ban_queue,
-                fail2ban_reader,
-            ),
-        );
+    let ip_bans_uc: Arc<
+        dyn sentinel_core::ports::inbound::system::manage_ip_bans::ManageIpBansUseCase,
+    > = Arc::new(
+        sentinel_core::application::system::manage_ip_bans_service::ManageIpBansService::new(
+            ip_ban_repo,
+            host_ban_queue,
+            fail2ban_reader,
+        ),
+    );
 
     // Sondes de securite host (JSON cron) : reader fichier + use case pass-through.
     let host_probe_reader: Arc<
@@ -553,37 +573,58 @@ pub async fn build_app_state(
     let oauth_session_repo: Arc<dyn sentinel_core::ports::outbound::system::oauth_session_repository::OAuthSessionRepository> =
         Arc::new(crate::adapters::outbound::postgres::system::oauth_session_repository::PgOAuthSessionRepository::new(pg_pool.clone()));
     let oauth_uc: Arc<dyn sentinel_core::ports::inbound::system::manage_oauth::ManageOAuthUseCase> =
-        Arc::new(sentinel_core::application::system::manage_oauth_service::ManageOAuthService::new(
-            oauth_session_repo,
-        ));
+        Arc::new(
+            sentinel_core::application::system::manage_oauth_service::ManageOAuthService::new(
+                oauth_session_repo,
+            ),
+        );
 
     // Quarantaine de securite : repo Postgres (SQL security_quarantine_pending) +
     // use case (calcul du delai avant kick). Le handler ne fait que parse/RBAC/map.
     let quarantine_repo: Arc<dyn sentinel_core::ports::outbound::system::quarantine_repository::QuarantineRepository> =
         Arc::new(crate::adapters::outbound::postgres::system::quarantine_repository::PgQuarantineRepository::new(pg_pool.clone()));
-    let quarantine_uc: Arc<dyn sentinel_core::ports::inbound::system::manage_quarantine::ManageQuarantineUseCase> =
-        Arc::new(sentinel_core::application::system::manage_quarantine_service::ManageQuarantineService::new(
+    let quarantine_uc: Arc<
+        dyn sentinel_core::ports::inbound::system::manage_quarantine::ManageQuarantineUseCase,
+    > = Arc::new(
+        sentinel_core::application::system::manage_quarantine_service::ManageQuarantineService::new(
             quarantine_repo,
-        ));
+        ),
+    );
 
     // Lockdown de securite : repo Postgres (SQL security_lockdown_active) + use
     // case (calcul de l'expiration). Le handler ne fait que parse/RBAC/map.
-    let lockdown_repo: Arc<dyn sentinel_core::ports::outbound::system::lockdown_repository::LockdownRepository> =
-        Arc::new(crate::adapters::outbound::postgres::system::lockdown_repository::PgLockdownRepository::new(pg_pool.clone()));
-    let lockdown_uc: Arc<dyn sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCase> =
-        Arc::new(sentinel_core::application::system::manage_lockdown_service::ManageLockdownService::new(
+    let lockdown_repo: Arc<
+        dyn sentinel_core::ports::outbound::system::lockdown_repository::LockdownRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::system::lockdown_repository::PgLockdownRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let lockdown_uc: Arc<
+        dyn sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCase,
+    > = Arc::new(
+        sentinel_core::application::system::manage_lockdown_service::ManageLockdownService::new(
             lockdown_repo,
-        ));
+        ),
+    );
 
     // Slowmode de securite manuel : repo Postgres (SQL security_slowmode_active) +
     // use case (calcul de l'expiration). Le handler ne fait que parse/RBAC/map.
     // Distinct de l'automod adaptatif (moderation).
-    let slowmode_repo: Arc<dyn sentinel_core::ports::outbound::system::slowmode_repository::SlowmodeRepository> =
-        Arc::new(crate::adapters::outbound::postgres::system::slowmode_repository::PgSlowmodeRepository::new(pg_pool.clone()));
-    let slowmode_uc: Arc<dyn sentinel_core::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCase> =
-        Arc::new(sentinel_core::application::system::manage_slowmode_service::ManageSlowmodeService::new(
+    let slowmode_repo: Arc<
+        dyn sentinel_core::ports::outbound::system::slowmode_repository::SlowmodeRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::system::slowmode_repository::PgSlowmodeRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let slowmode_uc: Arc<
+        dyn sentinel_core::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCase,
+    > = Arc::new(
+        sentinel_core::application::system::manage_slowmode_service::ManageSlowmodeService::new(
             slowmode_repo,
-        ));
+        ),
+    );
 
     // Règles d'alerte de supervision : repo Postgres (SQL alert_rules) + use
     // case (invariants sévérité/cooldown). Le handler ne fait que RBAC/mapper.
@@ -618,14 +659,16 @@ pub async fn build_app_state(
         Arc::new(crate::adapters::outbound::system::docker_host::BollardDockerHost);
 
     // Cert TLS + GeoIP (infra externe : fichier/openssl + http ip-api).
-    let tls_cert_reader: Arc<dyn sentinel_core::ports::outbound::system::tls_cert_reader::TlsCertReader> =
-        Arc::new(crate::adapters::outbound::host_security::tls_cert::FileTlsCertReader::new());
-    let tls_cert_uc: Arc<dyn sentinel_core::ports::inbound::system::read_tls_cert::ReadTlsCertUseCase> =
-        Arc::new(
-            sentinel_core::application::system::read_tls_cert_service::ReadTlsCertService::new(
-                tls_cert_reader,
-            ),
-        );
+    let tls_cert_reader: Arc<
+        dyn sentinel_core::ports::outbound::system::tls_cert_reader::TlsCertReader,
+    > = Arc::new(crate::adapters::outbound::host_security::tls_cert::FileTlsCertReader::new());
+    let tls_cert_uc: Arc<
+        dyn sentinel_core::ports::inbound::system::read_tls_cert::ReadTlsCertUseCase,
+    > = Arc::new(
+        sentinel_core::application::system::read_tls_cert_service::ReadTlsCertService::new(
+            tls_cert_reader,
+        ),
+    );
     let geoip_lookup: Arc<dyn sentinel_core::ports::outbound::system::geoip_lookup::GeoIpLookup> =
         Arc::new(crate::adapters::outbound::geoip::IpApiGeoIpLookup::new());
     let geoip_uc: Arc<dyn sentinel_core::ports::inbound::system::lookup_geoip::LookupGeoIpUseCase> =
@@ -634,7 +677,6 @@ pub async fn build_app_state(
                 geoip_lookup,
             ),
         );
-
 
     // Sync Discord <-> Web (Phase 1 — cf. SYNC_DISCORD_WEB_DESIGN.md).
     // Repo outbound + use case inbound : on injecte uniquement le use
@@ -688,7 +730,6 @@ pub async fn build_app_state(
             modstats_repo.clone(),
         ),
     );
-
 
     // ── Ban en sursis (moderation) ──
     let sursis_repo: Arc<
@@ -754,7 +795,6 @@ pub async fn build_app_state(
         tickets_uc: tickets_uc.clone(),
         system_logs_uc: system_logs_uc.clone(),
         server_events_uc: server_events_uc.clone(),
-        rotation_uc: rotation_uc.clone(),
         reset_guild_uc: reset_guild_uc.clone(),
         bot_persistence_uc: bot_persistence_uc.clone(),
         alert_rules_uc: alert_rules_uc.clone(),

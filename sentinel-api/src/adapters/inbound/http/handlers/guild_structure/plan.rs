@@ -20,7 +20,6 @@ use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 
-
 // ── Lecture de l'existant ──
 
 /// Un salon du serveur, tel qu'affiche par le constructeur web.
@@ -146,7 +145,6 @@ pub async fn apply_plan(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<ApplyPlanRequest>,
 ) -> Result<Json<ApplyPlanResponse>, ApiError> {
-
     let plan = ChannelPlan {
         items: body
             .items

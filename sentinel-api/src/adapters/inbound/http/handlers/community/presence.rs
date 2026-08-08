@@ -104,11 +104,13 @@ async fn presence_dto(
 ) -> Result<Json<PresenceDto>, ApiError> {
     ensure_guild_id(&guild_id)?;
 
-    let presence = state
-        .presence_uc
-        .voice(&guild_id)
-        .await?
-        .map(|p| if inclure_restreints { p } else { p.sans_restreints() });
+    let presence = state.presence_uc.voice(&guild_id).await?.map(|p| {
+        if inclure_restreints {
+            p
+        } else {
+            p.sans_restreints()
+        }
+    });
     let text = state
         .presence_uc
         .text_activity(&guild_id, TEXT_CHANNELS)

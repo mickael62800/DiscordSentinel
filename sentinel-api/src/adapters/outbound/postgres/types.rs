@@ -39,7 +39,6 @@ impl From<ModerationGravity> for PgModerationGravity {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, sqlx::Type)]
 #[sqlx(type_name = "voice_channel_kind", rename_all = "lowercase")]
 pub enum PgVoiceChannelKind {

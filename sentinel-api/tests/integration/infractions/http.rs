@@ -16,12 +16,12 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use sentinel_core::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
 use sentinel_core::domain::enums::moderation::action::Action;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_core::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use test_helpers::build_test_state_infractions;
 
 // ══════════════════════════════════════════════════════════

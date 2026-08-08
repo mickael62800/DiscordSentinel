@@ -149,7 +149,10 @@ fn transfer_rejects_amount_above_historical_cap() {
 #[test]
 fn transfer_refuses_insufficient_balance_explicitly() {
     let err = validate_transfer("u1", "u2", 101, 100).unwrap_err();
-    assert!(matches!(err, crate::domain::errors::DomainError::Validation(_)));
+    assert!(matches!(
+        err,
+        crate::domain::errors::DomainError::Validation(_)
+    ));
 }
 
 #[test]

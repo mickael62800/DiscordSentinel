@@ -15,8 +15,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio::time::{timeout, Duration};
 
-use nexus_core::ports::outbound::game::rcon_client::{RconClient, RconConnectionParams, RconResponse};
 use nexus_core::domain::errors::DomainError;
+use nexus_core::ports::outbound::game::rcon_client::{
+    RconClient, RconConnectionParams, RconResponse,
+};
 
 const PKT_TYPE_LOGIN: i32 = 3;
 const PKT_TYPE_COMMAND: i32 = 2;

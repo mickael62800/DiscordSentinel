@@ -29,9 +29,7 @@ impl ManageSpotlightService {
         Self { repo }
     }
 
-    fn sanitize(
-        mut cmd: UpsertSpotlightCommand,
-    ) -> Result<UpsertSpotlightCommand, DomainError> {
+    fn sanitize(mut cmd: UpsertSpotlightCommand) -> Result<UpsertSpotlightCommand, DomainError> {
         if cmd.user_id.trim().is_empty() {
             return Err(DomainError::ValidationError("membre obligatoire".into()));
         }
@@ -49,7 +47,10 @@ impl ManageSpotlightService {
         }
 
         cmd.username = cmd.username.trim().to_string();
-        cmd.avatar = cmd.avatar.map(|a| a.trim().to_string()).filter(|a| !a.is_empty());
+        cmd.avatar = cmd
+            .avatar
+            .map(|a| a.trim().to_string())
+            .filter(|a| !a.is_empty());
 
         // Periode absente = mois courant, le cas de loin le plus frequent.
         cmd.period = Some(match cmd.period.map(|p| p.trim().to_string()) {
@@ -96,10 +97,7 @@ impl ManageSpotlightUseCase for ManageSpotlightService {
         self.repo.list(guild_id, limit.clamp(1, MAX_LIMIT)).await
     }
 
-    async fn designate(
-        &self,
-        cmd: UpsertSpotlightCommand,
-    ) -> Result<Spotlight, DomainError> {
+    async fn designate(&self, cmd: UpsertSpotlightCommand) -> Result<Spotlight, DomainError> {
         self.repo.upsert(&Self::sanitize(cmd)?).await
     }
 

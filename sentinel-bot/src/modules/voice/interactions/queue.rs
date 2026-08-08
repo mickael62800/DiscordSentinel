@@ -266,8 +266,12 @@ async fn handle_queue_accept(ctx: &Context, component: &ComponentInteraction) {
         })
         .unwrap_or(false);
     if !in_queue {
-        super::respond_ephemeral(ctx, component, "Ce membre n'est pas dans la file d'attente.")
-            .await;
+        super::respond_ephemeral(
+            ctx,
+            component,
+            "Ce membre n'est pas dans la file d'attente.",
+        )
+        .await;
         return;
     }
 

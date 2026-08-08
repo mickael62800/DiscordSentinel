@@ -16,11 +16,11 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::bootstrap::state::CommunityState;
+use axum::Extension;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::community::manage_announcements::{
     CreateAnnouncementCommand, RenderedAnnouncement, UpdateAnnouncementCommand,
 };
-use axum::Extension;
-use sentinel_core::domain::errors::DomainError;
 
 const ANNOUNCEMENTS_BOT: &str = "announcements";
 

@@ -4,8 +4,8 @@
 
 pub mod adaptive_slowmode;
 pub mod insult;
-pub mod night_mode;
 pub mod link;
+pub mod night_mode;
 pub mod phishing;
 pub mod spam;
 pub mod unicode;

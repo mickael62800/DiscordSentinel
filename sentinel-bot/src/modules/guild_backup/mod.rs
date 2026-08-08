@@ -28,7 +28,6 @@ use serenity::all::{
 };
 use tracing::warn;
 
-
 const CONFIRM_PREFIX: &str = "gbackup:confirm:";
 const CANCEL_ID: &str = "gbackup:cancel";
 /// Suffixes du `custom_id` de confirmation encodant le mode wipe. Le custom_id
@@ -399,8 +398,7 @@ async fn cmd_preview(
     // Snapshot -> ensembles de noms.
     let snap_roles: HashSet<String> = snapshot.roles.iter().map(|r| r.name.clone()).collect();
     let snap_cats: HashSet<String> = snapshot.categories.iter().map(|c| c.name.clone()).collect();
-    let snap_chans: HashSet<String> =
-        snapshot.channels.iter().map(|c| c.name.clone()).collect();
+    let snap_chans: HashSet<String> = snapshot.channels.iter().map(|c| c.name.clone()).collect();
 
     let (roles_new, roles_reused) = count(&snap_roles, &role_names);
     let (cats_new, cats_reused) = count(&snap_cats, &cat_names);
@@ -675,10 +673,7 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         ));
     }
     if let Some(ok) = report.icon_restored {
-        txt.push_str(&format!(
-            "\nIcone : {}.",
-            if ok { "ok" } else { "echec" }
-        ));
+        txt.push_str(&format!("\nIcone : {}.", if ok { "ok" } else { "echec" }));
     }
     if !report.notes.is_empty() {
         txt.push_str("\n\n⚠️ Notes : ");

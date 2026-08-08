@@ -222,10 +222,8 @@ impl ManageMembersUseCase for ManageMembersService {
         &self,
         guild_id: &str,
         days: i32,
-    ) -> Result<
-        Vec<crate::domain::entities::community::milestone::JoinAnniversary>,
-        DomainError,
-    > {
+    ) -> Result<Vec<crate::domain::entities::community::milestone::JoinAnniversary>, DomainError>
+    {
         // Fenetre bornee : au-dela de deux mois, ce ne sont plus des
         // « anniversaires a venir » mais un annuaire.
         self.member_repo

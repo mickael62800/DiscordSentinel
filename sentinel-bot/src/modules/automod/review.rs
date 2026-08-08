@@ -318,52 +318,39 @@ async fn create_review_in_api(
         Action::Ban => "ban",
         Action::None => return None,
     };
-    let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
-        Some(a) => a.clone(),
-        None => return None,
+    let grpc = {
+        let data = ctx.data.read().await;
+        match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
+            None => return None,
+        }
     };
-    drop(data);
+    let review_api = super::api_client::ApiClient::new(grpc);
 
-    #[derive(serde::Serialize)]
-    struct CreateBody<'a> {
-        guild_id: &'a str,
-        channel_id: &'a str,
-        message_id: &'a str,
-        user_id: &'a str,
-        user_name: &'a str,
-        content_preview: &'a str,
-        suggested_action: &'a str,
-        score: f64,
-        reason: &'a str,
-        flags: serde_json::Value,
-        already_sanctioned: bool,
-    }
-    #[derive(serde::Deserialize)]
-    struct CreateResp {
-        id: String,
-    }
-
-    let body = CreateBody {
-        guild_id,
-        channel_id,
-        message_id,
-        user_id,
-        user_name,
-        content_preview,
-        suggested_action: suggested_str,
-        score,
-        reason,
-        flags: serde_json::json!({
-            "spam": flags.spam,
-            "insult": flags.insult,
-            "link": flags.link,
-            "phishing": flags.phishing,
-        }),
-        already_sanctioned,
-    };
-
-    let resp: Result<CreateResp, _> = api.post_json("/api/automod/reviews", &body).await;
+    // Carte 1-clic (hors mode vote) : pas de `voting_deadline`, pas d'agregation.
+    let resp = review_api
+        .create_review(super::api_client::CreateReviewParams {
+            guild_id,
+            channel_id,
+            message_id,
+            user_id,
+            user_name,
+            content_preview,
+            suggested_action: suggested_str,
+            score,
+            reason,
+            flags: serde_json::json!({
+                "spam": flags.spam,
+                "insult": flags.insult,
+                "link": flags.link,
+                "phishing": flags.phishing,
+            }),
+            voting_deadline: None,
+            aggregate: false,
+            aggregate_window_minutes: None,
+            already_sanctioned,
+        })
+        .await;
     match resp {
         Ok(r) => Some(r.id),
         Err(e) => {
@@ -386,15 +373,15 @@ async fn register_review_mapping(
     let Ok(uuid) = uuid::Uuid::parse_str(review_id) else {
         return;
     };
-    let api = {
+    let grpc = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
+        match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
             None => return,
         }
     };
     crate::sync::register_action_message(
-        &api,
+        &grpc,
         uuid,
         crate::sync::kinds::AUTOMOD_REVIEW,
         guild_id,
@@ -778,23 +765,18 @@ pub(super) async fn handle_review_button(
     // close. Les boutons 1-clic ne portent pas le review_id -> on le retrouve par
     // le message d'infraction. No-op si aucune discussion.
     {
-        let api = {
+        let grpc = {
             let data = ctx.data.read().await;
-            data.get::<ApiClientKey>().cloned()
+            data.get::<crate::shared::grpc_client::GrpcClientKey>()
+                .cloned()
         };
-        if let Some(api) = api {
-            #[derive(serde::Deserialize)]
-            struct R {
-                id: String,
-                user_id: String,
-            }
-            if let Ok(Some(r)) = api
-                .get_json::<Option<R>>(&format!(
-                    "/api/automod/{guild_id}/reviews/by-message/{message_id_str}"
-                ))
+        if let Some(grpc) = grpc {
+            let review_api = super::api_client::ApiClient::new(grpc);
+            if let Ok(Some(r)) = review_api
+                .find_review_by_message(&guild_id, message_id_str)
                 .await
             {
-                super::vote::archive_discussion_channel(ctx, &api, &r.id, &r.user_id).await;
+                super::vote::archive_discussion_channel(ctx, &review_api, &r.id, &r.user_id).await;
             }
         }
     }
@@ -886,22 +868,16 @@ pub(super) async fn handle_redis_event(ctx: &Context, payload: &str) {
     // transcript en DB + verrouillage), comme la finalisation/cloture Discord.
     // Vaut pour TOUTE resolution web, y compris "ignore".
     {
-        let api = {
+        let grpc = {
             let data = ctx.data.read().await;
-            match data.get::<ApiClientKey>() {
-                Some(a) => a.clone(),
+            match data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+                Some(g) => g.clone(),
                 None => return,
             }
         };
-        #[derive(serde::Deserialize)]
-        struct U {
-            user_id: String,
-        }
-        if let Ok(r) = api
-            .get_json::<U>(&format!("/api/automod/reviews/{action_id}"))
-            .await
-        {
-            super::vote::archive_discussion_channel(ctx, &api, action_id, &r.user_id).await;
+        let review_api = super::api_client::ApiClient::new(grpc);
+        if let Ok(r) = review_api.get_review(action_id).await {
+            super::vote::archive_discussion_channel(ctx, &review_api, action_id, &r.user_id).await;
         }
     }
 }
@@ -925,25 +901,19 @@ async fn apply_web_resolution(ctx: &Context, action_id: &str, applied_action: &s
         );
         return;
     }
-    let api = {
+    let (api, grpc) = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
-            None => return,
+        match (
+            data.get::<ApiClientKey>(),
+            data.get::<crate::shared::grpc_client::GrpcClientKey>(),
+        ) {
+            (Some(a), Some(g)) => (a.clone(), g.clone()),
+            _ => return,
         }
     };
+    let review_api = super::api_client::ApiClient::new(grpc);
 
-    #[derive(serde::Deserialize)]
-    struct ReviewDto {
-        guild_id: String,
-        channel_id: String,
-        message_id: String,
-        user_id: String,
-    }
-    let review: ReviewDto = match api
-        .get_json(&format!("/api/automod/reviews/{action_id}"))
-        .await
-    {
+    let review = match review_api.get_review(action_id).await {
         Ok(r) => r,
         Err(e) => {
             warn!(error = %e, action_id, "Echec fetch review (resolution web) : sanction non appliquee");
@@ -987,23 +957,14 @@ async fn edit_review_card_from_web(
 ) {
     use serenity::all::{ChannelId, GetMessages, MessageId};
 
-    let data_lock = ctx.data.read().await;
-    let api = match data_lock.get::<ApiClientKey>() {
-        Some(a) => a.clone(),
-        None => return,
+    let grpc = {
+        let data_lock = ctx.data.read().await;
+        match data_lock.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
+            None => return,
+        }
     };
-    drop(data_lock);
-
-    #[derive(serde::Deserialize)]
-    struct Mapping {
-        kind: String,
-        channel_id: String,
-        message_id: String,
-    }
-    let mappings: Vec<Mapping> = match api
-        .get_json(&format!("/api/discord-messages/{action_id}"))
-        .await
-    {
+    let mappings = match crate::sync::list_action_messages(&grpc, action_id).await {
         Ok(list) => list,
         Err(e) => {
             warn!(error = %e, action_id, "Echec fetch mapping automod_review");

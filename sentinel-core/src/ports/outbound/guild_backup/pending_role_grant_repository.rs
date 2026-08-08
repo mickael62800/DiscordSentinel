@@ -17,11 +17,8 @@ pub trait PendingRoleGrantRepository: Send + Sync {
 
     /// Lit ET supprime ATOMIQUEMENT (DELETE ... RETURNING) les role_ids d'un
     /// membre. `None` si aucune ligne.
-    async fn take(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-    ) -> Result<Option<Vec<String>>, DomainError>;
+    async fn take(&self, guild_id: &str, user_id: &str)
+        -> Result<Option<Vec<String>>, DomainError>;
 
     /// Supprime toutes les entrees d'une guild. Renvoie le nombre supprime.
     async fn clear_guild(&self, guild_id: &str) -> Result<u64, DomainError>;

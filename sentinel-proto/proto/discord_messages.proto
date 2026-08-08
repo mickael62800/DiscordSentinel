@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package sentinel.discord_messages.v1;
+
+// Service discord_messages : mapping `action_id <-> message(s) Discord` de la
+// table `discord_action_messages` (cf. SYNC_DISCORD_WEB_DESIGN.md).
+//
+// Ressource de SYNC TRANSVERSE (pas d'un domaine metier) : un module qui poste
+// une carte/panneau Discord lie a une entite (automod_review, ticket,
+// voice_panel...) enregistre la correspondance, et le web/bot la retrouve pour
+// editer le bon message. Wrappe `ManageDiscordActionMessagesUseCase`.
+service DiscordActionMessagesService {
+  // Enregistre (idempotent) une representation Discord d'une action.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+  // Toutes les representations Discord d'une meme entite metier.
+  rpc ListForAction(ListForActionRequest) returns (ActionMessageList);
+}
+
+message RegisterRequest {
+  // UUID de l'entite metier (action).
+  string action_id = 1;
+  // Convention partagee : "automod_review" | "ticket" | "voice_panel" | ...
+  string kind = 2;
+  string guild_id = 3;
+  string channel_id = 4;
+  string message_id = 5;
+}
+
+message RegisterResponse {}
+
+message ListForActionRequest {
+  string action_id = 1;
+}
+
+message ActionMessage {
+  string action_id = 1;
+  string kind = 2;
+  string guild_id = 3;
+  string channel_id = 4;
+  string message_id = 5;
+  // RFC3339.
+  string posted_at = 6;
+  optional string last_edited_at = 7;
+}
+
+message ActionMessageList {
+  repeated ActionMessage messages = 1;
+}

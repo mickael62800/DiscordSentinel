@@ -56,7 +56,6 @@ pub async fn list_roles(
     Ok(map_to_dtos(roles))
 }
 
-
 /// POST /api/discord-roles/{guild_id}/create — Creer un role Discord
 pub async fn create_role(
     State(state): State<CommunityState>,

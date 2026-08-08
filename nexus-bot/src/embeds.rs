@@ -180,13 +180,29 @@ fn nom_classe(cle: &str) -> String {
 /// Le profil parle de CONFORT et de place sur le canape, pas de points de vie :
 /// c'est le meme chiffre, mais il raconte enfin quelque chose.
 pub fn build_coussin_profile_embed(p: &crate::api_client::CoussinProfileResponse) -> CreateEmbed {
-    CreateEmbed::new().title(format!("🛋️ Place de {} sur le canape", p.username)).color(0x5865F2)
-        .description(format!("**{}** · Niveau **{}** — {} XP\n🛋️ Confort {}/{} · 🪙 {} coins", p.title, p.level, p.xp, p.hp_current, p.hp_max, p.coins))
+    CreateEmbed::new()
+        .title(format!("🛋️ Place de {} sur le canape", p.username))
+        .color(0x5865F2)
+        .description(format!(
+            "**{}** · Niveau **{}** — {} XP\n🛋️ Confort {}/{} · 🪙 {} coins",
+            p.title, p.level, p.xp, p.hp_current, p.hp_max, p.coins
+        ))
         .field("Maniere de s'asseoir", nom_classe(&p.class), true)
         .field("Impact / Moelleux", format!("{} / {}", p.atk, p.def), true)
         .field("Points a placer", p.stat_points.to_string(), true)
-        .field("Palmares", format!("{} assis · {} leves · {} match nuls", p.total_wins, p.total_losses, p.total_draws), false)
-        .field("Trouve sous les coussins", format!("{} coins", p.total_stolen), true)
+        .field(
+            "Palmares",
+            format!(
+                "{} assis · {} leves · {} match nuls",
+                p.total_wins, p.total_losses, p.total_draws
+            ),
+            false,
+        )
+        .field(
+            "Trouve sous les coussins",
+            format!("{} coins", p.total_stolen),
+            true,
+        )
         .field("Fois reste debout", p.cowardice_count.to_string(), true)
         .field("Bazar declenche", p.chaos_events.to_string(), true)
 }
@@ -220,7 +236,9 @@ pub fn build_coussin_insurance_embed(is_scam: bool, expires_at: &str) -> CreateE
     } else {
         CreateEmbed::new()
             .title("🧼 Garantie anti-tache active")
-            .description(format!("Tes pertes sont couvertes jusqu'a **{expires_at}**."))
+            .description(format!(
+                "Tes pertes sont couvertes jusqu'a **{expires_at}**."
+            ))
             .color(0x2ECC71)
     }
 }

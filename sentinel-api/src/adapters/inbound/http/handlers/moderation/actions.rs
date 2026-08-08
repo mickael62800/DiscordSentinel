@@ -17,11 +17,11 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::bootstrap::state::ModerationState;
 use crate::adapters::inbound::http::validation;
-use sentinel_core::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
+use crate::bootstrap::state::ModerationState;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 
 /// S1/S4 — Resout l'identite moderateur a journaliser.
 ///
@@ -200,7 +200,6 @@ pub async fn execute_ban(
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_reason(&dto.reason).map_err(ApiError)?;
 
-
     state
         .discord_api
         .ban_user(&dto.guild_id, &dto.user_id, &dto.reason)
@@ -213,18 +212,19 @@ pub async fn execute_ban(
     // web (WebUser), sinon valeurs desktop par defaut (appel interne).
     let (moderator_id, moderator_name) = resolve_web_moderator(&user, "desktop", "Desktop App");
 
-    let command = sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand {
-        guild_id: dto.guild_id.clone(),
-        channel_id: String::new().into(),
-        moderator_id: moderator_id.clone(),
-        moderator_name: moderator_name.clone(),
-        target_id: dto.user_id.clone().into(),
-        target_name: dto.user_id.clone().into(),
-        action_type: "ban_permanent".into(),
-        reason: dto.reason,
-        gravity: None,
-        duration: None,
-    };
+    let command =
+        sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand {
+            guild_id: dto.guild_id.clone(),
+            channel_id: String::new().into(),
+            moderator_id: moderator_id.clone(),
+            moderator_name: moderator_name.clone(),
+            target_id: dto.user_id.clone().into(),
+            target_name: dto.user_id.clone().into(),
+            action_type: "ban_permanent".into(),
+            reason: dto.reason,
+            gravity: None,
+            duration: None,
+        };
     state.moderation_uc.log_action(command).await?;
 
     state.broadcaster.broadcast(
@@ -280,7 +280,6 @@ pub async fn execute_mute(
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_reason(&dto.reason).map_err(ApiError)?;
 
-
     let duration =
         sentinel_core::domain::entities::moderation::review::manual::resolve_mute_duration(
             dto.duration,
@@ -298,18 +297,19 @@ pub async fn execute_mute(
     // S1/S4 — identite moderateur derivee du principal authentifie (web).
     let (moderator_id, moderator_name) = resolve_web_moderator(&user, "web-panel", "Web Admin");
 
-    let command = sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand {
-        guild_id: dto.guild_id.clone(),
-        channel_id: String::new().into(),
-        moderator_id,
-        moderator_name: moderator_name.clone(),
-        target_id: dto.user_id.clone().into(),
-        target_name: target_name.clone(),
-        action_type: "mute".into(),
-        reason: dto.reason.clone(),
-        gravity: None,
-        duration: Some(duration),
-    };
+    let command =
+        sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand {
+            guild_id: dto.guild_id.clone(),
+            channel_id: String::new().into(),
+            moderator_id,
+            moderator_name: moderator_name.clone(),
+            target_id: dto.user_id.clone().into(),
+            target_name: target_name.clone(),
+            action_type: "mute".into(),
+            reason: dto.reason.clone(),
+            gravity: None,
+            duration: Some(duration),
+        };
     state.moderation_uc.log_action(command).await?;
 
     state.broadcaster.broadcast(
@@ -343,7 +343,6 @@ pub async fn execute_unban(
     // Validation
     validation::validate_guild_user_path(&dto.guild_id, &dto.user_id).map_err(ApiError)?;
 
-
     state
         .discord_api
         .unban_user(&dto.guild_id, &dto.user_id)
@@ -356,18 +355,19 @@ pub async fn execute_unban(
     // S1/S4 — identite moderateur derivee du principal authentifie (web).
     let (moderator_id, moderator_name) = resolve_web_moderator(&user, "desktop", "Desktop App");
 
-    let command = sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand {
-        guild_id: dto.guild_id,
-        channel_id: String::new().into(),
-        moderator_id,
-        moderator_name: moderator_name.clone(),
-        target_id: target_id.clone().into(),
-        target_name: target_id.clone().into(),
-        action_type: "unban".into(),
-        reason: "Deban depuis le desktop".into(),
-        gravity: None,
-        duration: None,
-    };
+    let command =
+        sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand {
+            guild_id: dto.guild_id,
+            channel_id: String::new().into(),
+            moderator_id,
+            moderator_name: moderator_name.clone(),
+            target_id: target_id.clone().into(),
+            target_name: target_id.clone().into(),
+            action_type: "unban".into(),
+            reason: "Deban depuis le desktop".into(),
+            gravity: None,
+            duration: None,
+        };
     state
         .moderation_uc
         .delete_bans_for_user(&guild_id, &target_id)
@@ -476,8 +476,7 @@ pub async fn add_evidence(
 ) -> Result<Json<EvidenceEntryDto>, ApiError> {
     // Pour gater user on a besoin du guild_id : on le recupere via l'action liee.
     if user.is_some() {
-        if let Ok(_action_uuid) = uuid::Uuid::parse_str(&dto.action_id) {
-        }
+        if let Ok(_action_uuid) = uuid::Uuid::parse_str(&dto.action_id) {}
     }
     // Validation URL — regle metier dans `domain/entities/moderation_review.rs`.
     sentinel_core::domain::entities::moderation::review::manual::validate_evidence_url(&dto.url)
@@ -632,7 +631,6 @@ pub async fn list_pending_reviews(
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<Vec<ReviewQueueEntryDto>>, ApiError> {
-
     let entries = state.review_repo.list_pending(&guild_id).await?;
     Ok(Json(entries.into_iter().map(review_entry_to_dto).collect()))
 }
@@ -712,7 +710,8 @@ pub async fn get_modstats(
     Json<Vec<crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto>>,
     ApiError,
 > {
-    let days = (crate::adapters::inbound::http::helpers::normalize_in(params.days, 30, 1, 90)) as i32;
+    let days =
+        (crate::adapters::inbound::http::helpers::normalize_in(params.days, 30, 1, 90)) as i32;
 
     let rows = state.modstats_uc.modstats(&guild_id, days).await?;
 
@@ -745,8 +744,8 @@ pub async fn get_modstats_trend(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Query(params): Query<TrendQuery>,
 ) -> Result<Json<Vec<ModstatsTrendDayDto>>, ApiError> {
-
-    let days = (crate::adapters::inbound::http::helpers::normalize_in(params.days, 30, 1, 90)) as i32;
+    let days =
+        (crate::adapters::inbound::http::helpers::normalize_in(params.days, 30, 1, 90)) as i32;
 
     let rows = state.modstats_uc.modstats_trend(&guild_id, days).await?;
 
@@ -822,8 +821,10 @@ pub async fn mod_action_count(
     Query(q): Query<ModActionCountQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Fenetre effective (defaut/bornes) : règle du core ; SQL : repository.
-    let window = sentinel_core::domain::entities::moderation::action::reversal::
-        mod_action_window_secs(q.window_secs);
+    let window =
+        sentinel_core::domain::entities::moderation::action::reversal::mod_action_window_secs(
+            q.window_secs,
+        );
     let count = state
         .moderation_uc
         .count_recent_mod_actions(&guild_id, &moderator_id, window)

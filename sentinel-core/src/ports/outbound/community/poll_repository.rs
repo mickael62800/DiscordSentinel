@@ -40,9 +40,5 @@ pub trait PollRepository: Send + Sync {
     ) -> Result<bool, DomainError>;
 
     /// Option choisie par un membre, pour pre-cocher son vote a l'affichage.
-    async fn vote_of(
-        &self,
-        poll_id: Uuid,
-        user_id: &str,
-    ) -> Result<Option<Uuid>, DomainError>;
+    async fn vote_of(&self, poll_id: Uuid, user_id: &str) -> Result<Option<Uuid>, DomainError>;
 }

@@ -152,16 +152,39 @@ fn generic_matches(facts: &BumpMessageFacts) -> bool {
 /// recompensable) : cooldown en cours, votes epuises, simple invitation a voter.
 const FAILURE_WORDS: &[&str] = &[
     // Cooldown / attente
-    "wait", "minute", "patient", "cooldown", "seconde", "second", "already",
-    "try again", "deja", "déjà", "prochain", "heure", "hour", "attends",
-    "encore", "trop tot", "trop tôt", "next bump", "come back", "revenir",
+    "wait",
+    "minute",
+    "patient",
+    "cooldown",
+    "seconde",
+    "second",
+    "already",
+    "try again",
+    "deja",
+    "déjà",
+    "prochain",
+    "heure",
+    "hour",
+    "attends",
+    "encore",
+    "trop tot",
+    "trop tôt",
+    "next bump",
+    "come back",
+    "revenir",
     "reviens",
     // Votes epuises (DiscordL : « Tu n'as plus de votes ... aujourd'hui »)
-    "plus de vote", "n'as plus", "n as plus", "no more vote",
+    "plus de vote",
+    "n'as plus",
+    "n as plus",
+    "no more vote",
     // Invitation a voter, pas une confirmation (top.gg : « Vote is ready »)
-    "is ready", "vote for",
+    "is ready",
+    "vote for",
     // Symboles d'echec/avertissement, fiables cross-plateforme
-    "❌", "⚠️", "🚫",
+    "❌",
+    "⚠️",
+    "🚫",
 ];
 
 /// `detect` generique : succes = message exploitable ET aucun signal d'echec.
@@ -243,7 +266,11 @@ pub fn provider_for_message_configured<F: Fn(&str) -> u64>(
 ) -> Option<&'static BumpProvider> {
     PROVIDERS.iter().find(|p| {
         let configured = bot_id_for(p.key);
-        let effective = if configured != 0 { configured } else { p.bot_id };
+        let effective = if configured != 0 {
+            configured
+        } else {
+            p.bot_id
+        };
         effective != 0 && effective == facts.author_id && (p.matches)(facts)
     })
 }
@@ -259,7 +286,9 @@ pub fn provider_for_message(facts: &BumpMessageFacts) -> Option<&'static BumpPro
 
 /// Un provider a bot_id PAR DEFAUT (Disboard/DiscordL) poste-t-il avec ce bot_id ?
 pub fn is_provider_bot(bot_id: u64) -> bool {
-    PROVIDERS.iter().any(|p| p.bot_id != 0 && p.bot_id == bot_id)
+    PROVIDERS
+        .iter()
+        .any(|p| p.bot_id != 0 && p.bot_id == bot_id)
 }
 
 pub fn provider_by_key(key: &str) -> Option<&'static BumpProvider> {
@@ -572,7 +601,10 @@ mod tests {
 
     #[test]
     fn votes_epuises_rejete() {
-        let f = facts_with_desc(0, "❌ Tu n'as plus de votes pour La Bande du Canapé aujourd'hui");
+        let f = facts_with_desc(
+            0,
+            "❌ Tu n'as plus de votes pour La Bande du Canapé aujourd'hui",
+        );
         assert!(!(SPACEBUMP.detect)(&f));
     }
 

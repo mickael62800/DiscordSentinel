@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_ctx;
-use sentinel_core::ports::outbound::audit::audit_event_counter::AuditEventCounter;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::audit::audit_event_counter::AuditEventCounter;
 
 /// Comptage postgres des events d'audit par `event_type` sur une fenetre en
 /// jours. Alimente le use case `GetWeeklyReport` (agregation server-side).

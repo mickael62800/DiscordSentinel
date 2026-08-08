@@ -42,8 +42,9 @@ struct Row {
 impl TryFrom<Row> for Sursis {
     type Error = DomainError;
     fn try_from(r: Row) -> Result<Self, DomainError> {
-        let status = SursisStatus::from_str_lossy(&r.status)
-            .ok_or_else(|| DomainError::Internal(format!("statut sursis inconnu : {}", r.status)))?;
+        let status = SursisStatus::from_str_lossy(&r.status).ok_or_else(|| {
+            DomainError::Internal(format!("statut sursis inconnu : {}", r.status))
+        })?;
         let saved_roles = r
             .saved_roles
             .as_array()

@@ -17,8 +17,7 @@ pub trait ManageNewsUseCase: Send + Sync {
 
     async fn create(&self, cmd: UpsertNewsCommand) -> Result<NewsPost, DomainError>;
 
-    async fn update(&self, id: Uuid, cmd: UpsertNewsCommand)
-        -> Result<NewsPost, DomainError>;
+    async fn update(&self, id: Uuid, cmd: UpsertNewsCommand) -> Result<NewsPost, DomainError>;
 
     async fn delete(&self, id: Uuid) -> Result<(), DomainError>;
 }

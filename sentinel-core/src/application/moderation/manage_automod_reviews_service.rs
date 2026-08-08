@@ -111,7 +111,12 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         limit: i64,
     ) -> Result<Vec<AutomodReview>, DomainError> {
         crate::application::validation::validate_guild_id(guild_id)?;
-        self.repo.list_pending(guild_id, limit.clamp(1, crate::application::validation::PAGE_LIMIT_MAX)).await
+        self.repo
+            .list_pending(
+                guild_id,
+                limit.clamp(1, crate::application::validation::PAGE_LIMIT_MAX),
+            )
+            .await
     }
 
     async fn list_recent(
@@ -120,7 +125,12 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         limit: i64,
     ) -> Result<Vec<AutomodReview>, DomainError> {
         crate::application::validation::validate_guild_id(guild_id)?;
-        self.repo.list_recent(guild_id, limit.clamp(1, crate::application::validation::PAGE_LIMIT_MAX)).await
+        self.repo
+            .list_recent(
+                guild_id,
+                limit.clamp(1, crate::application::validation::PAGE_LIMIT_MAX),
+            )
+            .await
     }
 
     async fn resolve(
@@ -273,7 +283,9 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
     }
 
     async fn list_expired_voting(&self, limit: i64) -> Result<Vec<AutomodReview>, DomainError> {
-        self.repo.list_expired_voting(limit.clamp(1, crate::application::validation::PAGE_LIMIT_MAX)).await
+        self.repo
+            .list_expired_voting(limit.clamp(1, crate::application::validation::PAGE_LIMIT_MAX))
+            .await
     }
 
     async fn expire_stale_decided_reviews(
@@ -282,7 +294,10 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         limit: i64,
     ) -> Result<Vec<ExpiredReviewCard>, DomainError> {
         self.repo
-            .expire_stale_decided(grace_hours.clamp(1, 8760), limit.clamp(1, crate::application::validation::BATCH_LIMIT_MAX))
+            .expire_stale_decided(
+                grace_hours.clamp(1, 8760),
+                limit.clamp(1, crate::application::validation::BATCH_LIMIT_MAX),
+            )
             .await
     }
 
@@ -292,7 +307,10 @@ impl ManageAutomodReviewsUseCase for ManageAutomodReviewsService {
         limit: i64,
     ) -> Result<Vec<ExpiredReviewCard>, DomainError> {
         self.repo
-            .expire_review_cards(days.clamp(1, 3650), limit.clamp(1, crate::application::validation::BATCH_LIMIT_MAX))
+            .expire_review_cards(
+                days.clamp(1, 3650),
+                limit.clamp(1, crate::application::validation::BATCH_LIMIT_MAX),
+            )
             .await
     }
 

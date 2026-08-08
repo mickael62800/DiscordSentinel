@@ -2,9 +2,9 @@ use crate::adapters::outbound::postgres::pg_err;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::community::voice_channel_repository::VoiceChannelStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::voice_channel_repository::VoiceChannelStore;
 
 #[derive(sqlx::FromRow)]
 struct VoiceChannelRow {
@@ -193,10 +193,7 @@ impl VoiceChannelStore for super::PgVoiceChannelRepository {
         self.close(id).await
     }
 
-    async fn hard_delete_closed_by_channel_id(
-        &self,
-        channel_id: &str,
-    ) -> Result<u64, DomainError> {
+    async fn hard_delete_closed_by_channel_id(&self, channel_id: &str) -> Result<u64, DomainError> {
         let res = sqlx::query(
             "DELETE FROM voice_channels WHERE channel_id = $1 AND channel_status = 'closed'",
         )

@@ -21,8 +21,7 @@ pub trait ManagePollsUseCase: Send + Sync {
         limit: i64,
     ) -> Result<Vec<Poll>, DomainError>;
 
-    async fn get(&self, id: Uuid, viewer_id: Option<&str>)
-        -> Result<PollWithVote, DomainError>;
+    async fn get(&self, id: Uuid, viewer_id: Option<&str>) -> Result<PollWithVote, DomainError>;
 
     async fn create(&self, cmd: UpsertPollCommand) -> Result<Poll, DomainError>;
 

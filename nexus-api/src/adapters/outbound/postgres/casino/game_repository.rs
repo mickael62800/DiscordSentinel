@@ -2,10 +2,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use super::super::pg_err;
+use nexus_core::domain::errors::DomainError;
 use nexus_core::ports::outbound::casino::game_repository::Game;
 use nexus_core::ports::outbound::casino::game_repository::GamePanel;
 use nexus_core::ports::outbound::casino::game_repository::GameRepository;
-use nexus_core::domain::errors::DomainError;
 
 pub struct PgGameRepository {
     pool: PgPool,

@@ -118,8 +118,13 @@ impl PendingActionRepository for PgPendingActionRepository {
         sqlx::query(
             "UPDATE pending_mod_actions SET status = $1, reviewed_by = $2, updated_at = NOW() \
              WHERE id = $3 AND status = 'pending'",
-        ).bind(status).bind(reviewed_by).bind(id)
-        .execute(&self.pool).await.map_err(pg_err)?;
+        )
+        .bind(status)
+        .bind(reviewed_by)
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
         Ok(())
     }
 }

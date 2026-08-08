@@ -155,6 +155,9 @@ fn enabled_flag_parses_value() {
 
 #[test]
 fn u64_csv_ignores_invalid() {
-    assert_eq!(parse_u64_csv("300, 3600 ,abc,86400"), vec![300, 3600, 86400]);
+    assert_eq!(
+        parse_u64_csv("300, 3600 ,abc,86400"),
+        vec![300, 3600, 86400]
+    );
     assert!(parse_u64_csv("").is_empty());
 }

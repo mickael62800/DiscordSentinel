@@ -11,10 +11,7 @@ use sentinel_core::domain::errors::DomainError;
 /// Un identifiant Discord est un entier 64 bits en decimal : au plus 20
 /// chiffres, rien d'autre.
 pub fn ensure_guild_id(guild_id: &str) -> Result<(), ApiError> {
-    if guild_id.is_empty()
-        || guild_id.len() > 20
-        || !guild_id.chars().all(|c| c.is_ascii_digit())
-    {
+    if guild_id.is_empty() || guild_id.len() > 20 || !guild_id.chars().all(|c| c.is_ascii_digit()) {
         return Err(ApiError(DomainError::ValidationError(
             "guild_id invalide".into(),
         )));

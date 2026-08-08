@@ -281,7 +281,8 @@ pub async fn deploy_panel(
 ) -> Result<StatusCode, ApiError> {
     use nexus_core::application::deploy_panel_service::DeployGamesPanelUseCase;
     let uc = DeployGamesPanelUseCase::new(state.events.clone());
-    uc.execute(&guild_id, &dto.channel_id, dto.category.as_deref()).await;
+    uc.execute(&guild_id, &dto.channel_id, dto.category.as_deref())
+        .await;
     Ok(StatusCode::ACCEPTED)
 }
 
@@ -335,7 +336,9 @@ pub async fn upload_emoji(
     }
 
     let uc = UploadEmojiUseCase::new(state.discord_api.clone());
-    let (id, emoji_name) = uc.execute(&guild_id, &name, &image_bytes, &mime_type).await?;
+    let (id, emoji_name) = uc
+        .execute(&guild_id, &name, &image_bytes, &mime_type)
+        .await?;
 
     Ok(Json(json!({ "id": id, "name": emoji_name })))
 }

@@ -4,9 +4,10 @@ use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
+use crate::shared::grpc_client::GrpcClientKey;
 use crate::shared::heartbeat::ApiClientKey;
 
-use super::super::api_client::Action;
+use super::super::api_client::{Action, ApiClient, CreateReviewParams};
 use super::super::detectors;
 use super::super::review;
 use super::cards::edit_aggregated_card;
@@ -14,7 +15,7 @@ use super::context::{fetch_context_after, fetch_context_before};
 use super::labels::{action_char, action_label, char_to_str};
 use super::render::{
     aggregated_vote_embed, render_history_totals, render_votes, secondary_row, vote_buttons,
-    vote_embed, ReviewResp, VOTES_FIELD,
+    vote_embed, VOTES_FIELD,
 };
 
 /// Cree la review en mode vote et poste la carte avec les boutons de vote.
@@ -48,46 +49,46 @@ pub(crate) async fn post_vote_card(
     let user_id = msg.author.id.to_string();
     let content_preview = review::sanitize_embed_content(&msg.content, 500);
 
-    let api = {
+    let (api, grpc) = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
-            None => return,
+        match (data.get::<ApiClientKey>(), data.get::<GrpcClientKey>()) {
+            (Some(a), Some(g)) => (a.clone(), g.clone()),
+            _ => return,
         }
     };
+    let review_api = ApiClient::new(grpc);
 
     // 1. Creer la review en mode vote (avec echeance) pour obtenir son id.
     //    Si `aggregate`, l'API peut fusionner l'incident dans une carte
     //    'voting' ouverte du meme utilisateur -> on edite alors la carte
     //    existante au lieu d'en poster une nouvelle.
-    let deadline = chrono::Utc::now() + chrono::Duration::hours(
-        sentinel_core::domain::entities::moderation::review::automod::clamp_vote_deadline_hours(
-            deadline_hours,
-        ),
-    );
+    let deadline = chrono::Utc::now()
+        + chrono::Duration::hours(
+            sentinel_core::domain::entities::moderation::review::automod::clamp_vote_deadline_hours(
+                deadline_hours,
+            ),
+        );
     let suggested_str = char_to_str(action_char(suggested_action));
-    let body = serde_json::json!({
-        "guild_id": guild_id,
-        "channel_id": channel_id,
-        "message_id": message_id,
-        "user_id": user_id,
-        "user_name": msg.author.name,
-        "content_preview": content_preview,
-        "suggested_action": suggested_str,
-        "score": score,
-        "reason": reason,
-        "flags": {
-            "spam": flags.spam, "insult": flags.insult,
-            "link": flags.link, "phishing": flags.phishing,
-        },
-        "voting_deadline": deadline.to_rfc3339(),
-        "aggregate": aggregate,
-        "aggregate_window_minutes": aggregate_window_minutes,
-        "already_sanctioned": already_sanctioned,
-    });
-
-    let resp = match api
-        .post_json::<_, ReviewResp>("/api/automod/reviews", &body)
+    let resp = match review_api
+        .create_review(CreateReviewParams {
+            guild_id: &guild_id,
+            channel_id: &channel_id,
+            message_id: &message_id,
+            user_id: &user_id,
+            user_name: &msg.author.name,
+            content_preview: &content_preview,
+            suggested_action: suggested_str,
+            score,
+            reason,
+            flags: serde_json::json!({
+                "spam": flags.spam, "insult": flags.insult,
+                "link": flags.link, "phishing": flags.phishing,
+            }),
+            voting_deadline: Some(deadline.to_rfc3339()),
+            aggregate,
+            aggregate_window_minutes: Some(aggregate_window_minutes),
+            already_sanctioned,
+        })
         .await
     {
         Ok(r) => r,
@@ -101,7 +102,7 @@ pub(crate) async fn post_vote_card(
     // Cas agregation : l'incident a ete fusionne -> on edite la carte existante.
     // Si le message de cette carte a disparu (supprime), on ne `return` pas :
     // on retombe sur le posting normal ci-dessous pour reposter une carte neuve.
-    if resp.merged && edit_aggregated_card(ctx, &api, &resp).await {
+    if resp.merged && edit_aggregated_card(ctx, &api, &review_api, &resp).await {
         return;
     }
 
@@ -171,7 +172,7 @@ pub(crate) async fn post_vote_card(
     // 3. Enregistrer le mapping pour le sync (web + event decided).
     if let Ok(uuid) = uuid::Uuid::parse_str(&review_id) {
         crate::sync::register_action_message(
-            &api,
+            review_api.grpc(),
             uuid,
             crate::sync::kinds::AUTOMOD_REVIEW,
             &guild_id,
@@ -231,39 +232,43 @@ pub(crate) async fn post_manual_vote_card(
     let user_id = msg.author.id.to_string();
     let content_preview = review::sanitize_embed_content(&msg.content, 500);
 
-    let api = {
+    let (api, grpc) = {
         let data = ctx.data.read().await;
-        match data.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
-            None => return,
+        match (data.get::<ApiClientKey>(), data.get::<GrpcClientKey>()) {
+            (Some(a), Some(g)) => (a.clone(), g.clone()),
+            _ => return,
         }
     };
+    let review_api = ApiClient::new(grpc);
 
     // 1. Creer la review en mode vote (memes champs que la carte automod ;
     // score 0 et flags vides car signalement humain, pas IA).
-    let deadline = chrono::Utc::now() + chrono::Duration::hours(
-        sentinel_core::domain::entities::moderation::review::automod::clamp_vote_deadline_hours(
-            deadline_hours,
-        ),
-    );
+    let deadline = chrono::Utc::now()
+        + chrono::Duration::hours(
+            sentinel_core::domain::entities::moderation::review::automod::clamp_vote_deadline_hours(
+                deadline_hours,
+            ),
+        );
     let suggested_str = char_to_str(action_char(suggested_action));
-    let body = serde_json::json!({
-        "guild_id": guild_id,
-        "channel_id": channel_id,
-        "message_id": message_id,
-        "user_id": user_id,
-        "user_name": msg.author.name,
-        "content_preview": content_preview,
-        "suggested_action": suggested_str,
-        "score": 0.0,
-        "reason": reason,
-        "flags": { "spam": false, "insult": false, "link": false, "phishing": false },
-        "voting_deadline": deadline.to_rfc3339(),
-        "aggregate": aggregate,
-    });
-
-    let resp = match api
-        .post_json::<_, ReviewResp>("/api/automod/reviews", &body)
+    let resp = match review_api
+        .create_review(CreateReviewParams {
+            guild_id: &guild_id,
+            channel_id: &channel_id,
+            message_id: &message_id,
+            user_id: &user_id,
+            user_name: &msg.author.name,
+            content_preview: &content_preview,
+            suggested_action: suggested_str,
+            score: 0.0,
+            reason,
+            flags: serde_json::json!(
+                { "spam": false, "insult": false, "link": false, "phishing": false }
+            ),
+            voting_deadline: Some(deadline.to_rfc3339()),
+            aggregate,
+            aggregate_window_minutes: None,
+            already_sanctioned: false,
+        })
         .await
     {
         Ok(r) => r,
@@ -277,7 +282,7 @@ pub(crate) async fn post_manual_vote_card(
     // Agregation : si l'incident a ete fusionne, on edite la carte existante.
     // Si son message a disparu (supprime), on retombe sur le posting normal
     // ci-dessous pour reposter une carte neuve (mapping upserte).
-    if resp.merged && edit_aggregated_card(ctx, &api, &resp).await {
+    if resp.merged && edit_aggregated_card(ctx, &api, &review_api, &resp).await {
         return;
     }
 
@@ -353,7 +358,7 @@ pub(crate) async fn post_manual_vote_card(
     // 4. Mapping pour le sync (web + event decided), identique a l'automod.
     if let Ok(uuid) = uuid::Uuid::parse_str(&review_id) {
         crate::sync::register_action_message(
-            &api,
+            review_api.grpc(),
             uuid,
             crate::sync::kinds::AUTOMOD_REVIEW,
             &guild_id,

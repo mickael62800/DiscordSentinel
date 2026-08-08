@@ -286,7 +286,9 @@ pub fn start(
             "guild-backup-bot",
             move |pool| {
                 let redis = redis.clone();
-                Box::pin(async move { domains::guild_backup::auto_backup::run(&pool, &redis).await })
+                Box::pin(
+                    async move { domains::guild_backup::auto_backup::run(&pool, &redis).await },
+                )
             },
         );
     }

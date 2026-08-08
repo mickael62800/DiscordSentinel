@@ -112,11 +112,9 @@ impl TransferCoinsUseCase for WalletService {
         validate_transfer(&cmd.from_user_id, &cmd.to_user_id, cmd.amount, from.coins)?;
 
         // Bornes propres au serveur, par-dessus les regles universelles.
-        let cfg = crate::application::economy_config::load_economy(
-            &self.config_repo,
-            &cmd.guild_id,
-        )
-        .await?;
+        let cfg =
+            crate::application::economy_config::load_economy(&self.config_repo, &cmd.guild_id)
+                .await?;
         cfg.validate_transfer(cmd.amount)
             .map_err(DomainError::Validation)?;
 

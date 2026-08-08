@@ -7,7 +7,8 @@
 //! 2. Le bot (ce module) consume via event_bus::listen_stream_group,
 //!    poste sur chaque channel cible (text simple ou embed riche),
 //!    rapporte le resultat (channel_id, message_id, success) a l'API
-//!    via POST /api/announcements/internal/runs/{run_id}/result.
+//!    via `AnnouncementsService::RecordRunResult` (gRPC). Les clics de
+//!    boutons remontent via `RecordButtonClick`.
 
 use std::sync::Arc;
 
@@ -37,8 +38,8 @@ fn extract_role_ids(s: &str) -> Vec<RoleId> {
 }
 use tracing::{info, warn};
 
-use crate::shared::api_client::BaseApiClient;
-use crate::shared::heartbeat::ApiClientKey;
+use crate::shared::grpc_client::{grpc_err_to_string, GrpcClientKey, SentinelGrpcClient};
+use sentinel_proto::announcements::v1 as proto_ann;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct RenderedEmbed {
@@ -76,17 +77,12 @@ struct RenderedAnnouncement {
     auto_reactions: Vec<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 struct ChannelPostResult {
     channel_id: String,
     message_id: Option<String>,
     success: bool,
     error: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct RecordRunResultBody {
-    channels_posted: Vec<ChannelPostResult>,
 }
 
 /// Spawn le consumer durable. Appele une fois au `ready`.
@@ -140,14 +136,14 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
     }
 
     // Rapporte le resultat a l'API
-    let api = {
+    let grpc = {
         let data = ctx.data.read().await;
-        data.get::<ApiClientKey>().cloned()
+        data.get::<GrpcClientKey>().cloned()
     };
-    if let Some(api) = api {
-        report_run_result(&api, &payload.run_id, &results).await;
+    if let Some(grpc) = grpc {
+        report_run_result(&grpc, &payload.run_id, &results).await;
     } else {
-        warn!("ApiClientKey absent, impossible de reporter le resultat du run");
+        warn!("GrpcClientKey absent, impossible de reporter le resultat du run");
     }
 }
 
@@ -383,33 +379,35 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     }
 
     // Report a l'API
-    let api = {
+    let grpc = {
         let data = ctx.data.read().await;
-        data.get::<ApiClientKey>().cloned()
+        data.get::<GrpcClientKey>().cloned()
     };
-    if let Some(api) = api {
-        let body = serde_json::json!({
-            "announcement_id": announcement_id,
-            "run_id": run_id,
-            "user_id": component.user.id.to_string(),
-            "user_name": component.user.name,
-            "button_custom_id": button_user_id,
-            "button_label": label,
-        });
-        let resp: Result<serde_json::Value, String> = api
-            .post_json("/api/announcements/internal/button-click", &body)
-            .await;
-        if let Err(e) = resp {
+    if let Some(grpc) = grpc {
+        let req = proto_ann::RecordButtonClickRequest {
+            announcement_id,
+            run_id: Some(run_id),
+            user_id: component.user.id.to_string(),
+            user_name: Some(component.user.name.clone()),
+            button_custom_id: button_user_id,
+            button_label: Some(label),
+        };
+        if let Err(e) = crate::grpc_call!(@unit &grpc, announcements, record_button_click, req) {
             warn!(error = %e, "Echec report button-click a l'API");
         }
     }
 }
 
-async fn report_run_result(api: &Arc<BaseApiClient>, run_id: &str, results: &[ChannelPostResult]) {
-    let body = RecordRunResultBody {
+async fn report_run_result(
+    grpc: &Arc<SentinelGrpcClient>,
+    run_id: &str,
+    results: &[ChannelPostResult],
+) {
+    let req = proto_ann::RecordRunResultRequest {
+        run_id: run_id.to_string(),
         channels_posted: results
             .iter()
-            .map(|r| ChannelPostResult {
+            .map(|r| proto_ann::ChannelPostResult {
                 channel_id: r.channel_id.clone(),
                 message_id: r.message_id.clone(),
                 success: r.success,
@@ -417,9 +415,7 @@ async fn report_run_result(api: &Arc<BaseApiClient>, run_id: &str, results: &[Ch
             })
             .collect(),
     };
-    let path = format!("/api/announcements/internal/runs/{}/result", run_id);
-    let resp: Result<serde_json::Value, String> = api.post_json(&path, &body).await;
-    match resp {
+    match crate::grpc_call!(@unit grpc, announcements, record_run_result, req) {
         Ok(_) => info!(run_id, "Run result reported"),
         Err(e) => warn!(run_id, error = %e, "Echec report run result"),
     }

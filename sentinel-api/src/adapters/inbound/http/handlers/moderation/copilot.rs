@@ -1,4 +1,4 @@
-﻿//! Handler HTTP du copilote de moderation (lecture seule, consultatif).
+//! Handler HTTP du copilote de moderation (lecture seule, consultatif).
 //!
 //! `GET /api/moderation/{guild_id}/copilot/{user_id}?lookback_days=&min_precedents=`
 //! Renvoie l'historique de moderation du membre + une suggestion de sanction
@@ -32,7 +32,6 @@ pub async fn get_member_context(
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
     Query(params): Query<CopilotQuery>,
 ) -> Result<Json<MemberModerationContextDto>, ApiError> {
-
     let lookback_days = params.lookback_days.unwrap_or(90);
     let min_precedents = params.min_precedents.unwrap_or(3);
 

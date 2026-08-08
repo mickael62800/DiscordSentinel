@@ -16,11 +16,11 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_core::domain::entities::audit::audit_log::AuditLog;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use sentinel_core::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use sentinel_core::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
-use sentinel_core::domain::entities::audit::audit_log::AuditLog;
-use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_audit_logs;
 
 // ══════════════════════════════════════════════════════════
@@ -96,11 +96,7 @@ impl ManageAuditLogsUseCase for MockAuditLogsUC {
     }
     /// Le mock ignore les filtres : les tests qui s'appuient sur `count`
     /// verifient l'en-tete de pagination, pas le comptage lui-meme.
-    async fn count(
-        &self,
-        guild_id: Option<&str>,
-        _: &AuditLogFilters,
-    ) -> Result<i64, DomainError> {
+    async fn count(&self, guild_id: Option<&str>, _: &AuditLogFilters) -> Result<i64, DomainError> {
         let all = self.items.lock().unwrap();
         Ok(all
             .iter()

@@ -211,7 +211,10 @@ pub async fn guidelines_embed(
          version — l'objectif est de vérifier si la sanction est justifiée.\n\n"
     ));
     if let Some(a) = action_id {
-        desc.push_str(&format!("**Référence de l'action :** `{}`\n\n", &a[..16.min(a.len())]));
+        desc.push_str(&format!(
+            "**Référence de l'action :** `{}`\n\n",
+            &a[..16.min(a.len())]
+        ));
     }
     desc.push_str(&guidelines);
 
@@ -499,9 +502,10 @@ async fn ensure_admin(ctx: &Context, component: &ComponentInteraction) -> bool {
 async fn do_cancel_action(ctx: &Context, action_id: &str) -> Result<(), String> {
     let data = ctx.data.read().await;
     let base = data.get::<ApiClientKey>().ok_or("api indisponible")?;
-    let req = base
-        .client()
-        .delete(format!("{}/api/moderation/actions/{action_id}", base.base_url()));
+    let req = base.client().delete(format!(
+        "{}/api/moderation/actions/{action_id}",
+        base.base_url()
+    ));
     let resp = base.auth(req).send().await.map_err(|e| e.to_string())?;
     if resp.status().is_success() {
         Ok(())
@@ -517,7 +521,11 @@ fn vote_embed(voters: &[String], quorum: usize) -> serenity::builder::CreateEmbe
     let voter_list = if voters.is_empty() {
         "—".to_string()
     } else {
-        voters.iter().map(|v| format!("<@{v}>")).collect::<Vec<_>>().join(", ")
+        voters
+            .iter()
+            .map(|v| format!("<@{v}>"))
+            .collect::<Vec<_>>()
+            .join(", ")
     };
     let status = if reached {
         "✅ Quorum atteint — un **administrateur** peut valider l'annulation."
@@ -536,11 +544,17 @@ pub async fn handle_vote_cancel(ctx: &Context, component: &ComponentInteraction)
     if !ensure_moderator(ctx, component).await {
         return;
     }
-    let Some(action_id) = component.data.custom_id.strip_prefix(APPEAL_VOTE_PREFIX).map(str::to_string)
+    let Some(action_id) = component
+        .data
+        .custom_id
+        .strip_prefix(APPEAL_VOTE_PREFIX)
+        .map(str::to_string)
     else {
         return;
     };
-    let Some(guild_id) = component.guild_id.map(|g| g.to_string()) else { return };
+    let Some(guild_id) = component.guild_id.map(|g| g.to_string()) else {
+        return;
+    };
     let quorum = cancel_quorum(ctx, &guild_id).await;
 
     let voters: Vec<String> = {
@@ -556,7 +570,10 @@ pub async fn handle_vote_cancel(ctx: &Context, component: &ComponentInteraction)
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
-                    .content(format!("🗳️ Ton vote est pris en compte ({}/{quorum}).", voters.len()))
+                    .content(format!(
+                        "🗳️ Ton vote est pris en compte ({}/{quorum}).",
+                        voters.len()
+                    ))
                     .ephemeral(true),
             ),
         )
@@ -576,11 +593,17 @@ pub async fn handle_validate_cancel(ctx: &Context, component: &ComponentInteract
     if !ensure_admin(ctx, component).await {
         return;
     }
-    let Some(action_id) = component.data.custom_id.strip_prefix(APPEAL_VALIDATE_PREFIX).map(str::to_string)
+    let Some(action_id) = component
+        .data
+        .custom_id
+        .strip_prefix(APPEAL_VALIDATE_PREFIX)
+        .map(str::to_string)
     else {
         return;
     };
-    let Some(guild_id) = component.guild_id.map(|g| g.to_string()) else { return };
+    let Some(guild_id) = component.guild_id.map(|g| g.to_string()) else {
+        return;
+    };
     let quorum = cancel_quorum(ctx, &guild_id).await;
 
     let count = cancel_votes()
@@ -606,7 +629,9 @@ pub async fn handle_validate_cancel(ctx: &Context, component: &ComponentInteract
     let _ = component
         .create_response(
             &ctx.http,
-            CreateInteractionResponse::Defer(CreateInteractionResponseMessage::new().ephemeral(true)),
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
         )
         .await;
 
@@ -640,15 +665,20 @@ pub async fn handle_ban_close(ctx: &Context, component: &ComponentInteraction) {
     if !ensure_moderator(ctx, component).await {
         return;
     }
-    let Some(user_id) = component.data.custom_id.strip_prefix(APPEAL_BANCLOSE_PREFIX).map(str::to_string)
+    let Some(user_id) = component
+        .data
+        .custom_id
+        .strip_prefix(APPEAL_BANCLOSE_PREFIX)
+        .map(str::to_string)
     else {
         return;
     };
-    let confirm = serenity::builder::CreateActionRow::Buttons(vec![serenity::builder::CreateButton::new(
-        format!("{APPEAL_BANCONFIRM_PREFIX}{user_id}"),
-    )
-    .label("⚠️ Confirmer le bannissement")
-    .style(serenity::all::ButtonStyle::Danger)]);
+    let confirm =
+        serenity::builder::CreateActionRow::Buttons(vec![serenity::builder::CreateButton::new(
+            format!("{APPEAL_BANCONFIRM_PREFIX}{user_id}"),
+        )
+        .label("⚠️ Confirmer le bannissement")
+        .style(serenity::all::ButtonStyle::Danger)]);
     let _ = component
         .create_response(
             &ctx.http,
@@ -669,11 +699,17 @@ pub async fn handle_ban_confirm(ctx: &Context, component: &ComponentInteraction)
     if !ensure_moderator(ctx, component).await {
         return;
     }
-    let Some(user_id) = component.data.custom_id.strip_prefix(APPEAL_BANCONFIRM_PREFIX).map(str::to_string)
+    let Some(user_id) = component
+        .data
+        .custom_id
+        .strip_prefix(APPEAL_BANCONFIRM_PREFIX)
+        .map(str::to_string)
     else {
         return;
     };
-    let Some(gid) = component.guild_id else { return };
+    let Some(gid) = component.guild_id else {
+        return;
+    };
     let _ = component
         .create_response(
             &ctx.http,
@@ -686,7 +722,12 @@ pub async fn handle_ban_confirm(ctx: &Context, component: &ComponentInteraction)
         .await;
     if let Ok(uid) = user_id.parse::<u64>() {
         if let Err(e) = gid
-            .ban_with_reason(&ctx.http, UserId::new(uid), 0, "Appel refusé — bannissement")
+            .ban_with_reason(
+                &ctx.http,
+                UserId::new(uid),
+                0,
+                "Appel refusé — bannissement",
+            )
             .await
         {
             warn!(error = %e, user_id, "Echec ban depuis salon d'appel");

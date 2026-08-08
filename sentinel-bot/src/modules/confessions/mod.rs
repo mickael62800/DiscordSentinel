@@ -20,6 +20,9 @@ use tracing::{info, warn};
 use crate::shared::api_client::BaseApiClient;
 use crate::shared::heartbeat::ApiClientKey;
 
+mod api_client;
+use api_client::{ConfessionConfigData, ConfessionsApi};
+
 pub const MODULE_BOT_NAME: &str = "confessions";
 
 // ── Custom IDs ──────────────────────────────────────────────────────────
@@ -215,55 +218,38 @@ async fn admin_delete(ctx: &Context, command: &CommandInteraction) {
         return;
     }
     let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let api = match api_client(ctx).await {
+    let api = match confessions_api(ctx).await {
         Some(a) => a,
         None => return,
     };
     // Trouve la confession par numero
-    let path = format!(
-        "/api/confessions/{}/list?limit=500&include_deleted=false",
-        guild_id
-    );
-    let list: Result<Vec<serde_json::Value>, String> = api.get_json(&path).await;
-    let list = match list {
+    let list = match api.list(&guild_id, 500, false).await {
         Ok(l) => l,
         Err(e) => {
             reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await;
             return;
         }
     };
-    let target = list
-        .iter()
-        .find(|c| c.get("public_number").and_then(|v| v.as_i64()) == Some(number));
-    let target = match target {
+    let target = match list.into_iter().find(|c| c.public_number == number) {
         Some(t) => t,
         None => {
             reply_ephemeral(ctx, command, &format!("Confession #{} introuvable", number)).await;
             return;
         }
     };
-    let id = target.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    // Pas de delete_json avec body, on poste le payload via post_json sur
-    // un endpoint patch-like. Notre route DELETE accepte un body : on fait
-    // un appel HTTP direct via reqwest.
-    let url = format!("{}/api/confessions/by-id/{}", api.base_url(), id);
-    let body = serde_json::json!({
-        "deleted_by": command.user.id.to_string(),
-        "reason": "Supprimee par admin via slash command",
-    });
-    let req = api
-        .client()
-        .request(reqwest::Method::DELETE, &url)
-        .json(&body);
-    let req = api.auth(req);
-    let resp: Result<(), String> = req.send().await.map(|_| ()).map_err(|e| e.to_string());
+    let resp = api
+        .delete(
+            &target.id,
+            &command.user.id.to_string(),
+            Some("Supprimee par admin via slash command"),
+        )
+        .await;
     match resp {
         Ok(_) => {
             // Supprime aussi le message Discord (best-effort)
-            if let (Some(ch), Some(msg)) = (
-                target.get("channel_id").and_then(|v| v.as_str()),
-                target.get("message_id").and_then(|v| v.as_str()),
-            ) {
+            if let (Some(ch), Some(msg)) =
+                (target.channel_id.as_deref(), target.message_id.as_deref())
+            {
                 if let (Ok(c), Ok(m)) = (ch.parse::<u64>(), msg.parse::<u64>()) {
                     let _ = ChannelId::new(c)
                         .delete_message(&ctx.http, MessageId::new(m))
@@ -290,31 +276,24 @@ async fn admin_reveal(ctx: &Context, command: &CommandInteraction) {
         return;
     }
     let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let api = match api_client(ctx).await {
+    let api = match confessions_api(ctx).await {
         Some(a) => a,
         None => return,
     };
-    let path = format!(
-        "/api/confessions/{}/list?limit=500&include_deleted=true",
-        guild_id
-    );
-    let list: Result<Vec<serde_json::Value>, String> = api.get_json(&path).await;
-    let list = match list {
+    let list = match api.list(&guild_id, 500, true).await {
         Ok(l) => l,
         Err(e) => {
             reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await;
             return;
         }
     };
-    let target = list
-        .iter()
-        .find(|c| c.get("public_number").and_then(|v| v.as_i64()) == Some(number));
-    match target {
+    match list.into_iter().find(|c| c.public_number == number) {
         Some(t) => {
-            let author = t
-                .get("author_user_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("?");
+            let author = if t.author_user_id.is_empty() {
+                "?".to_string()
+            } else {
+                t.author_user_id
+            };
             reply_ephemeral(
                 ctx,
                 command,
@@ -448,42 +427,29 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
     let guild_id = modal.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let user_id = modal.user.id.to_string();
 
-    let api = match api_client(ctx).await {
-        Some(a) => a,
-        None => return,
+    // base (HTTP) pour la config transverse `/api/bots/config` (repost_panel) ;
+    // api (gRPC) pour les operations confessions.
+    let (base, api) = match (api_client(ctx).await, confessions_api(ctx).await) {
+        (Some(b), Some(a)) => (b, a),
+        _ => return,
     };
 
     // 1. Cree la confession via API
-    let create_body = serde_json::json!({
-        "guild_id": guild_id,
-        "author_user_id": user_id,
-        "content": content,
-    });
-    let created: Result<serde_json::Value, String> =
-        api.post_json("/api/confessions", &create_body).await;
-    let created = match created {
-        Ok(v) => v,
+    let created = match api.create(&guild_id, &user_id, &content).await {
+        Ok(c) => c,
         Err(e) => {
             modal_reply_ephemeral(ctx, modal, &format!("❌ {}", e)).await;
             return;
         }
     };
-    let id = created.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    let public_number = created
-        .get("public_number")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0);
+    let id = created.id;
+    let public_number = created.public_number;
 
     // 2. Recupere la config (gardee entiere pour pouvoir republier le panneau).
-    let cfg_path = format!("/api/confessions/config/{}", guild_id);
-    let cfg_val: Option<serde_json::Value> = api.get_json(&cfg_path).await.ok();
-    let channel_id_str = cfg_val
+    let cfg = api.get_config(&guild_id).await.ok();
+    let channel_id_str = cfg
         .as_ref()
-        .and_then(|c| {
-            c.get("channel_id")
-                .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
-        })
+        .and_then(|c| c.channel_id.clone())
         .unwrap_or_default();
     if channel_id_str.is_empty() {
         modal_reply_ephemeral(
@@ -547,22 +513,14 @@ async fn handle_submit(ctx: &Context, modal: &ModalInteraction) {
     let thread_id = thread.as_ref().map(|t| t.id.to_string());
 
     // 5. Update message_refs cote API
-    let refs_body = serde_json::json!({
-        "message_id": posted.id.to_string(),
-        "channel_id": ch.to_string(),
-        "thread_id": thread_id,
-    });
-    let _: Result<serde_json::Value, String> = api
-        .post_json(
-            &format!("/api/confessions/by-id/{}/message-refs", id),
-            &refs_body,
-        )
+    let _ = api
+        .update_message_refs(&id, &posted.id.to_string(), &ch.to_string(), thread_id)
         .await;
 
     // 6. "Message collant" : on republie le panneau EN BAS du salon pour que le
     // bouton "Poster une confession" reste accessible sans remonter le fil.
-    if let Some(cfg_val) = cfg_val {
-        repost_panel(ctx, &api, ch, cfg_val).await;
+    if let Some(cfg) = cfg {
+        repost_panel(ctx, &base, ch, cfg).await;
     }
 
     modal_reply_ephemeral(
@@ -580,17 +538,10 @@ async fn repost_panel(
     ctx: &Context,
     api: &Arc<BaseApiClient>,
     channel: ChannelId,
-    cfg_val: serde_json::Value,
+    cfg: ConfessionConfigData,
 ) {
-    let old_panel_id = cfg_val
-        .get("panel_message_id")
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string());
-    let guild_id = cfg_val
-        .get("guild_id")
-        .and_then(|v| v.as_str())
-        .unwrap_or_default()
-        .to_string();
+    let old_panel_id = cfg.panel_message_id.clone();
+    let guild_id = cfg.guild_id.clone();
 
     let posted = match channel
         .send_message(
@@ -637,44 +588,23 @@ async fn handle_reply(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
         .await;
     let content = extract_input(modal, "content").unwrap_or_default();
     let user_id = modal.user.id.to_string();
-    let api = match api_client(ctx).await {
+    let api = match confessions_api(ctx).await {
         Some(a) => a,
         None => return,
     };
 
-    let body = serde_json::json!({
-        "author_user_id": user_id,
-        "content": content,
-        "is_anonymous": true,
-    });
-    let created: Result<serde_json::Value, String> = api
-        .post_json(
-            &format!("/api/confessions/by-id/{}/replies", conf_id),
-            &body,
-        )
-        .await;
-    let created = match created {
+    let created = match api.create_reply(conf_id, &user_id, &content, true).await {
         Ok(v) => v,
         Err(e) => {
             modal_reply_ephemeral(ctx, modal, &format!("❌ {}", e)).await;
             return;
         }
     };
-    let reply_id = created.get("id").and_then(|v| v.as_str()).unwrap_or("");
-    let public_number = created
-        .get("public_number")
-        .and_then(|v| v.as_i64())
-        .unwrap_or(0);
+    let reply_id = created.id;
+    let public_number = created.public_number;
 
     // Recupere la confession pour avoir le thread_id
-    let conf: Result<serde_json::Value, String> = api
-        .get_json(&format!("/api/confessions/by-id/{}", conf_id))
-        .await;
-    let thread_id_str = conf.ok().and_then(|c| {
-        c.get("thread_id")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-    });
+    let thread_id_str = api.get(conf_id).await.ok().and_then(|c| c.thread_id);
     let Some(thread_id) = thread_id_str else {
         modal_reply_ephemeral(ctx, modal, "❌ Thread introuvable").await;
         return;
@@ -695,12 +625,8 @@ async fn handle_reply(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
         .send_message(&ctx.http, CreateMessage::new().embed(embed))
         .await;
     if let Ok(m) = posted {
-        let body = serde_json::json!({ "message_id": m.id.to_string() });
-        let _: Result<serde_json::Value, String> = api
-            .post_json(
-                &format!("/api/confessions/replies/{}/message-id", reply_id),
-                &body,
-            )
+        let _ = api
+            .update_reply_message_id(&reply_id, &m.id.to_string())
             .await;
     }
     modal_reply_ephemeral(ctx, modal, "✅ Reponse anonyme postee").await;
@@ -709,19 +635,19 @@ async fn handle_reply(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
 async fn handle_report(ctx: &Context, modal: &ModalInteraction, conf_id: &str) {
     let reason = extract_input(modal, "reason").unwrap_or_default();
     let guild_id = modal.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let api = match api_client(ctx).await {
+    let api = match confessions_api(ctx).await {
         Some(a) => a,
         None => return,
     };
-    let body = serde_json::json!({
-        "guild_id": guild_id,
-        "confession_id": conf_id,
-        "reply_id": null,
-        "reporter_user_id": modal.user.id.to_string(),
-        "reason": reason,
-    });
-    let resp: Result<serde_json::Value, String> =
-        api.post_json("/api/confessions/reports", &body).await;
+    let resp = api
+        .create_report(
+            &guild_id,
+            Some(conf_id),
+            None,
+            &modal.user.id.to_string(),
+            &reason,
+        )
+        .await;
     match resp {
         Ok(_) => modal_reply_ephemeral(ctx, modal, "✅ Signalement transmis aux moderateurs").await,
         Err(e) => modal_reply_ephemeral(ctx, modal, &format!("❌ {}", e)).await,
@@ -746,6 +672,14 @@ fn extract_input(modal: &ModalInteraction, field_id: &str) -> Option<String> {
 async fn api_client(ctx: &Context) -> Option<Arc<BaseApiClient>> {
     let data = ctx.data.read().await;
     data.get::<ApiClientKey>().cloned()
+}
+
+/// Client gRPC du `ConfessionsService`, construit depuis le client partage.
+async fn confessions_api(ctx: &Context) -> Option<ConfessionsApi> {
+    let data = ctx.data.read().await;
+    data.get::<crate::shared::grpc_client::GrpcClientKey>()
+        .cloned()
+        .map(ConfessionsApi::new)
 }
 
 /// Ecrit une cle de reglage confessions dans la source unique
@@ -962,19 +896,12 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
             if confession_id.is_empty() || message_id_str.is_empty() {
                 return;
             }
-            let api = match api_client(ctx).await {
+            let api = match confessions_api(ctx).await {
                 Some(a) => a,
                 None => return,
             };
-            let conf: Result<serde_json::Value, String> = api
-                .get_json(&format!("/api/confessions/by-id/{}", confession_id))
-                .await;
-            let thread_id_str = match conf {
-                Ok(c) => c
-                    .get("thread_id")
-                    .and_then(|v| v.as_str())
-                    .map(|s| s.to_string())
-                    .unwrap_or_default(),
+            let thread_id_str = match api.get(confession_id).await {
+                Ok(c) => c.thread_id.unwrap_or_default(),
                 Err(_) => return,
             };
             if thread_id_str.is_empty() {

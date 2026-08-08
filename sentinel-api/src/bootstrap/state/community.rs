@@ -22,8 +22,8 @@ use sentinel_core::ports::inbound::community::manage_monthly_ranking::ManageMont
 use sentinel_core::ports::inbound::community::manage_news::ManageNewsUseCase;
 use sentinel_core::ports::inbound::community::manage_polls::ManagePollsUseCase;
 use sentinel_core::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
-use sentinel_core::ports::inbound::community::manage_spotlight::ManageSpotlightUseCase;
 use sentinel_core::ports::inbound::community::manage_sponsorships::ManageSponsorshipsUseCase;
+use sentinel_core::ports::inbound::community::manage_spotlight::ManageSpotlightUseCase;
 use sentinel_core::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
 use sentinel_core::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
 use sentinel_core::ports::inbound::community::read_presence::ReadPresenceUseCase;

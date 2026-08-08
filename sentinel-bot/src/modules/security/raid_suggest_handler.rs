@@ -168,7 +168,12 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
         // lockdown sur le serveur B (custom_id forge/rejoue).
         if component.guild_id != Some(guild_id) {
             warn!(user = %component.user.name, target = %guild_id, "Confirmation anti-raid cross-serveur refusee");
-            finalize(ctx, component, "\u{26a0}\u{fe0f} Action non autorisée sur ce serveur").await;
+            finalize(
+                ctx,
+                component,
+                "\u{26a0}\u{fe0f} Action non autorisée sur ce serveur",
+            )
+            .await;
             return;
         }
 

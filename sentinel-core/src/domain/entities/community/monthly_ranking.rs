@@ -165,7 +165,12 @@ mod tests {
 
     #[test]
     fn top_entries_sorts_filters_and_truncates() {
-        let rows = vec![row("a", 10, 5), row("b", 30, 0), row("c", 0, 40), row("d", -5, 0)];
+        let rows = vec![
+            row("a", 10, 5),
+            row("b", 30, 0),
+            row("c", 0, 40),
+            row("d", -5, 0),
+        ];
 
         let text = top_entries(&rows, 2, |t, _| t);
         assert_eq!(text.len(), 2);

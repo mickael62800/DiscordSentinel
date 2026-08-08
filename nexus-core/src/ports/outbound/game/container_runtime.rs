@@ -303,7 +303,9 @@ impl ContainerRuntime for MockContainerRuntime {
     }
 
     async fn logs(&self, _container_id: &str, _lines: u32) -> Result<Vec<String>, DomainError> {
-        Ok(vec!["[Mock Runtime] Server initialized successfully.".into()])
+        Ok(vec![
+            "[Mock Runtime] Server initialized successfully.".into()
+        ])
     }
 
     async fn list_managed_containers(&self) -> Result<Vec<ManagedContainer>, DomainError> {

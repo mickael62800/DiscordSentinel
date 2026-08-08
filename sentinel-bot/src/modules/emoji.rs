@@ -69,5 +69,4 @@ mod tests {
             _ => panic!(),
         }
     }
-
 }

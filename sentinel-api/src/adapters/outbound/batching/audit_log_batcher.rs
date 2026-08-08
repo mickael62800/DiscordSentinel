@@ -1,11 +1,11 @@
 //! BatchedPgAuditLogRepository — wrap PgAuditLogRepository avec un BatchWriter<AuditLog>.
 
 use crate::adapters::outbound::postgres::audit::audit_log_repository::PgAuditLogRepository;
-use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
-use sentinel_core::ports::outbound::audit::audit_log_repository::AuditLogRepository;
 use async_trait::async_trait;
 use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_core::ports::outbound::audit::audit_log_repository::AuditLogRepository;
 use sqlx::PgPool;
 use sqlx::QueryBuilder;
 

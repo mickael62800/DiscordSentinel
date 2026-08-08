@@ -10,7 +10,6 @@
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-
 use super::api_client::ApiClient;
 use super::WatchedUserIdsKey;
 
@@ -73,7 +72,9 @@ pub async fn bootstrap_watched_users(ctx: &Context) {
         warn!("bootstrap_watched_users: WatchedUserIdsKey manquant");
         return;
     };
-    let api_client = data.get::<crate::shared::grpc_client::GrpcClientKey>().cloned();
+    let api_client = data
+        .get::<crate::shared::grpc_client::GrpcClientKey>()
+        .cloned();
     drop(data);
 
     let Some(base) = api_client else {
@@ -111,7 +112,10 @@ async fn refresh_watched_for_guilds(
         for id in collected {
             watched_set.insert(id);
         }
-        info!(count = watched_set.len(), origine, "watched_users cache rafraichi via API");
+        info!(
+            count = watched_set.len(),
+            origine, "watched_users cache rafraichi via API"
+        );
     }
 }
 
@@ -136,7 +140,9 @@ pub async fn handle_watched_refresh_event(ctx: &Context, payload_json: &str) {
     let Some(watched_set) = data.get::<WatchedUserIdsKey>().cloned() else {
         return;
     };
-    let api_client = data.get::<crate::shared::grpc_client::GrpcClientKey>().cloned();
+    let api_client = data
+        .get::<crate::shared::grpc_client::GrpcClientKey>()
+        .cloned();
     drop(data);
 
     let Some(base) = api_client else {

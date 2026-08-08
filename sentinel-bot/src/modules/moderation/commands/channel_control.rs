@@ -57,16 +57,14 @@ pub fn register_slowmode() -> CreateCommand {
 }
 
 /// Extrait une option de type salon.
-fn option_channel(
-    options: &[serenity::all::CommandDataOption],
-    name: &str,
-) -> Option<ChannelId> {
-    options.iter().find(|o| o.name == name).and_then(|o| {
-        match &o.value {
+fn option_channel(options: &[serenity::all::CommandDataOption], name: &str) -> Option<ChannelId> {
+    options
+        .iter()
+        .find(|o| o.name == name)
+        .and_then(|o| match &o.value {
             serenity::all::CommandDataOptionValue::Channel(id) => Some(*id),
             _ => None,
-        }
-    })
+        })
 }
 
 /// Salon cible : option `channel` si fournie, sinon le salon de la commande.

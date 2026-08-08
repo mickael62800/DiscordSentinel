@@ -70,4 +70,3 @@ where
 {
     post_json(path, &serde_json::json!({})).await
 }
-

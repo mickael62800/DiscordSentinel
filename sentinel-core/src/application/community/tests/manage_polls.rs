@@ -72,11 +72,7 @@ impl PollRepository for MockRepo {
         Ok(true)
     }
 
-    async fn vote_of(
-        &self,
-        _poll_id: Uuid,
-        user_id: &str,
-    ) -> Result<Option<Uuid>, DomainError> {
+    async fn vote_of(&self, _poll_id: Uuid, user_id: &str) -> Result<Option<Uuid>, DomainError> {
         Ok(self
             .votes
             .lock()
@@ -159,7 +155,9 @@ fn service(repo: MockRepo) -> (ManagePollsService, Arc<MockRepo>) {
 #[tokio::test]
 async fn creation_rogne_la_question_et_vide_la_description_blanche() {
     let (svc, repo) = service(MockRepo::default());
-    svc.create(cmd(vec![("A", None), ("B", None)])).await.unwrap();
+    svc.create(cmd(vec![("A", None), ("B", None)]))
+        .await
+        .unwrap();
 
     let saved = repo.created.lock().unwrap()[0].clone();
     assert_eq!(saved.question, "Quel jeu ?");
@@ -192,9 +190,14 @@ async fn moins_de_deux_choix_est_refuse() {
 #[tokio::test]
 async fn options_blanches_sont_ignorees_puis_comptees() {
     let (svc, repo) = service(MockRepo::default());
-    svc.create(cmd(vec![("A", None), ("  ", None), ("B", None), ("", None)]))
-        .await
-        .unwrap();
+    svc.create(cmd(vec![
+        ("A", None),
+        ("  ", None),
+        ("B", None),
+        ("", None),
+    ]))
+    .await
+    .unwrap();
     assert_eq!(repo.created.lock().unwrap()[0].options.len(), 2);
 }
 
@@ -213,7 +216,8 @@ async fn options_blanches_ne_masquent_pas_un_choix_unique() {
 async fn options_en_double_sont_refusees_meme_a_la_casse_pres() {
     let (svc, _) = service(MockRepo::default());
     assert!(matches!(
-        svc.create(cmd(vec![("Valheim", None), ("valheim", None)])).await,
+        svc.create(cmd(vec![("Valheim", None), ("valheim", None)]))
+            .await,
         Err(DomainError::ValidationError(_))
     ));
 }
@@ -233,9 +237,12 @@ async fn trop_d_options_est_refuse() {
 #[tokio::test]
 async fn couleur_est_normalisee_et_le_diese_retire() {
     let (svc, repo) = service(MockRepo::default());
-    svc.create(cmd(vec![("A", Some("#A855F7")), ("B", Some("pas-une-couleur"))]))
-        .await
-        .unwrap();
+    svc.create(cmd(vec![
+        ("A", Some("#A855F7")),
+        ("B", Some("pas-une-couleur")),
+    ]))
+    .await
+    .unwrap();
 
     let options = repo.created.lock().unwrap()[0].options.clone();
     assert_eq!(options[0].1.as_deref(), Some("a855f7"));

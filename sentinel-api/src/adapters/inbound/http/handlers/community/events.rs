@@ -136,7 +136,11 @@ fn default_true() -> bool {
 fn parse_dt(s: &str, field: &str) -> Result<DateTime<Utc>, ApiError> {
     DateTime::parse_from_rfc3339(s)
         .map(|d| d.with_timezone(&Utc))
-        .map_err(|_| ApiError(DomainError::ValidationError(format!("{field} invalide (RFC3339)"))))
+        .map_err(|_| {
+            ApiError(DomainError::ValidationError(format!(
+                "{field} invalide (RFC3339)"
+            )))
+        })
 }
 
 // ── Back-office ──
@@ -148,7 +152,6 @@ pub async fn list_events(
     Path(guild_id): Path<String>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<EventDto>>, ApiError> {
-
     let events = state
         .events_uc
         .list_window(&guild_id, parse_window(&q)?, false)
@@ -185,7 +188,6 @@ pub async fn create_event(
     Path(guild_id): Path<String>,
     Json(dto): Json<UpsertEventDto>,
 ) -> Result<Json<EventDto>, ApiError> {
-
     let author = user
         .as_ref()
         .map(|Extension(c)| c.discord_user_id.clone())
@@ -201,7 +203,11 @@ pub async fn create_event(
         ends_at: parse_dt(&dto.ends_at, "ends_at")?,
         all_day: dto.all_day,
         is_public: dto.is_public,
-        status: dto.status.as_deref().map(EventStatus::parse).unwrap_or(EventStatus::Published),
+        status: dto
+            .status
+            .as_deref()
+            .map(EventStatus::parse)
+            .unwrap_or(EventStatus::Published),
         created_by: author,
     };
     Ok(Json(state.events_uc.create(cmd).await?.into()))
@@ -226,7 +232,11 @@ pub async fn update_event(
         ends_at: parse_dt(&dto.ends_at, "ends_at")?,
         all_day: dto.all_day,
         is_public: dto.is_public,
-        status: dto.status.as_deref().map(EventStatus::parse).unwrap_or(EventStatus::Published),
+        status: dto
+            .status
+            .as_deref()
+            .map(EventStatus::parse)
+            .unwrap_or(EventStatus::Published),
         created_by: existing.event.created_by,
     };
     Ok(Json(state.events_uc.update(id, cmd).await?.into()))
@@ -258,7 +268,9 @@ pub async fn join_event(
     Json(dto): Json<JoinDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let Some(Extension(ctx)) = user else {
-        return Err(ApiError(DomainError::Forbidden("auth Discord requise".into())));
+        return Err(ApiError(DomainError::Forbidden(
+            "auth Discord requise".into(),
+        )));
     };
 
     state
@@ -267,7 +279,10 @@ pub async fn join_event(
             id,
             &ctx.discord_user_id,
             "",
-            dto.answer.as_deref().map(EventAnswer::parse).unwrap_or(EventAnswer::Going),
+            dto.answer
+                .as_deref()
+                .map(EventAnswer::parse)
+                .unwrap_or(EventAnswer::Going),
         )
         .await?;
     Ok(Json(serde_json::json!({ "ok": true })))
@@ -280,7 +295,9 @@ pub async fn leave_event(
     Path(id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let Some(Extension(ctx)) = user else {
-        return Err(ApiError(DomainError::Forbidden("auth Discord requise".into())));
+        return Err(ApiError(DomainError::Forbidden(
+            "auth Discord requise".into(),
+        )));
     };
     state.events_uc.leave(id, &ctx.discord_user_id).await?;
     Ok(Json(serde_json::json!({ "ok": true })))

@@ -4,8 +4,6 @@
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use crate::shared::heartbeat::ApiClientKey;
-
 use super::labels::action_label;
 use super::{CLOSE_PREFIX, FINALIZE_PREFIX};
 
@@ -41,24 +39,14 @@ pub(crate) async fn handle_decided_event(ctx: &Context, payload: &str) {
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
 
-    let api = {
+    let grpc = {
         let d = ctx.data.read().await;
-        match d.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
+        match d.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
             None => return,
         }
     };
-
-    #[derive(serde::Deserialize)]
-    struct Mapping {
-        kind: String,
-        channel_id: String,
-        message_id: String,
-    }
-    let mappings: Vec<Mapping> = match api
-        .get_json(&format!("/api/discord-messages/{action_id}"))
-        .await
-    {
+    let mappings = match crate::sync::list_action_messages(&grpc, action_id).await {
         Ok(l) => l,
         Err(e) => {
             warn!(error = %e, action_id, "Echec fetch mapping (decided)");

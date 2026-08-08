@@ -9,9 +9,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::community::poll::{
-    Poll, UpsertPollCommand, MAX_OPTIONS, MIN_OPTIONS,
-};
+use crate::domain::entities::community::poll::{Poll, UpsertPollCommand, MAX_OPTIONS, MIN_OPTIONS};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::community::manage_polls::{ManagePollsUseCase, PollWithVote};
 use crate::ports::outbound::community::poll_repository::PollRepository;
@@ -43,7 +41,12 @@ impl ManagePollsService {
 
         cmd.description = cmd
             .description
-            .map(|d| d.trim().chars().take(MAX_DESCRIPTION_CHARS).collect::<String>())
+            .map(|d| {
+                d.trim()
+                    .chars()
+                    .take(MAX_DESCRIPTION_CHARS)
+                    .collect::<String>()
+            })
             .filter(|d| !d.is_empty());
 
         // Un sondage deja clos a sa creation ne recueillerait aucune voix.
@@ -58,7 +61,11 @@ impl ManagePollsService {
         let mut vues: Vec<String> = Vec::new();
         let mut options = Vec::new();
         for (label, couleur) in std::mem::take(&mut cmd.options) {
-            let label = label.trim().chars().take(MAX_LABEL_CHARS).collect::<String>();
+            let label = label
+                .trim()
+                .chars()
+                .take(MAX_LABEL_CHARS)
+                .collect::<String>();
             if label.is_empty() {
                 continue;
             }
@@ -85,9 +92,7 @@ impl ManagePollsService {
             ));
         }
         if options.len() > MAX_OPTIONS {
-            return Err(DomainError::ValidationError(
-                "dix choix au maximum".into(),
-            ));
+            return Err(DomainError::ValidationError("dix choix au maximum".into()));
         }
         cmd.options = options;
 
@@ -115,11 +120,7 @@ impl ManagePollsUseCase for ManagePollsService {
             .await
     }
 
-    async fn get(
-        &self,
-        id: Uuid,
-        viewer_id: Option<&str>,
-    ) -> Result<PollWithVote, DomainError> {
+    async fn get(&self, id: Uuid, viewer_id: Option<&str>) -> Result<PollWithVote, DomainError> {
         let poll = self.load(id).await?;
         let my_vote = match viewer_id {
             Some(uid) => self.repo.vote_of(id, uid).await?,

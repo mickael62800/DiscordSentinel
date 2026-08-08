@@ -133,7 +133,6 @@ pub async fn banned_ips(
     State(state): State<SystemState>,
     _user: Option<Extension<WebUser>>,
 ) -> Result<Json<BannedIpsResponse>, ApiError> {
-
     let Some(status) = state.ip_bans_uc.fail2ban_status().await.map_err(ApiError)? else {
         return Ok(Json(BannedIpsResponse {
             installed: false,
@@ -244,7 +243,6 @@ pub async fn ban_ip(
     user: Option<Extension<WebUser>>,
     Json(dto): Json<BanIpDto>,
 ) -> Result<Json<BanIpResponse>, ApiError> {
-
     let actor = user
         .as_ref()
         .map(|r| r.0.discord_user_id.clone())
@@ -284,7 +282,6 @@ pub async fn unban_ip(
     user: Option<Extension<WebUser>>,
     Json(dto): Json<BanIpDto>,
 ) -> Result<Json<BanIpResponse>, ApiError> {
-
     let actor = user
         .as_ref()
         .map(|r| r.0.discord_user_id.clone())
@@ -763,7 +760,8 @@ pub async fn traffic_trend(
     Query(q): Query<TrafficTrendQuery>,
 ) -> Result<Json<TrafficTrendResponse>, ApiError> {
     let window = LogWindow::parse(q.window.as_deref().unwrap_or("24h"));
-    let bucket_min = (crate::adapters::inbound::http::helpers::normalize_in(q.bucket_minutes, 5, 1, 60)) as i64;
+    let bucket_min =
+        (crate::adapters::inbound::http::helpers::normalize_in(q.bucket_minutes, 5, 1, 60)) as i64;
 
     let trend = state
         .security_logs_uc

@@ -4,12 +4,12 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
-use sentinel_core::ports::outbound::moderation::infraction_repository::InfractionRepository;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::moderation::infraction::Infraction;
 use sentinel_core::domain::enums::moderation::action::Action;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_core::ports::outbound::moderation::infraction_repository::InfractionRepository;
 
 pub struct PgInfractionRepository {
     pool: PgPool,
@@ -223,7 +223,10 @@ impl InfractionRepository for PgInfractionRepository {
         .fetch_all(&self.pool)
         .await
         .map_err(pg_ctx("count_infractions_by_action"))?;
-        Ok(rows.into_iter().map(|(a, n)| (a, n.max(0) as u64)).collect())
+        Ok(rows
+            .into_iter()
+            .map(|(a, n)| (a, n.max(0) as u64))
+            .collect())
     }
 }
 

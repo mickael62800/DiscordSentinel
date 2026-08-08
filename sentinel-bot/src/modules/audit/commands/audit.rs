@@ -147,7 +147,13 @@ async fn handle_search(ctx: &Context, command: &CommandInteraction) {
                     .map(|(i, e)| {
                         let actor = e.actor_name.as_deref().unwrap_or("?");
                         let target = e.target_name.as_deref().unwrap_or("?");
-                        format!("{}. **{}** par {} sur {}", i + 1, e.event_type, actor, target)
+                        format!(
+                            "{}. **{}** par {} sur {}",
+                            i + 1,
+                            e.event_type,
+                            actor,
+                            target
+                        )
                     })
                     .collect::<Vec<_>>()
                     .join("\n")

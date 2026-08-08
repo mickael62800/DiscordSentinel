@@ -6,9 +6,9 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_ctx;
-use sentinel_core::ports::outbound::community::monthly_ranking_repository::MonthlyRankingRepository;
 use sentinel_core::domain::entities::community::monthly_ranking::RankingRow;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::monthly_ranking_repository::MonthlyRankingRepository;
 
 pub struct PgMonthlyRankingRepository {
     pool: PgPool,

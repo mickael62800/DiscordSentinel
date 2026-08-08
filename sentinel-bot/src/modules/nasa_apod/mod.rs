@@ -97,8 +97,9 @@ async fn tick(ctx: &Context) -> Result<(), String> {
             .get("timezone_offset")
             .and_then(|v| v.trim().parse::<i64>().ok())
             .unwrap_or(0);
-        let target_utc =
-            sentinel_core::domain::services::system::scheduling::local_hour_to_utc(post_hour, offset);
+        let target_utc = sentinel_core::domain::services::system::scheduling::local_hour_to_utc(
+            post_hour, offset,
+        );
         if now_hour != target_utc {
             continue;
         }
@@ -106,8 +107,8 @@ async fn tick(ctx: &Context) -> Result<(), String> {
         if api_key.trim().is_empty() {
             continue; // cle obligatoire : rien sans elle
         }
-        let Some(channel) = get_channel_from_config(ctx, &guild_id, MODULE_BOT_NAME, "channel_id")
-            .await
+        let Some(channel) =
+            get_channel_from_config(ctx, &guild_id, MODULE_BOT_NAME, "channel_id").await
         else {
             continue;
         };
@@ -180,7 +181,10 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
 
     // La recuperation + traduction peut prendre 1-2 s : on differe la reponse.
     if command
-        .create_response(&ctx.http, CreateInteractionResponse::Defer(Default::default()))
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(Default::default()),
+        )
         .await
         .is_err()
     {
@@ -341,7 +345,11 @@ fn build_embed(apod: &Apod, title: &str, explanation: &str, marker: &str) -> Cre
     // Image : pour une image, la grande version ; pour une video, la vignette.
     if apod.media_type == "image" {
         let img = apod.hdurl.clone().unwrap_or_default();
-        let img = if img.is_empty() { apod.url.clone() } else { img };
+        let img = if img.is_empty() {
+            apod.url.clone()
+        } else {
+            img
+        };
         if !img.is_empty() {
             embed = embed.image(img);
         }

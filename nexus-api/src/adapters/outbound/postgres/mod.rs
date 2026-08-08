@@ -1,13 +1,13 @@
 //! Adapters Postgres (sqlx) implementant les ports outbound de nexus-core.
 
 pub mod casino;
-pub mod coussin_repository;
-pub mod coussin_inventory_repository;
-pub mod coussin_insurance_repository;
-pub mod coussin_steal_repository;
-pub mod coussin_prime_repository;
 pub mod coussin_bet_repository;
 pub mod coussin_cooldown_repository;
+pub mod coussin_insurance_repository;
+pub mod coussin_inventory_repository;
+pub mod coussin_prime_repository;
+pub mod coussin_repository;
+pub mod coussin_steal_repository;
 pub mod game;
 pub mod system;
 pub mod wallet_repository;

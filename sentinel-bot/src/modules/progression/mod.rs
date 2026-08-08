@@ -7,8 +7,8 @@ pub mod classement_cmd;
 pub mod level_channel;
 pub mod level_cmd;
 pub mod nickname;
-pub mod role_tiers;
 pub mod resync_cmd;
+pub mod role_tiers;
 pub mod stats_cmd;
 pub mod tracker;
 

@@ -21,7 +21,9 @@ fn salon(nom: &str, n: usize) -> VoiceChannelPresence {
     VoiceChannelPresence {
         channel_id: nom.into(),
         channel_name: nom.into(),
-        members: (0..n).map(|i| membre(&format!("u{i}"), false, false, false)).collect(),
+        members: (0..n)
+            .map(|i| membre(&format!("u{i}"), false, false, false))
+            .collect(),
         restreint: false,
     }
 }
@@ -87,14 +89,25 @@ fn total_additionne_les_salons() {
 #[test]
 fn salons_vides_sont_ecartes() {
     let p = presence(vec![salon("plein", 2), salon("vide", 0)], 0);
-    let noms: Vec<_> = p.occupied_channels().iter().map(|c| c.channel_name.as_str()).collect();
+    let noms: Vec<_> = p
+        .occupied_channels()
+        .iter()
+        .map(|c| c.channel_name.as_str())
+        .collect();
     assert_eq!(noms, vec!["plein"]);
 }
 
 #[test]
 fn salons_sont_tries_du_plus_peuple_au_moins_peuple() {
-    let p = presence(vec![salon("petit", 1), salon("gros", 5), salon("moyen", 3)], 0);
-    let noms: Vec<_> = p.occupied_channels().iter().map(|c| c.channel_name.as_str()).collect();
+    let p = presence(
+        vec![salon("petit", 1), salon("gros", 5), salon("moyen", 3)],
+        0,
+    );
+    let noms: Vec<_> = p
+        .occupied_channels()
+        .iter()
+        .map(|c| c.channel_name.as_str())
+        .collect();
     assert_eq!(noms, vec!["gros", "moyen", "petit"]);
 }
 
@@ -139,7 +152,11 @@ fn sans_restreints_ne_garde_que_les_salons_publics() {
     let p = presence(vec![salon("general", 2), salon_restreint("staff", 3)], 0);
     let filtre = p.sans_restreints();
 
-    let noms: Vec<&str> = filtre.channels.iter().map(|c| c.channel_name.as_str()).collect();
+    let noms: Vec<&str> = filtre
+        .channels
+        .iter()
+        .map(|c| c.channel_name.as_str())
+        .collect();
     assert_eq!(noms, vec!["general"]);
 }
 

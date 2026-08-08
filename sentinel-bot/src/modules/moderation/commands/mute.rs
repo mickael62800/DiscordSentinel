@@ -161,7 +161,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let duration_secs = duration_minutes.map(|m| (m as u64) * 60);
     let is_permanent = duration_minutes.is_none();
-    let timeout_secs = duration_secs.unwrap_or(max_allowed_secs).min(max_allowed_secs);
+    let timeout_secs = duration_secs
+        .unwrap_or(max_allowed_secs)
+        .min(max_allowed_secs);
 
     let duration_label = if is_permanent {
         format!("{} jours (max Discord)", max_allowed_secs / (24 * 3600))

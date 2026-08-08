@@ -9,7 +9,7 @@ mod adaptive_slowmode;
 mod discussions;
 mod dto;
 mod fp_stats;
-mod reviews;
+pub(crate) mod reviews;
 
 pub use adaptive_slowmode::*;
 pub use discussions::*;

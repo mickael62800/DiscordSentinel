@@ -11,8 +11,8 @@ pub mod voice;
 pub(super) use super::audit_event;
 pub(super) use super::permission_diff;
 pub(super) use super::watched_users;
-pub(super) use super::{log, post_to_channel, send_event};
 pub(super) use super::MessageCacheKey;
+pub(super) use super::{log, post_to_channel, send_event};
 
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;

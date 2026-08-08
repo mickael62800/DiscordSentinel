@@ -29,11 +29,11 @@ use futures_util::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use nexus_core::domain::errors::DomainError;
 use nexus_core::ports::outbound::game::container_runtime::{
     ContainerRuntime, ContainerSpec, ContainerState, ContainerStats, ContainerStatus,
     ManagedContainer, PortProtocol, RestartPolicy,
 };
-use nexus_core::domain::errors::DomainError;
 
 const SENTINEL_LABEL_KEY: &str = "sentinel.managed";
 const SENTINEL_LABEL_VALUE: &str = "game-portal";

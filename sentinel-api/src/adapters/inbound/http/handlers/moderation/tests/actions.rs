@@ -1,7 +1,7 @@
 use super::*;
-use sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry;
 use chrono::TimeZone;
 use chrono::Utc;
+use sentinel_core::ports::outbound::moderation::review_repository::ReviewEntry;
 use uuid::Uuid;
 
 fn sample_entry(resolved: Option<chrono::DateTime<Utc>>) -> ReviewEntry {

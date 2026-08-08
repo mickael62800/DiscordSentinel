@@ -14,9 +14,9 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
-use sentinel_core::domain::errors::DomainError;
 use test_helpers::build_test_state_welcome;
 
 #[derive(Default)]

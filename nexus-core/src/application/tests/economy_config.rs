@@ -34,8 +34,6 @@ fn multiplicateur_n_ecrase_pas_les_petits_montants() {
     assert_eq!(c.apply_payout(50), 60);
 }
 
-
-
 #[test]
 fn transfert_dans_les_bornes_est_accepte() {
     let c = EconomyConfig {
@@ -118,9 +116,6 @@ fn penalite_d_echec_est_toujours_d_au_moins_un_coin() {
     assert_eq!(CoussinConfig::default().steal_penalty(0), 1);
 }
 
-
-
-
 // ── Lecture des valeurs stockees ──
 
 fn kv(paires: &[(&str, &str)]) -> Vec<BotGuildConfig> {
@@ -159,7 +154,11 @@ fn cle_absente_retombe_sur_le_defaut() {
 fn booleen_accepte_les_deux_ecritures() {
     assert!(b(&kv(&[("steal_enabled", "true")]), "steal_enabled", false));
     assert!(b(&kv(&[("steal_enabled", "1")]), "steal_enabled", false));
-    assert!(!b(&kv(&[("steal_enabled", "false")]), "steal_enabled", true));
+    assert!(!b(
+        &kv(&[("steal_enabled", "false")]),
+        "steal_enabled",
+        true
+    ));
     assert!(!b(&kv(&[("steal_enabled", "0")]), "steal_enabled", true));
 }
 

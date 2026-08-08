@@ -78,7 +78,6 @@ pub async fn validate_sponsorship(
     ValidatedGuild { guild_id }: ValidatedGuild,
     Json(body): Json<SponsorshipEligibilityBody>,
 ) -> Result<Json<EligibilityDto>, ApiError> {
-
     let decision = state
         .eligibility_uc
         .validate_sponsorship(ValidateSponsorshipCommand {

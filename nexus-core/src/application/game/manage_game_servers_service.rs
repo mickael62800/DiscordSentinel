@@ -188,11 +188,11 @@ impl ManageGameServersService {
         // Le CONTENEUR recoit plus que le jeu : une JVM configuree avec 2 Go
         // de tas en consomme davantage, et se fait tuer par le noyau si la
         // limite du conteneur vaut exactement son tas.
-        let memory_bytes = (crate::domain::entities::game::server::container_memory_mb(
-            server.allocated_memory_mb,
-        ) as u64)
-            * 1024
-            * 1024;
+        let memory_bytes =
+            (crate::domain::entities::game::server::container_memory_mb(server.allocated_memory_mb)
+                as u64)
+                * 1024
+                * 1024;
         env.insert(
             "MEMORY".to_string(),
             format!("{}M", server.allocated_memory_mb),

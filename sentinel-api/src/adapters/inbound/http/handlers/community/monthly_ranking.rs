@@ -3,8 +3,8 @@
 //! regle metier (gates, deltas, assemblage des tops, baselines) vit dans
 //! `ManageMonthlyRankingUseCase` ; le SQL dans `MonthlyRankingRepository`.
 
-use axum::Json;
 use axum::extract::State;
+use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
@@ -65,7 +65,6 @@ pub async fn force_publish_monthly_ranking(
     State(state): State<CommunityState>,
     Json(req): Json<ForceRankingRequest>,
 ) -> Result<Json<ForceRankingResponse>, ApiError> {
-
     let data = state
         .monthly_ranking_uc
         .force_ranking(&req.guild_id, req.mois)

@@ -109,6 +109,14 @@ fn container_lifecycle_routes() -> Router<AppState> {
             post(handlers::game::servers::execute_rcon),
         )
         .route(
+            "/api/games/servers/{server_id}/stream-logs",
+            get(handlers::game::servers::stream_logs_sse),
+        )
+        .route(
+            "/api/games/servers/{server_id}/stream-stats",
+            get(handlers::game::servers::stream_stats_sse),
+        )
+        .route(
             "/api/games/servers/{server_id}",
             delete(handlers::game::servers::delete_server),
         )
@@ -199,24 +207,66 @@ pub fn build_router_with(state: AppState, config: HttpConfig) -> Router {
             "/api/wheel/{guild_id}/cases",
             get(handlers::wheel::list_cases).put(handlers::wheel::replace_cases),
         )
-        .route("/api/coussin/{guild_id}/{user_id}/profile", get(handlers::coussin::profile))
-        .route("/api/coussin/{guild_id}/{user_id}/class", post(handlers::coussin::choose_class))
-        .route("/api/coussin/{guild_id}/{user_id}/train", post(handlers::coussin::train))
-        .route("/api/coussin/{guild_id}/{user_id}/inventory", get(handlers::coussin::inventory))
-        .route("/api/coussin/{guild_id}/{user_id}/shop", post(handlers::coussin::buy_item))
-        .route("/api/coussin/{guild_id}/{user_id}/insurance", get(handlers::coussin::insurance).post(handlers::coussin::buy_insurance))
-        .route("/api/coussin/{guild_id}/{user_id}/steal", post(handlers::coussin::steal))
-        .route("/api/coussin/{guild_id}/{user_id}/prime", post(handlers::coussin::place_prime))
-        .route("/api/coussin/{guild_id}/{user_id}/bets", post(handlers::coussin::place_bet))
-        .route("/api/coussin/{guild_id}/classement", get(handlers::coussin::ranking))
+        .route(
+            "/api/coussin/{guild_id}/{user_id}/profile",
+            get(handlers::coussin::profile),
+        )
+        .route(
+            "/api/coussin/{guild_id}/{user_id}/class",
+            post(handlers::coussin::choose_class),
+        )
+        .route(
+            "/api/coussin/{guild_id}/{user_id}/train",
+            post(handlers::coussin::train),
+        )
+        .route(
+            "/api/coussin/{guild_id}/{user_id}/inventory",
+            get(handlers::coussin::inventory),
+        )
+        .route(
+            "/api/coussin/{guild_id}/{user_id}/shop",
+            post(handlers::coussin::buy_item),
+        )
+        .route(
+            "/api/coussin/{guild_id}/{user_id}/insurance",
+            get(handlers::coussin::insurance).post(handlers::coussin::buy_insurance),
+        )
+        .route(
+            "/api/coussin/{guild_id}/{user_id}/steal",
+            post(handlers::coussin::steal),
+        )
+        .route(
+            "/api/coussin/{guild_id}/{user_id}/prime",
+            post(handlers::coussin::place_prime),
+        )
+        .route(
+            "/api/coussin/{guild_id}/{user_id}/bets",
+            post(handlers::coussin::place_bet),
+        )
+        .route(
+            "/api/coussin/{guild_id}/classement",
+            get(handlers::coussin::ranking),
+        )
         .route(
             "/api/coussin/{guild_id}/{user_id}/combats",
             get(handlers::coussin::combat_history),
         )
-        .route("/api/coussin/{guild_id}/combats", post(handlers::coussin::challenge))
-        .route("/api/coussin/combats/{id}/accept", post(handlers::coussin::accept))
-        .route("/api/coussin/combats/{id}/refuse", post(handlers::coussin::refuse))
-        .route("/api/coussin/combats/{id}/resolve", post(handlers::coussin::resolve))
+        .route(
+            "/api/coussin/{guild_id}/combats",
+            post(handlers::coussin::challenge),
+        )
+        .route(
+            "/api/coussin/combats/{id}/accept",
+            post(handlers::coussin::accept),
+        )
+        .route(
+            "/api/coussin/combats/{id}/refuse",
+            post(handlers::coussin::refuse),
+        )
+        .route(
+            "/api/coussin/combats/{id}/resolve",
+            post(handlers::coussin::resolve),
+        )
         .route(
             "/api/games/{guild_id}/by-category",
             get(handlers::casino::games::list_games_by_category),
@@ -342,7 +392,10 @@ pub fn build_router_with(state: AppState, config: HttpConfig) -> Router {
         ))
         // Pose APRES l'auth donc traverse AVANT elle : une inondation de
         // requetes non authentifiees doit etre coupee sans consulter l'etat.
-        .layer(middleware::from_fn_with_state(limiter, rate_limit_middleware));
+        .layer(middleware::from_fn_with_state(
+            limiter,
+            rate_limit_middleware,
+        ));
 
     // Vitrine publique : montee HORS du groupe protege par le Bearer, comme
     // /health. Le DTO est ecrit champ par champ (cf. public_servers.rs).
@@ -445,9 +498,7 @@ async fn single_guild(
         .uri()
         .path()
         .split('/')
-        .find(|seg| {
-            (17..=20).contains(&seg.len()) && seg.chars().all(|c| c.is_ascii_digit())
-        })
+        .find(|seg| (17..=20).contains(&seg.len()) && seg.chars().all(|c| c.is_ascii_digit()))
         .map(str::to_string);
 
     if let Some(gid) = trouve {

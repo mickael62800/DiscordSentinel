@@ -145,7 +145,8 @@ pub async fn update_streak(
     Json(dto): Json<UpdateStreakDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state
-        .system.bot_persistence_uc
+        .system
+        .bot_persistence_uc
         .update_streak(
             &guild_id,
             &user_id,
@@ -183,7 +184,8 @@ pub async fn update_ticket_sla(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
     state
-        .system.tickets_uc
+        .system
+        .tickets_uc
         .update_sla(
             uuid,
             dto.first_response_at.as_deref(),
@@ -232,7 +234,8 @@ pub async fn create_sponsorship(
     // Pass-through pour les appels bot-internal (user absent).
 
     state
-        .community.sponsorship_repo
+        .community
+        .sponsorship_repo
         .create(&dto.guild_id, &dto.sponsor_id, &dto.sponsored_id)
         .await
         .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert sponsorship"))
@@ -246,12 +249,15 @@ pub async fn list_sponsorships(
     State(state): State<AppState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
-) -> Result<Json<Vec<sentinel_core::ports::outbound::community::sponsorship_repository::Sponsorship>>, ApiError>
-{
+) -> Result<
+    Json<Vec<sentinel_core::ports::outbound::community::sponsorship_repository::Sponsorship>>,
+    ApiError,
+> {
     // Validation
 
     let entries = state
-        .community.sponsorship_repo
+        .community
+        .sponsorship_repo
         .list(&guild_id)
         .await
         .unwrap_or_else(|e| {
@@ -298,7 +304,8 @@ pub async fn create_temp_role(
     // C5 — Gate user : moderator+ requis pour assigner un role temporaire.
 
     state
-        .community.temp_role_repo
+        .community
+        .temp_role_repo
         .create(&dto.guild_id, &dto.user_id, &dto.role_id, &dto.expires_at)
         .await
         .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert temp_role"))
@@ -312,12 +319,15 @@ pub async fn list_temp_roles(
     State(state): State<AppState>,
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
-) -> Result<Json<Vec<sentinel_core::ports::outbound::community::temp_role_repository::TempRole>>, ApiError>
-{
+) -> Result<
+    Json<Vec<sentinel_core::ports::outbound::community::temp_role_repository::TempRole>>,
+    ApiError,
+> {
     // Validation
 
     let entries = state
-        .community.temp_role_repo
+        .community
+        .temp_role_repo
         .list_active(&guild_id)
         .await
         .unwrap_or_else(|e| {
@@ -344,7 +354,8 @@ pub async fn delete_temp_role(
     // X-Discord-Token → pass-through non-breaking.
 
     state
-        .community.temp_role_repo
+        .community
+        .temp_role_repo
         .delete(&guild_id, &user_id, &role_id)
         .await
         .inspect_err(|e| warn!(error = %e, guild_id = %guild_id, "Echec delete temp_role"))
@@ -405,7 +416,8 @@ pub async fn create_pending_action(
     .map_err(ApiError)?;
 
     match state
-        .moderation.pending_action_repo
+        .moderation
+        .pending_action_repo
         .create(
             &dto.guild_id,
             &dto.moderator_id,
@@ -439,7 +451,8 @@ pub async fn list_pending_actions(
     // Validation
 
     let entries = state
-        .moderation.pending_action_repo
+        .moderation
+        .pending_action_repo
         .list_pending(&guild_id)
         .await
         .unwrap_or_else(|e| {
@@ -470,7 +483,8 @@ pub async fn resolve_pending_action(
     let uuid = validation::parse_uuid("id", &id).map_err(ApiError)?;
 
     state
-        .moderation.pending_action_repo
+        .moderation
+        .pending_action_repo
         .resolve(uuid, &dto.status, &dto.reviewed_by)
         .await
         .inspect_err(|e| warn!(error = %e, action_id = %id, "Echec resolution pending_action"))

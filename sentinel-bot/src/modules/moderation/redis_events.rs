@@ -47,8 +47,14 @@ async fn handle_sursis_ban(ctx: &Context, data: &serde_json::Value) {
         info!(guild_id, user_id, "Sursis expire -> ban definitif applique");
     }
     // Nettoie le salon d'appel si connu.
-    if let Some(cid) = data.get("channel_id").and_then(|v| v.as_str()).and_then(|s| s.parse::<u64>().ok()) {
-        let _ = serenity::model::id::ChannelId::new(cid).delete(&ctx.http).await;
+    if let Some(cid) = data
+        .get("channel_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<u64>().ok())
+    {
+        let _ = serenity::model::id::ChannelId::new(cid)
+            .delete(&ctx.http)
+            .await;
     }
 }
 

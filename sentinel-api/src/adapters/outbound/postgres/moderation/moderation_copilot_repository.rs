@@ -14,9 +14,9 @@ use chrono::Utc;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_ctx;
-use sentinel_core::ports::outbound::moderation::moderation_copilot_repository::ModerationCopilotRepository;
 use sentinel_core::domain::entities::moderation::copilot::PrecedentDistribution;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::moderation::moderation_copilot_repository::ModerationCopilotRepository;
 
 pub struct PgModerationCopilotRepository {
     pool: PgPool,

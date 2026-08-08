@@ -262,7 +262,10 @@ pub async fn restore(
             };
             // Discord attend une image en data URI base64.
             let data_uri = CreateAttachment::bytes(bytes, "emoji").to_base64();
-            match guild_id.create_emoji(&ctx.http, &emoji.name, &data_uri).await {
+            match guild_id
+                .create_emoji(&ctx.http, &emoji.name, &data_uri)
+                .await
+            {
                 Ok(_) => report.emojis_created += 1,
                 Err(e) => {
                     let msg = e.to_string();
@@ -462,7 +465,9 @@ async fn apply_settings(
             None => {
                 warn!(guild = %guild_id, url = %icon_url, "guild_backup: echec download icone");
                 report.icon_restored = Some(false);
-                report.notes.push("icone non restauree (download)".to_string());
+                report
+                    .notes
+                    .push("icone non restauree (download)".to_string());
             }
         }
     }

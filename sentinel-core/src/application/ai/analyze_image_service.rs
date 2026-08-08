@@ -157,7 +157,10 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
         //    fusionnees depuis l'ancien ia_config via la migration 146).
         let automod_entries = match self
             .bot_config_repo
-            .get_config(&cmd.guild_id, crate::domain::entities::system::bot_names::AUTOMOD_BOT)
+            .get_config(
+                &cmd.guild_id,
+                crate::domain::entities::system::bot_names::AUTOMOD_BOT,
+            )
             .await
         {
             Ok(e) => e,

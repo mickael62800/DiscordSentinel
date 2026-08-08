@@ -19,11 +19,24 @@ pub trait CoussinProfileUseCase: Send + Sync {
         limit: i64,
     ) -> Result<Vec<crate::ports::outbound::coussin_repository::CoussinCombatResult>, DomainError>;
 
-    async fn choose_class(&self, guild_id: &str, user_id: &str, username: &str, class: &str) -> Result<CoussinProfile, DomainError>;
-    async fn train(&self, guild_id: &str, user_id: &str, username: &str, stat: &str) -> Result<CoussinProfile, DomainError>;
+    async fn choose_class(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        class: &str,
+    ) -> Result<CoussinProfile, DomainError>;
+    async fn train(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        stat: &str,
+    ) -> Result<CoussinProfile, DomainError>;
     /// Classement des joueurs de la guild (supervision). Lecture seule :
     /// contrairement a `profile`, ne cree aucun profil manquant.
-    async fn ranking(&self, guild_id: &str, limit: i64) -> Result<Vec<CoussinProfile>, DomainError>;
+    async fn ranking(&self, guild_id: &str, limit: i64)
+        -> Result<Vec<CoussinProfile>, DomainError>;
 }
 
 #[async_trait]

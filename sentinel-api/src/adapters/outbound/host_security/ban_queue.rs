@@ -8,8 +8,8 @@ use std::path::Path;
 
 use async_trait::async_trait;
 
-use sentinel_core::ports::outbound::system::host_ban_queue::HostBanQueue;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::system::host_ban_queue::HostBanQueue;
 
 const BANS_PENDING_PATH: &str = "/var/lib/sentinel/bans-pending.txt";
 const UNBANS_PENDING_PATH: &str = "/var/lib/sentinel/unbans-pending.txt";
@@ -33,9 +33,7 @@ impl FileBanQueue {
         // NOUVELLE ligne de ban -> on pourrait bannir une IP arbitraire (LAN/
         // loopback) en contournant validate_bannable_ip. On neutralise ces
         // caracteres de controle avant l'ecriture.
-        let safe_reason = reason
-            .unwrap_or("")
-            .replace(['\n', '\r', '\t'], " ");
+        let safe_reason = reason.unwrap_or("").replace(['\n', '\r', '\t'], " ");
         let line = format!(
             "{}\t{}\t{}\n",
             ip,

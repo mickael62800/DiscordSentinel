@@ -56,7 +56,6 @@ pub async fn add_strike(
     _user: Option<Extension<WebUser>>,
     Json(dto): Json<AddStrikeDto>,
 ) -> Result<Json<StrikeResultDto>, ApiError> {
-
     let (command, (guild_id, user_id)) = crate::capture_and_into!(dto, guild_id, user_id);
     let result = state.strikes_uc.add_strike(command).await?;
 

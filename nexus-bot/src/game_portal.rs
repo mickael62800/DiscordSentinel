@@ -424,7 +424,10 @@ async fn create_channel(
         b
     };
 
-    let premiere = match guild_id.create_channel(&ctx.http, construire(category)).await {
+    let premiere = match guild_id
+        .create_channel(&ctx.http, construire(category))
+        .await
+    {
         Ok(ch) => return Some(ch.id),
         Err(e) => e,
     };

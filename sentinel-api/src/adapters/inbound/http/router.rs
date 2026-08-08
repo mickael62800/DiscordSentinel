@@ -110,7 +110,6 @@ fn protected_domain_routes() -> Router<AppState> {
         .merge(routes::guild_structure::routes())
         .merge(routes::bump::routes())
         .merge(routes::community::routes())
-        .merge(routes::rotation::routes())
         // Système + jobs async + RBAC + welcome
         .merge(routes::system::routes())
 }

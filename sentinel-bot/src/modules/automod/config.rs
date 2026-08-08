@@ -23,14 +23,17 @@ pub(super) fn build_detector_config(
             config,
             "spam_repeat_char_threshold",
             6,
-        ).max(1) as usize,
+        )
+        .max(1) as usize,
         spam_repeat_word_threshold: BaseApiClient::config_u64(
             config,
             "spam_repeat_word_threshold",
             5,
-        ).max(1) as usize,
+        )
+        .max(1) as usize,
         caps_enabled: BaseApiClient::config_bool(config, "caps_warning_enabled", true),
-        caps_threshold_chars: BaseApiClient::config_u64(config, "caps_threshold_chars", 8).max(1) as usize,
+        caps_threshold_chars: BaseApiClient::config_u64(config, "caps_threshold_chars", 8).max(1)
+            as usize,
         insult_enabled: BaseApiClient::config_bool(config, "insult_detection_enabled", true),
         insult_custom_words: crate::shared::parsers::split_csv(&BaseApiClient::config_or(
             config,

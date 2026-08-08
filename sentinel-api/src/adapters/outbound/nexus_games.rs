@@ -167,14 +167,10 @@ impl NexusGamesClient {
         &self,
         req: reqwest::RequestBuilder,
     ) -> Result<T, DomainError> {
-        let reponse = req
-            .bearer_auth(&self.api_key)
-            .send()
-            .await
-            .map_err(|e| {
-                tracing::warn!(error = %e, "nexus-games : appel echoue");
-                DomainError::Internal("plateforme de jeux injoignable".into())
-            })?;
+        let reponse = req.bearer_auth(&self.api_key).send().await.map_err(|e| {
+            tracing::warn!(error = %e, "nexus-games : appel echoue");
+            DomainError::Internal("plateforme de jeux injoignable".into())
+        })?;
 
         let statut = reponse.status();
         if statut.is_success() {

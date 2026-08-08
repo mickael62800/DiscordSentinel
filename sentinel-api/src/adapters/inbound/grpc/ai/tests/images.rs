@@ -67,10 +67,10 @@ fn analysis_to_proto_no_action_no_classifications() {
 
 // ── RPC handler tests avec mock ──
 
-use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
-use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use async_trait::async_trait;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use std::sync::Arc;
 use std::sync::Mutex;
 

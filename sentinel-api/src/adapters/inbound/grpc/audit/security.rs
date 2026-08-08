@@ -10,11 +10,11 @@ use tonic::Response;
 use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
+use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
+use sentinel_core::domain::services::audit::security_analyzer::JoinInfo;
 use sentinel_core::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
 use sentinel_core::ports::inbound::audit::manage_security::ManageSecurityUseCase;
 use sentinel_core::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
-use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
-use sentinel_core::domain::services::audit::security_analyzer::JoinInfo;
 pub struct SecurityGrpc {
     pub uc: Arc<dyn ManageSecurityUseCase>,
 }

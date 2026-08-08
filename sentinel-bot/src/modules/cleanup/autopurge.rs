@@ -74,8 +74,7 @@ async fn tick(ctx: &Context, last: &mut HashMap<(u64, u64), Instant>) {
 
         // Programme par salon : [{channel_id, hours}, ...] (JSON).
         let schedule_json = BaseApiClient::config_or(&cfg, "autopurge_schedule", "");
-        let schedule: Vec<ScheduleEntry> =
-            serde_json::from_str(&schedule_json).unwrap_or_default();
+        let schedule: Vec<ScheduleEntry> = serde_json::from_str(&schedule_json).unwrap_or_default();
 
         for entry in &schedule {
             let Ok(cid) = entry.channel_id.trim().parse::<u64>() else {

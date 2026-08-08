@@ -1,10 +1,10 @@
-use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_core::domain::entities::system::discord_ids::ChannelId;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::MessageId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use serde::Deserialize;
 use serde::Serialize;
 

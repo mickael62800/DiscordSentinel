@@ -8,28 +8,22 @@ use tracing::{info, warn};
 
 use crate::shared::api_client::BaseApiClient;
 
+use super::super::api_client::{ApiClient, DiscussionMessageIn, ReviewData};
 use super::context::fetch_context_before_ids;
-use super::render::{aggregated_vote_embed, render_history_totals, ReviewResp, VoteDto};
+use super::render::{aggregated_vote_embed, render_history_totals};
 
 /// Archive le salon de discussion lie a une review finalisee : renomme en
 /// "clos-…" et retire le droit d'ecrire au membre concerne (les moderateurs
 /// gardent l'acces en lecture pour la trace). No-op si aucun salon.
 pub(crate) async fn archive_discussion_channel(
     ctx: &Context,
-    api: &Arc<BaseApiClient>,
+    review_api: &ApiClient,
     review_id: &str,
     _target_user_id: &str,
 ) {
     use serenity::all::ChannelId;
 
-    #[derive(serde::Deserialize)]
-    struct DiscussionResp {
-        channel_id: String,
-    }
-    let Ok(Some(disc)) = api
-        .get_json::<Option<DiscussionResp>>(&format!("/api/automod/reviews/{review_id}/discussion"))
-        .await
-    else {
+    let Ok(Some(disc)) = review_api.get_discussion(review_id).await else {
         return;
     };
     let Ok(cid) = disc.channel_id.parse::<u64>() else {
@@ -39,7 +33,7 @@ pub(crate) async fn archive_discussion_channel(
 
     // Snapshot de la conversation -> DB (trace consultable sur le web) AVANT de
     // supprimer le salon. La trace reste consultable sur le web ensuite.
-    snapshot_discussion_messages(ctx, api, review_id, channel).await;
+    snapshot_discussion_messages(ctx, review_api, review_id, channel).await;
 
     // Suppression du salon : l'affaire est close, la conversation est archivee.
     if let Err(e) = channel.delete(&ctx.http).await {
@@ -54,7 +48,7 @@ pub(crate) async fn archive_discussion_channel(
 /// puis POST en batch (idempotent cote serveur sur (review, message_id)).
 async fn snapshot_discussion_messages(
     ctx: &Context,
-    api: &Arc<BaseApiClient>,
+    review_api: &ApiClient,
     review_id: &str,
     channel: serenity::all::ChannelId,
 ) {
@@ -71,27 +65,21 @@ async fn snapshot_discussion_messages(
     if msgs.is_empty() {
         return;
     }
-    // L'API renvoie du plus recent au plus ancien -> ordre chronologique.
-    let messages: Vec<serde_json::Value> = msgs
+    // On renvoie du plus recent au plus ancien -> ordre chronologique.
+    let messages: Vec<DiscussionMessageIn> = msgs
         .iter()
         .rev()
-        .map(|m| {
-            serde_json::json!({
-                "discord_message_id": m.id.to_string(),
-                "author_id": m.author.id.to_string(),
-                "author_name": m.author.name,
-                "author_is_bot": m.author.bot,
-                "content": m.content,
-                "sent_at": m.timestamp.to_string(),
-            })
+        .map(|m| DiscussionMessageIn {
+            discord_message_id: m.id.to_string(),
+            author_id: m.author.id.to_string(),
+            author_name: m.author.name.clone(),
+            author_is_bot: m.author.bot,
+            content: m.content.clone(),
+            sent_at: m.timestamp.to_string(),
         })
         .collect();
-    let body = serde_json::json!({ "messages": messages });
-    if let Err(e) = api
-        .post_json::<_, serde_json::Value>(
-            &format!("/api/automod/reviews/{review_id}/discussion/messages"),
-            &body,
-        )
+    if let Err(e) = review_api
+        .append_discussion_messages(review_id, messages)
         .await
     {
         warn!(error = %e, review_id, "Echec persistance transcript discussion");
@@ -109,20 +97,12 @@ async fn snapshot_discussion_messages(
 pub(super) async fn edit_aggregated_card(
     ctx: &Context,
     api: &Arc<BaseApiClient>,
-    resp: &ReviewResp,
+    review_api: &ApiClient,
+    resp: &ReviewData,
 ) -> bool {
     use serenity::all::{ChannelId, MessageId};
 
-    #[derive(serde::Deserialize)]
-    struct Mapping {
-        kind: String,
-        channel_id: String,
-        message_id: String,
-    }
-    let mappings: Vec<Mapping> = match api
-        .get_json(&format!("/api/discord-messages/{}", resp.id))
-        .await
-    {
+    let mappings = match crate::sync::list_action_messages(review_api.grpc(), &resp.id).await {
         Ok(m) => m,
         Err(e) => {
             warn!(error = %e, review_id = %resp.id, "Echec fetch mapping (agregation)");
@@ -143,10 +123,7 @@ pub(super) async fn edit_aggregated_card(
     let msg_id = MessageId::new(mid);
 
     // Recharge les votes pour les conserver dans l'embed reconstruit.
-    let votes: Vec<VoteDto> = api
-        .get_json(&format!("/api/automod/reviews/{}/votes", resp.id))
-        .await
-        .unwrap_or_default();
+    let votes = review_api.list_votes(&resp.id).await.unwrap_or_default();
 
     let mut embed = aggregated_vote_embed(resp, &votes);
     // Re-injecte le CONTEXTE autour du DERNIER message agrege (sinon il

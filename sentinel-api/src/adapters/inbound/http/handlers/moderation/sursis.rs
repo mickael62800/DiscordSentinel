@@ -1,7 +1,7 @@
 //! Handlers « ban en sursis ».
 
-use axum::Json;
 use axum::extract::{Path, State};
+use axum::Json;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -128,8 +128,12 @@ pub async fn resolve_sursis(
     Path(id): Path<Uuid>,
     Json(dto): Json<ResolveSursisDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let status = SursisStatus::from_str_lossy(&dto.status)
-        .ok_or_else(|| ApiError(DomainError::ValidationError(format!("statut invalide : {}", dto.status))))?;
+    let status = SursisStatus::from_str_lossy(&dto.status).ok_or_else(|| {
+        ApiError(DomainError::ValidationError(format!(
+            "statut invalide : {}",
+            dto.status
+        )))
+    })?;
     // Gate sur la guilde du sursis (derive de la ressource) avant de resoudre.
     state
         .sursis_uc

@@ -6,8 +6,8 @@ use crate::adapters::inbound::http::dto::ai::analyze_image::AnalyzeImageRequestD
 use crate::adapters::inbound::http::dto::ai::analyze_image::AnalyzeImageResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::bootstrap::state::AiState;
-use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 
 // Limites et content-types autorises sont definis dans `domain/entities/image_analysis.rs`.
 use sentinel_core::domain::entities::ai::image_analysis::is_allowed_image_content_type;

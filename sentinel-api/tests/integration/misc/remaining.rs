@@ -18,7 +18,6 @@ fn ugid() -> String {
     )
 }
 
-
 // ── Guild members ──
 
 #[tokio::test]

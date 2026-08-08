@@ -31,7 +31,12 @@ fn ordering_matches_hierarchy() {
     // Verifie la chaine complete plutot que des paires choisies : ainsi
     // l'ajout d'un role au milieu casse le test au lieu de passer inapercu.
     for paire in TOUS.windows(2) {
-        assert!(paire[0] < paire[1], "{:?} devrait preceder {:?}", paire[0], paire[1]);
+        assert!(
+            paire[0] < paire[1],
+            "{:?} devrait preceder {:?}",
+            paire[0],
+            paire[1]
+        );
     }
 }
 
@@ -72,6 +77,9 @@ fn member_est_le_role_le_plus_faible() {
 fn acces_backoffice_commence_a_viewer() {
     assert!(!Role::Member.has_backoffice_access());
     for r in [Role::Viewer, Role::Moderator, Role::Admin, Role::Owner] {
-        assert!(r.has_backoffice_access(), "{r:?} doit acceder au back-office");
+        assert!(
+            r.has_backoffice_access(),
+            "{r:?} doit acceder au back-office"
+        );
     }
 }

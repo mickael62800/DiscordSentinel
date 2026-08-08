@@ -88,6 +88,48 @@ pub mod automod {
     }
 }
 
+pub mod security_state {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.security_state.v1");
+    }
+}
+
+pub mod automod_review {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.automod_review.v1");
+    }
+}
+
+pub mod discord_messages {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.discord_messages.v1");
+    }
+}
+
+pub mod sursis {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.sursis.v1");
+    }
+}
+
+pub mod bump {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.bump.v1");
+    }
+}
+
+pub mod confessions {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.confessions.v1");
+    }
+}
+
+pub mod announcements {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.announcements.v1");
+    }
+}
+
 pub mod voice {
     pub mod v1 {
         tonic::include_proto!("sentinel.voice.v1");

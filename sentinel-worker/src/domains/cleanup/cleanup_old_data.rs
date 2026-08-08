@@ -55,10 +55,12 @@ pub async fn run(pool: &PgPool, config: &CleanupConfig) -> Result<(), String> {
 
     let logs_deleted = match logs_days {
         Some(days) => {
-            match sqlx::query("DELETE FROM logs WHERE created_at < NOW() - make_interval(days => $1)")
-                .bind(days)
-                .execute(pool)
-                .await
+            match sqlx::query(
+                "DELETE FROM logs WHERE created_at < NOW() - make_interval(days => $1)",
+            )
+            .bind(days)
+            .execute(pool)
+            .await
             {
                 Ok(r) => r.rows_affected(),
                 Err(e) => {

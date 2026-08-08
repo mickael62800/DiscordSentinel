@@ -66,4 +66,3 @@ pub async fn connect() -> Result<Channel, String> {
         .await
         .map_err(|e| format!("connect gRPC {url}: {e}"))
 }
-

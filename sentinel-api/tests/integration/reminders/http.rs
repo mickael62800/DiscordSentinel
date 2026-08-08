@@ -16,9 +16,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::inbound::moderation::manage_reminders::*;
 use sentinel_core::domain::entities::moderation::action::sanction_reminder::*;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::moderation::manage_reminders::*;
 
 // ══════════════════════════════════════════════════════════
 // Mock Reminders Use Case

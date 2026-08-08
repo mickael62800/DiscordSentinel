@@ -118,7 +118,8 @@ impl ManageMonthlyRankingUseCase for ManageMonthlyRankingService {
             let cfg = self.load_config(guild_id).await;
 
             // Module + feature actifs ?
-            if !cfg_bool(&cfg, "enabled", false) || !cfg_bool(&cfg, "monthly_ranking_enabled", false)
+            if !cfg_bool(&cfg, "enabled", false)
+                || !cfg_bool(&cfg, "monthly_ranking_enabled", false)
             {
                 plan.skipped += 1;
                 continue;
@@ -131,8 +132,12 @@ impl ManageMonthlyRankingUseCase for ManageMonthlyRankingService {
             }
 
             // Le mois precedent a-t-il une baseline COMPLETE (publiable) ?
-            let prev_complete =
-                matches!(self.repo.baseline_partial_flag(guild_id, &prev_period).await?, Some(false));
+            let prev_complete = matches!(
+                self.repo
+                    .baseline_partial_flag(guild_id, &prev_period)
+                    .await?,
+                Some(false)
+            );
             if prev_complete {
                 if let Some(channel_id) =
                     cfg_str(&cfg, "monthly_ranking_channel_id").filter(|s| !s.is_empty())
@@ -149,7 +154,9 @@ impl ManageMonthlyRankingUseCase for ManageMonthlyRankingService {
                             top,
                         ),
                         voice_block: build_ranking_block(
-                            rows.iter().map(|r| (r.user_id.clone(), r.d_voice)).collect(),
+                            rows.iter()
+                                .map(|r| (r.user_id.clone(), r.d_voice))
+                                .collect(),
                             top,
                         ),
                         global_block: build_ranking_block(

@@ -7,16 +7,15 @@
 //! au join d'un membre il POST `/consume` qui renvoie ET supprime ses roles
 //! (atomique) ; `DELETE` purge la guild (nouveau restore propre).
 
-use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
+use axum::Json;
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::{ValidatedGuild, ValidatedGuildUser};
 use crate::bootstrap::state::GuildBackupState;
 use sentinel_core::domain::entities::guild_backup::pending_role_grant::PendingRoleGrant;
-
 
 /// Une entree de re-attribution recue au restore (body de `save`).
 #[derive(Debug, Deserialize)]

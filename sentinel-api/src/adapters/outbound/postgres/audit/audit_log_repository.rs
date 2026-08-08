@@ -4,10 +4,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
-use sentinel_core::ports::outbound::audit::audit_log_repository::AuditLogRepository;
 use sentinel_core::domain::entities::audit::audit_log::AuditLog;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_core::ports::outbound::audit::audit_log_repository::AuditLogRepository;
 
 pub struct PgAuditLogRepository {
     pool: PgPool,

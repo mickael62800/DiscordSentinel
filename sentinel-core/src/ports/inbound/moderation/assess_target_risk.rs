@@ -22,8 +22,6 @@ pub struct AssessTargetRiskCommand {
 pub trait AssessTargetRiskUseCase: Send + Sync {
     /// Decide si la cible est a risque (exige une confirmation) en appliquant le
     /// seuil serveur (`recent_account_days`) + la politique metier aux faits.
-    async fn assess(
-        &self,
-        cmd: AssessTargetRiskCommand,
-    ) -> Result<TargetRiskDecision, DomainError>;
+    async fn assess(&self, cmd: AssessTargetRiskCommand)
+        -> Result<TargetRiskDecision, DomainError>;
 }

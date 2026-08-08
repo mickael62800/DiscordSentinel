@@ -17,7 +17,6 @@ pub mod idea;
 pub mod members;
 pub mod moderation;
 pub mod progression;
-pub mod rotation;
 pub mod security;
 pub mod stats;
 pub mod system;

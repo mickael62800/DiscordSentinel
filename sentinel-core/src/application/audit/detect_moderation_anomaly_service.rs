@@ -37,7 +37,9 @@ impl DetectModerationAnomalyUseCase for DetectModerationAnomalyService {
                 .await;
 
             if count >= threshold {
-                self.counter.reset(&command.guild_id, &command.category).await;
+                self.counter
+                    .reset(&command.guild_id, &command.category)
+                    .await;
                 return Some(ModerationAnomaly {
                     anomaly_type: format!("mass_{}", command.category),
                     count,

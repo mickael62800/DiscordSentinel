@@ -90,14 +90,14 @@ fn user_history_to_proto_empty_history() {
 
 // ── RPC tests avec mock ──
 
-use sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand;
-use sentinel_core::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
-use sentinel_core::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use async_trait::async_trait;
 use chrono::Utc;
 use sentinel_core::domain::entities::moderation::action::strikes::StrikeResult;
 use sentinel_core::domain::entities::moderation::action::strikes::UserStrike;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use sentinel_core::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
+use sentinel_core::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use std::sync::Arc;
 use std::sync::Mutex;
 #[derive(Default)]
@@ -554,7 +554,8 @@ fn grpc(uc: Arc<MockModerationUc>) -> ModerationGrpc {
         evidence_repo: Arc::new(MockEvidenceRepo),
         review_repo: Arc::new(MockReviewRepo),
         pending_action_repo: Arc::new(MockPendingActionRepo),
-        infractions_uc: Arc::new(MockInfractionsUc),        reminders_uc: Arc::new(MockRemindersUc::default()),
+        infractions_uc: Arc::new(MockInfractionsUc),
+        reminders_uc: Arc::new(MockRemindersUc::default()),
         moderation_copilot_uc: Arc::new(MockCopilotUc::default()),
     }
 }
@@ -569,7 +570,8 @@ fn grpc_with_reminders(uc: Arc<MockModerationUc>, rem: Arc<MockRemindersUc>) -> 
         evidence_repo: Arc::new(MockEvidenceRepo),
         review_repo: Arc::new(MockReviewRepo),
         pending_action_repo: Arc::new(MockPendingActionRepo),
-        infractions_uc: Arc::new(MockInfractionsUc),        reminders_uc: rem,
+        infractions_uc: Arc::new(MockInfractionsUc),
+        reminders_uc: rem,
         moderation_copilot_uc: Arc::new(MockCopilotUc::default()),
     }
 }
@@ -718,7 +720,8 @@ async fn get_member_context_maps_domain_to_proto() {
         evidence_repo: Arc::new(MockEvidenceRepo),
         review_repo: Arc::new(MockReviewRepo),
         pending_action_repo: Arc::new(MockPendingActionRepo),
-        infractions_uc: Arc::new(MockInfractionsUc),        reminders_uc: Arc::new(MockRemindersUc::default()),
+        infractions_uc: Arc::new(MockInfractionsUc),
+        reminders_uc: Arc::new(MockRemindersUc::default()),
         moderation_copilot_uc: copilot.clone(),
     };
     let resp = g

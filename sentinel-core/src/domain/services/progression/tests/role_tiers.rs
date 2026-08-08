@@ -10,9 +10,18 @@ fn analyse_une_liste_simple() {
     assert_eq!(
         p,
         vec![
-            Palier { niveau: 1, role_id: 100 },
-            Palier { niveau: 5, role_id: 200 },
-            Palier { niveau: 10, role_id: 300 },
+            Palier {
+                niveau: 1,
+                role_id: 100
+            },
+            Palier {
+                niveau: 5,
+                role_id: 200
+            },
+            Palier {
+                niveau: 10,
+                role_id: 300
+            },
         ]
     );
 }
@@ -29,7 +38,10 @@ fn accepte_les_retours_a_la_ligne_et_les_espaces() {
 #[test]
 fn trie_par_niveau_croissant() {
     let p = analyser_paliers("10:300,1:100,5:200");
-    assert_eq!(p.iter().map(|x| x.niveau).collect::<Vec<_>>(), vec![1, 5, 10]);
+    assert_eq!(
+        p.iter().map(|x| x.niveau).collect::<Vec<_>>(),
+        vec![1, 5, 10]
+    );
 }
 
 #[test]
@@ -57,7 +69,13 @@ fn rejette_un_role_nul() {
 #[test]
 fn garde_le_premier_role_quand_un_niveau_est_dedouble() {
     let p = analyser_paliers("5:100,5:999");
-    assert_eq!(p, vec![Palier { niveau: 5, role_id: 100 }]);
+    assert_eq!(
+        p,
+        vec![Palier {
+            niveau: 5,
+            role_id: 100
+        }]
+    );
 }
 
 #[test]
@@ -72,14 +90,23 @@ fn chaine_vide_ne_donne_aucun_palier() {
 fn mode_inconnu_retombe_sur_cumulatif() {
     // Le mode qui n'enleve rien : une faute de saisie ne peut pas depouiller
     // un membre de ses roles.
-    assert_eq!(ModePalier::depuis_config("nimportequoi"), ModePalier::Cumulatif);
+    assert_eq!(
+        ModePalier::depuis_config("nimportequoi"),
+        ModePalier::Cumulatif
+    );
     assert_eq!(ModePalier::depuis_config(""), ModePalier::Cumulatif);
 }
 
 #[test]
 fn mode_remplacement_est_reconnu() {
-    assert_eq!(ModePalier::depuis_config("remplacement"), ModePalier::Remplacement);
-    assert_eq!(ModePalier::depuis_config(" replace "), ModePalier::Remplacement);
+    assert_eq!(
+        ModePalier::depuis_config("remplacement"),
+        ModePalier::Remplacement
+    );
+    assert_eq!(
+        ModePalier::depuis_config(" replace "),
+        ModePalier::Remplacement
+    );
 }
 
 // ── Selection des roles ──

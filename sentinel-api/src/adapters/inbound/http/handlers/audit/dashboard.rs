@@ -65,15 +65,15 @@ pub async fn get_logs(
         .collect()
     } else {
         // Postgres : le use case pousse le filtre guild dans la requete.
-        let filters =
-            sentinel_core::ports::inbound::system::manage_system_logs::SystemLogFilters {
-                category: None,
-                level: params.level.clone(),
-                guild_id: params.guild_id.clone(),
-                limit,
-            };
+        let filters = sentinel_core::ports::inbound::system::manage_system_logs::SystemLogFilters {
+            category: None,
+            level: params.level.clone(),
+            guild_id: params.guild_id.clone(),
+            limit,
+        };
         state
-            .system.system_logs_uc
+            .system
+            .system_logs_uc
             .list_logs(filters)
             .await?
             .into_iter()
@@ -93,7 +93,11 @@ pub async fn delete_logs_by_category(
     // La garde "discord non purgeable" vit desormais dans le use case : on
     // purge Postgres d'abord (erreur avant tout effet pour `discord`), puis on
     // vide la stream Redis (cache).
-    let count = state.system.system_logs_uc.purge_category(&category).await?;
+    let count = state
+        .system
+        .system_logs_uc
+        .purge_category(&category)
+        .await?;
     redis_log_stream::delete_stream(&state.redis_client, &category).await;
     Ok(Json(serde_json::json!({ "deleted": count })))
 }
@@ -171,13 +175,24 @@ pub async fn get_all_infractions(
                     limit: 200,
                     offset: 0,
                 };
-            state.moderation.infractions_uc.list_infractions(gid, filters).await?
+            state
+                .moderation
+                .infractions_uc
+                .list_infractions(gid, filters)
+                .await?
         }
-        None => state.moderation.infractions_uc.list_all_infractions(200, 0).await?,
+        None => {
+            state
+                .moderation
+                .infractions_uc
+                .list_all_infractions(200, 0)
+                .await?
+        }
     };
 
     let actions = state
-        .moderation.moderation_uc
+        .moderation
+        .moderation_uc
         .list_actions(params.guild_id.as_deref(), 200)
         .await
         .unwrap_or_default();
@@ -215,7 +230,11 @@ pub async fn toggle_rule(
     Path(id): Path<Uuid>,
     Json(payload): Json<TogglePayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let enabled = state.moderation.rules_uc.toggle_rule(id, payload.enabled).await?;
+    let enabled = state
+        .moderation
+        .rules_uc
+        .toggle_rule(id, payload.enabled)
+        .await?;
     Ok(Json(serde_json::json!({ "enabled": enabled })))
 }
 
@@ -299,7 +318,12 @@ pub async fn register_guild(
 
     // Seed des regles de moderation par defaut (idempotent). Couvre les
     // nouvelles guilds + le retro-seed des anciennes au prochain bot startup.
-    if let Err(e) = state.moderation.rules_uc.seed_default_rules(&guild_id).await {
+    if let Err(e) = state
+        .moderation
+        .rules_uc
+        .seed_default_rules(&guild_id)
+        .await
+    {
         warn!(error = %e, guild_id = %guild_id, "Echec seed rules par defaut");
     }
 
@@ -333,7 +357,11 @@ pub async fn reconcile_guilds(
     State(state): State<AppState>,
     Json(dto): Json<ReconcileGuildsDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let deleted = state.system.guild_repo.delete_absent(&dto.guild_ids).await?;
+    let deleted = state
+        .system
+        .guild_repo
+        .delete_absent(&dto.guild_ids)
+        .await?;
     if deleted > 0 {
         invalidate_guilds_cache(&state).await;
     }

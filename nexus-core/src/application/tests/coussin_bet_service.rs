@@ -1,19 +1,24 @@
-use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use std::sync::{Arc, Mutex};
 
+use crate::application::coussin_bet_service::CoussinBetService;
+use crate::application::economy_config::EmptyBotConfigRepository;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coussin_bet::CoussinBetUseCase;
 use crate::ports::outbound::coussin_bet_repository::CoussinBetRepository;
 use crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository;
-use crate::application::coussin_bet_service::CoussinBetService;
-use crate::application::economy_config::EmptyBotConfigRepository;
 
 #[derive(Default)]
 struct MockCooldownRepo;
 
 #[async_trait]
 impl CoussinCooldownRepository for MockCooldownRepo {
-    async fn remaining_seconds(&self, _g: &str, _u: &str, _a: &str) -> Result<Option<i64>, DomainError> {
+    async fn remaining_seconds(
+        &self,
+        _g: &str,
+        _u: &str,
+        _a: &str,
+    ) -> Result<Option<i64>, DomainError> {
         Ok(None)
     }
     async fn arm(&self, _g: &str, _u: &str, _a: &str, _m: i64) -> Result<(), DomainError> {
@@ -37,7 +42,8 @@ impl CoussinBetRepository for MockBetRepo {
         backed_id: &str,
         amount: i64,
     ) -> Result<(), DomainError> {
-        *self.placed.lock().unwrap() = Some((combat_id, bettor_id.into(), backed_id.into(), amount));
+        *self.placed.lock().unwrap() =
+            Some((combat_id, bettor_id.into(), backed_id.into(), amount));
         Ok(())
     }
 }
@@ -50,7 +56,9 @@ async fn test_cannot_place_bet_below_min() {
         Arc::new(MockCooldownRepo::default()),
     );
     // Min is 10 by default
-    let res = service.place("g1", uuid::Uuid::new_v4(), "b1", "Bettor", "p1", 5).await;
+    let res = service
+        .place("g1", uuid::Uuid::new_v4(), "b1", "Bettor", "p1", 5)
+        .await;
     assert!(res.is_err());
 }
 
@@ -63,7 +71,9 @@ async fn test_place_bet_success() {
         Arc::new(MockCooldownRepo::default()),
     );
     let combat_id = uuid::Uuid::new_v4();
-    let res = service.place("g1", combat_id, "b1", "Bettor", "p1", 50).await;
+    let res = service
+        .place("g1", combat_id, "b1", "Bettor", "p1", 50)
+        .await;
     assert!(res.is_ok());
 
     let placed = repo.placed.lock().unwrap();

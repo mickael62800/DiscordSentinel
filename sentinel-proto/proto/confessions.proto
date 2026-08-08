@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package sentinel.confessions.v1;
+
+// Service confessions : confessions anonymes (creation, reponses, signalements,
+// config par serveur). Wrappe `ManageConfessionsUseCase`. Ce service couvre les
+// operations appelees par confessions-bot ; le web utilise en plus edit/list-
+// replies/reports/resolve (restes en HTTP tant qu'ils n'ont pas de client bot).
+service ConfessionsService {
+  rpc CreateConfession(CreateConfessionRequest) returns (Confession);
+  rpc GetConfession(GetConfessionRequest) returns (Confession);
+  rpc ListConfessions(ListConfessionsRequest) returns (ConfessionList);
+  rpc DeleteConfession(DeleteConfessionRequest) returns (Confession);
+  // Le bot enregistre les refs Discord (message/salon/thread) apres avoir poste.
+  rpc UpdateMessageRefs(UpdateMessageRefsRequest) returns (ConfessionsAck);
+
+  rpc CreateReply(CreateReplyRequest) returns (ConfessionReply);
+  rpc UpdateReplyMessageId(UpdateReplyMessageIdRequest) returns (ConfessionsAck);
+
+  rpc CreateReport(CreateReportRequest) returns (ConfessionsAck);
+
+  rpc GetConfig(GetConfigRequest) returns (ConfessionConfig);
+}
+
+message ConfessionsAck {}
+
+message Confession {
+  string id = 1;
+  string guild_id = 2;
+  int32 public_number = 3;
+  string author_user_id = 4;
+  string content = 5;
+  optional string message_id = 6;
+  optional string channel_id = 7;
+  optional string thread_id = 8;
+  // RFC3339.
+  string created_at = 9;
+}
+
+message ConfessionReply {
+  string id = 1;
+  string confession_id = 2;
+  int32 public_number = 3;
+  string author_user_id = 4;
+  string content = 5;
+  bool is_anonymous = 6;
+  optional string message_id = 7;
+  string created_at = 8;
+}
+
+message ConfessionConfig {
+  string guild_id = 1;
+  bool enabled = 2;
+  optional string channel_id = 3;
+  optional string panel_message_id = 4;
+  int32 cooldown_secs = 5;
+  int32 max_per_day = 6;
+  int32 quota_window_hours = 7;
+  int32 min_chars = 8;
+  int32 max_chars = 9;
+  bool automod_enabled = 10;
+  repeated string banned_user_ids = 11;
+  string updated_at = 12;
+}
+
+message CreateConfessionRequest {
+  string guild_id = 1;
+  string author_user_id = 2;
+  string content = 3;
+}
+
+message GetConfessionRequest {
+  string id = 1;
+}
+
+message ListConfessionsRequest {
+  string guild_id = 1;
+  int64 limit = 2;
+  bool include_deleted = 3;
+}
+
+message ConfessionList {
+  repeated Confession confessions = 1;
+}
+
+message DeleteConfessionRequest {
+  string id = 1;
+  string deleted_by = 2;
+  optional string reason = 3;
+}
+
+message UpdateMessageRefsRequest {
+  string id = 1;
+  string message_id = 2;
+  string channel_id = 3;
+  optional string thread_id = 4;
+}
+
+message CreateReplyRequest {
+  string confession_id = 1;
+  string author_user_id = 2;
+  string content = 3;
+  bool is_anonymous = 4;
+}
+
+message UpdateReplyMessageIdRequest {
+  string reply_id = 1;
+  string message_id = 2;
+}
+
+message CreateReportRequest {
+  string guild_id = 1;
+  optional string confession_id = 2;
+  optional string reply_id = 3;
+  string reporter_user_id = 4;
+  string reason = 5;
+}
+
+message GetConfigRequest {
+  string guild_id = 1;
+}

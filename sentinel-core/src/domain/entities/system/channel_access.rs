@@ -256,7 +256,10 @@ mod tests {
 
     #[test]
     fn a_category_carries_both_families() {
-        let ow = to_overwrite(&access("1", AccessMode::Write), PlannedChannelKind::Category);
+        let ow = to_overwrite(
+            &access("1", AccessMode::Write),
+            PlannedChannelKind::Category,
+        );
         assert!(ow.allow & SEND_MESSAGES != 0);
         assert!(ow.allow & SPEAK != 0);
     }
@@ -268,7 +271,10 @@ mod tests {
         assert!(text.allow & MANAGE_MESSAGES != 0);
         assert_eq!(text.allow & write.allow, write.allow);
 
-        let voice = to_overwrite(&access("1", AccessMode::Moderate), PlannedChannelKind::Voice);
+        let voice = to_overwrite(
+            &access("1", AccessMode::Moderate),
+            PlannedChannelKind::Voice,
+        );
         assert!(voice.allow & (MUTE_MEMBERS | DEAFEN_MEMBERS | MOVE_MEMBERS) != 0);
     }
 
@@ -327,7 +333,10 @@ mod tests {
 
     #[test]
     fn duplicate_or_malformed_role_ids_are_rejected() {
-        let dup = [access("7", AccessMode::Read), access("7", AccessMode::Write)];
+        let dup = [
+            access("7", AccessMode::Read),
+            access("7", AccessMode::Write),
+        ];
         assert!(validate_access(&dup, false, "42", "salon").is_err());
 
         let bad = [access("pas-un-id", AccessMode::Read)];

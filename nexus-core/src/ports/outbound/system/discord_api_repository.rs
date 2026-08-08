@@ -1,5 +1,5 @@
-use async_trait::async_trait;
 use crate::domain::errors::DomainError;
+use async_trait::async_trait;
 
 #[async_trait]
 pub trait DiscordApiRepository: Send + Sync {

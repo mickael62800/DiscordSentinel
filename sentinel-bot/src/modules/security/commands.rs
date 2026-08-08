@@ -98,12 +98,11 @@ async fn handle_panic(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    let embed = critical_embed("🚨 Mode panique activé")
-        .description(format!(
-            "Tous les salons texte sont verrouillés (@everyone ne peut plus écrire).\n\
+    let embed = critical_embed("🚨 Mode panique activé").description(format!(
+        "Tous les salons texte sont verrouillés (@everyone ne peut plus écrire).\n\
              Restauration automatique dans {}s, ou immédiate via `/security calm`.",
-            duration
-        ));
+        duration
+    ));
     reply_ephemeral_embed(ctx, command, embed).await;
     tracing::warn!(guild = %guild_id, moderator = %command.user.name, "security: mode panique active");
 }

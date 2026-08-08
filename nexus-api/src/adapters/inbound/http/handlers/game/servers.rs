@@ -105,7 +105,9 @@ pub async fn get_server(
 ) -> Result<Json<GameServerDetailDto>, ApiError> {
     let detail = state.game_servers_uc.get(server_id).await?;
     let hote = hote_public(&state, &detail.server.guild_id).await;
-    Ok(Json(GameServerDetailDto::from(detail).avec_hote(hote.as_deref())))
+    Ok(Json(
+        GameServerDetailDto::from(detail).avec_hote(hote.as_deref()),
+    ))
 }
 
 #[derive(Debug, Deserialize)]
@@ -254,4 +256,45 @@ pub async fn execute_rcon(
         .execute_rcon(server_id, &dto.command, &actor)
         .await?;
     Ok(Json(RconCommandResponseDto { response: resp }))
+}
+
+use axum::response::sse::{Event, Sse};
+use std::convert::Infallible;
+use std::time::Duration;
+use tokio_stream::Stream;
+
+/// GET /api/games/servers/{server_id}/stream-logs?lines=50
+pub async fn stream_logs_sse(
+    State(state): State<AppState>,
+    Path(server_id): Path<Uuid>,
+    Query(q): Query<LogsQuery>,
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ApiError> {
+    let lines = q.lines.unwrap_or(50).min(500);
+    let logs = state.game_servers_uc.get_logs(server_id, lines).await?;
+
+    let stream = async_stream::stream! {
+        for line in logs {
+            yield Ok(Event::default().data(line));
+        }
+    };
+
+    Ok(Sse::new(stream)
+        .keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_secs(15))))
+}
+
+/// GET /api/games/servers/{server_id}/stream-stats
+pub async fn stream_stats_sse(
+    State(state): State<AppState>,
+    Path(server_id): Path<Uuid>,
+) -> Result<Sse<impl Stream<Item = Result<Event, Infallible>>>, ApiError> {
+    let stats = state.game_servers_uc.get_stats(server_id).await?;
+
+    let stream = async_stream::stream! {
+        if let Ok(json) = serde_json::to_string(&GameServerStatsDto::from(stats)) {
+            yield Ok(Event::default().data(json));
+        }
+    };
+
+    Ok(Sse::new(stream)
+        .keep_alive(axum::response::sse::KeepAlive::new().interval(Duration::from_secs(15))))
 }

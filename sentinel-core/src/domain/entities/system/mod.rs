@@ -1,4 +1,3 @@
-pub mod admin_rotation;
 pub mod alert_rule;
 pub mod analytics;
 pub mod bot_config;

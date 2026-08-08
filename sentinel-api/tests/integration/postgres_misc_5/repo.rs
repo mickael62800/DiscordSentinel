@@ -8,11 +8,11 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::community::daily_activity_repository::PgDailyActivityRepository;
-use sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository;
 use sentinel_api::adapters::outbound::postgres::community::sponsorship_repository::PgSponsorshipRepository;
+use sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository;
 use sentinel_core::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
-use sentinel_core::ports::outbound::community::temp_role_repository::TempRoleRepository;
 use sentinel_core::ports::outbound::community::sponsorship_repository::SponsorshipRepository;
+use sentinel_core::ports::outbound::community::temp_role_repository::TempRoleRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()

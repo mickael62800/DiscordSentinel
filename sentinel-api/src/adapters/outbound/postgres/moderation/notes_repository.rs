@@ -5,9 +5,9 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::moderation::notes_repository::NotesRepository;
 use sentinel_core::domain::entities::moderation::user_note::UserNote;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::moderation::notes_repository::NotesRepository;
 
 pub struct PgNotesRepository {
     pool: PgPool,

@@ -1,11 +1,11 @@
-use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use std::sync::{Arc, Mutex};
 
+use crate::application::coussin_steal_service::CoussinStealService;
+use crate::application::economy_config::EmptyBotConfigRepository;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coussin_steal::CoussinStealUseCase;
 use crate::ports::outbound::coussin_steal_repository::CoussinStealRepository;
-use crate::application::coussin_steal_service::CoussinStealService;
-use crate::application::economy_config::EmptyBotConfigRepository;
 
 #[derive(Default)]
 struct MockStealRepo {

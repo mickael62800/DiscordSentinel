@@ -3,10 +3,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use nexus_core::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use nexus_core::domain::entities::system::bot_config::BotDefinition;
 use nexus_core::domain::entities::system::bot_config::BotGuildConfig;
 use nexus_core::domain::errors::DomainError;
+use nexus_core::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 pub struct PgBotConfigRepository {
     pool: PgPool,

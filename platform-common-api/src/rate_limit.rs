@@ -230,7 +230,10 @@ mod tests {
         // Le hop de confiance est le plus a DROITE : les valeurs de gauche
         // sont controlees par le client et ne doivent jamais etre retenues.
         assert_eq!(
-            client_ip(&req(&[("x-forwarded-for", "1.1.1.1, 2.2.2.2, 3.3.3.3")]), socket),
+            client_ip(
+                &req(&[("x-forwarded-for", "1.1.1.1, 2.2.2.2, 3.3.3.3")]),
+                socket
+            ),
             ip("3.3.3.3")
         );
 
@@ -257,10 +260,7 @@ mod tests {
         );
 
         // X-Real-IP invalide -> socket.
-        assert_eq!(
-            client_ip(&req(&[("x-real-ip", "garbage")]), socket),
-            socket
-        );
+        assert_eq!(client_ip(&req(&[("x-real-ip", "garbage")]), socket), socket);
 
         // XFF prime sur X-Real-IP.
         assert_eq!(
@@ -273,7 +273,10 @@ mod tests {
 
         // Moins de sauts que prevu : en-tete forge ou topologie inattendue.
         std::env::set_var("TRUST_PROXY_HOPS", "2");
-        assert_eq!(client_ip(&req(&[("x-forwarded-for", "1.1.1.1")]), socket), socket);
+        assert_eq!(
+            client_ip(&req(&[("x-forwarded-for", "1.1.1.1")]), socket),
+            socket
+        );
 
         std::env::set_var("TRUST_PROXY_HOPS", "1");
     }

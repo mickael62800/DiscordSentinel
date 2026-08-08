@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package sentinel.sursis.v1;
+
+// Service sursis : « ban en sursis » (au lieu d'un ban dur, le membre passe en
+// role Sursis avec N jours pour contester ; un worker le bannit a l'echeance).
+// Wrappe `ManageSursisUseCase`.
+service SursisService {
+  // Enregistre une mise en sursis. Le delai (`sursis_appeal_days`) est lu cote
+  // serveur dans la config guild ; le bot ne le fournit pas.
+  rpc CreateSursis(CreateSursisRequest) returns (Sursis);
+  rpc GetSursis(GetSursisRequest) returns (Sursis);
+  // Resout un sursis ("gracie" | "banni"). `claimed` = ce resolve a bien fait la
+  // transition (false = deja resolu -> le bot s'abstient de refaire l'action).
+  rpc ResolveSursis(ResolveSursisRequest) returns (ResolveSursisResponse);
+}
+
+message Sursis {
+  string id = 1;
+  string user_id = 2;
+  string username = 3;
+  string reason = 4;
+  repeated string saved_roles = 5;
+  optional string channel_id = 6;
+  // "en_sursis" | "gracie" | "banni".
+  string status = 7;
+  // RFC3339.
+  string expires_at = 8;
+}
+
+message CreateSursisRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  string moderator_id = 4;
+  string moderator_name = 5;
+  string reason = 6;
+  repeated string saved_roles = 7;
+  optional string channel_id = 8;
+}
+
+message GetSursisRequest {
+  string id = 1;
+}
+
+message ResolveSursisRequest {
+  string id = 1;
+  // "gracie" | "banni".
+  string status = 2;
+}
+
+message ResolveSursisResponse {
+  bool claimed = 1;
+}

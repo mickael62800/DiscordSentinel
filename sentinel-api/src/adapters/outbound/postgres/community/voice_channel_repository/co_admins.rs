@@ -2,9 +2,9 @@ use crate::adapters::outbound::postgres::pg_err;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::community::voice_channel_repository::VoiceCoAdminStore;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::voice_channel_repository::VoiceCoAdminStore;
 
 #[derive(sqlx::FromRow)]
 struct CoAdminRow {

@@ -121,15 +121,15 @@ fn auto_role_to_proto_full_mapping() {
 
 // ── RPC tests avec mocks ──
 
+use async_trait::async_trait;
+use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
+use sentinel_core::domain::entities::system::discord_role::DiscordRole;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
 use sentinel_core::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
 use sentinel_core::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
 use sentinel_core::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
 use sentinel_core::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
-use async_trait::async_trait;
-use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
-use sentinel_core::domain::entities::system::discord_role::DiscordRole;
-use sentinel_core::domain::errors::DomainError;
 use std::sync::Arc;
 use std::sync::Mutex;
 

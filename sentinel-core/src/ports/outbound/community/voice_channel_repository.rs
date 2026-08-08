@@ -34,10 +34,7 @@ pub trait VoiceChannelStore: Send + Sync {
     /// Hard-delete d'un salon archive (`channel_status = 'closed'`) via son
     /// `channel_id`. Retourne le nombre de lignes supprimees (0 si le salon est
     /// introuvable ou toujours ouvert).
-    async fn hard_delete_closed_by_channel_id(
-        &self,
-        channel_id: &str,
-    ) -> Result<u64, DomainError>;
+    async fn hard_delete_closed_by_channel_id(&self, channel_id: &str) -> Result<u64, DomainError>;
     /// Hard-delete de tous les salons fermes d'une guild. Retourne le nombre de
     /// lignes supprimees.
     async fn hard_delete_closed_by_guild(&self, guild_id: &str) -> Result<u64, DomainError>;

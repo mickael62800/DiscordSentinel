@@ -4,9 +4,9 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use nexus_core::ports::outbound::game::game_audit_repository::GameAuditRepository;
 use nexus_core::domain::entities::game::audit::{GameAuditAction, GameAuditEntry};
 use nexus_core::domain::errors::DomainError;
+use nexus_core::ports::outbound::game::game_audit_repository::GameAuditRepository;
 
 pub struct PgGameAuditRepository {
     pool: PgPool,

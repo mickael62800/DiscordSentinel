@@ -103,13 +103,13 @@ fn parse_rfc3339_invalid_returns_invalid_argument() {
 
 // ── RPC tests avec mock ──
 
+use async_trait::async_trait;
+use sentinel_core::domain::entities::community::guild_member::MemberSummary;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::community::manage_members::ManageMembersUseCase;
 use sentinel_core::ports::inbound::community::manage_members::RegisterMemberCommand;
 use sentinel_core::ports::inbound::community::manage_members::SyncMembersCommand;
 use sentinel_core::ports::inbound::community::manage_members::UpdateMemberCommand;
-use async_trait::async_trait;
-use sentinel_core::domain::entities::community::guild_member::MemberSummary;
-use sentinel_core::domain::errors::DomainError;
 use std::sync::Arc;
 use std::sync::Mutex;
 #[derive(Default)]
@@ -179,12 +179,7 @@ impl ManageMembersUseCase for MockMembersUc {
         Ok(vec![])
     }
 
-    async fn recent_joins(
-        &self,
-        _: &str,
-        _: i32,
-        _: i64,
-    ) -> Result<Vec<GuildMember>, DomainError> {
+    async fn recent_joins(&self, _: &str, _: i32, _: i64) -> Result<Vec<GuildMember>, DomainError> {
         Ok(vec![])
     }
 }

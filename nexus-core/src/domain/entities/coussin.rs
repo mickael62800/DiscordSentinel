@@ -76,12 +76,7 @@ impl PlayerClass {
     }
 
     /// Les quatre classes, pour parcourir sans rien oublier.
-    pub const ALL: [PlayerClass; 4] = [
-        Self::Ecraseur,
-        Self::Ressort,
-        Self::Piegeur,
-        Self::Couette,
-    ];
+    pub const ALL: [PlayerClass; 4] = [Self::Ecraseur, Self::Ressort, Self::Piegeur, Self::Couette];
 
     pub fn label(self) -> &'static str {
         match self {
@@ -241,10 +236,30 @@ pub struct ClassRules {
 impl Default for ClassRules {
     fn default() -> Self {
         Self {
-            ecraseur: ClassStats { atk: 25, def: 8, atk_growth: 4, def_growth: 1 },
-            ressort: ClassStats { atk: 12, def: 18, atk_growth: 2, def_growth: 3 },
-            piegeur: ClassStats { atk: 18, def: 14, atk_growth: 3, def_growth: 2 },
-            couette: ClassStats { atk: 8, def: 25, atk_growth: 1, def_growth: 4 },
+            ecraseur: ClassStats {
+                atk: 25,
+                def: 8,
+                atk_growth: 4,
+                def_growth: 1,
+            },
+            ressort: ClassStats {
+                atk: 12,
+                def: 18,
+                atk_growth: 2,
+                def_growth: 3,
+            },
+            piegeur: ClassStats {
+                atk: 18,
+                def: 14,
+                atk_growth: 3,
+                def_growth: 2,
+            },
+            couette: ClassStats {
+                atk: 8,
+                def: 25,
+                atk_growth: 1,
+                def_growth: 4,
+            },
             ecraseur_damage_pct: 125,
             ecraseur_rage_threshold_pct: 30,
             ecraseur_rage_bonus_pct: 125,
@@ -393,27 +408,76 @@ pub fn resolve_combat(
     } else {
         7
     };
-    for (index, (attacker_roll, defender_roll)) in rolls.iter().take(max_rounds as usize).enumerate() {
-        let attacker_atk = if attacker_is_higher { (attacker_atk as f32 * handicap) as i32 } else { attacker_atk };
-        let defender_atk = if !attacker_is_higher { (defender_atk as f32 * handicap) as i32 } else { defender_atk };
+    for (index, (attacker_roll, defender_roll)) in
+        rolls.iter().take(max_rounds as usize).enumerate()
+    {
+        let attacker_atk = if attacker_is_higher {
+            (attacker_atk as f32 * handicap) as i32
+        } else {
+            attacker_atk
+        };
+        let defender_atk = if !attacker_is_higher {
+            (defender_atk as f32 * handicap) as i32
+        } else {
+            defender_atk
+        };
         let c = &rules.classes;
-        let mut to_defender = damage_with(attacker_atk, defender_def, attacker_class, defender_class, c) * (*attacker_roll).clamp(1, dice);
-        let mut to_attacker = damage_with(defender_atk, attacker_def, defender_class, attacker_class, c) * (*defender_roll).clamp(1, dice);
+        let mut to_defender = damage_with(
+            attacker_atk,
+            defender_def,
+            attacker_class,
+            defender_class,
+            c,
+        ) * (*attacker_roll).clamp(1, dice);
+        let mut to_attacker = damage_with(
+            defender_atk,
+            attacker_def,
+            defender_class,
+            attacker_class,
+            c,
+        ) * (*defender_roll).clamp(1, dice);
         // Le baroud d'honneur de l'Ecraseur : sous son seuil de Confort, il
         // frappe plus fort.
-        if attacker_class == PlayerClass::Ecraseur && attacker_hp * 100 < max_hp_with(attacker_def, attacker_class, c) * c.ecraseur_rage_threshold_pct { to_defender = to_defender * c.ecraseur_rage_bonus_pct / 100; }
-        if defender_class == PlayerClass::Ecraseur && defender_hp * 100 < max_hp_with(defender_def, defender_class, c) * c.ecraseur_rage_threshold_pct { to_attacker = to_attacker * c.ecraseur_rage_bonus_pct / 100; }
-        if attacker_class == PlayerClass::Couette { to_attacker = (to_attacker - c.couette_flat_reduction).max(1); }
-        if defender_class == PlayerClass::Couette { to_defender = (to_defender - c.couette_flat_reduction).max(1); }
+        if attacker_class == PlayerClass::Ecraseur
+            && attacker_hp * 100
+                < max_hp_with(attacker_def, attacker_class, c) * c.ecraseur_rage_threshold_pct
+        {
+            to_defender = to_defender * c.ecraseur_rage_bonus_pct / 100;
+        }
+        if defender_class == PlayerClass::Ecraseur
+            && defender_hp * 100
+                < max_hp_with(defender_def, defender_class, c) * c.ecraseur_rage_threshold_pct
+        {
+            to_attacker = to_attacker * c.ecraseur_rage_bonus_pct / 100;
+        }
+        if attacker_class == PlayerClass::Couette {
+            to_attacker = (to_attacker - c.couette_flat_reduction).max(1);
+        }
+        if defender_class == PlayerClass::Couette {
+            to_defender = (to_defender - c.couette_flat_reduction).max(1);
+        }
         attacker_hp = (attacker_hp - to_attacker).max(0);
         defender_hp = (defender_hp - to_defender).max(0);
         attacker_damage_total += to_defender;
         defender_damage_total += to_attacker;
-        if attacker_hp == 0 || defender_hp == 0 || index + 1 == max_rounds as usize { break; }
+        if attacker_hp == 0 || defender_hp == 0 || index + 1 == max_rounds as usize {
+            break;
+        }
     }
-    let attacker_won = (attacker_hp != defender_hp).then_some(attacker_hp > defender_hp)
-        .or_else(|| (attacker_damage_total != defender_damage_total).then_some(attacker_damage_total > defender_damage_total));
-    Ok(CombatResult { attacker_won, attacker_hp, defender_hp, attacker_damage: attacker_damage_total, defender_damage: defender_damage_total, rounds: rolls.len().min(max_rounds as usize) as i32 })
+    let attacker_won = (attacker_hp != defender_hp)
+        .then_some(attacker_hp > defender_hp)
+        .or_else(|| {
+            (attacker_damage_total != defender_damage_total)
+                .then_some(attacker_damage_total > defender_damage_total)
+        });
+    Ok(CombatResult {
+        attacker_won,
+        attacker_hp,
+        defender_hp,
+        attacker_damage: attacker_damage_total,
+        defender_damage: defender_damage_total,
+        rounds: rolls.len().min(max_rounds as usize) as i32,
+    })
 }
 
 /// Resolution pure : le caller fournit les jets, ce qui garde le domaine
@@ -453,12 +517,25 @@ mod tests {
     }
     #[test]
     fn damage_never_zero() {
-        assert_eq!(damage(0, 999, PlayerClass::Ressort, PlayerClass::Couette), 1);
+        assert_eq!(
+            damage(0, 999, PlayerClass::Ressort, PlayerClass::Couette),
+            1
+        );
     }
     #[test]
     fn duel_declares_winner_or_draw() {
         assert_eq!(
-            resolve_duel(10, 1, PlayerClass::Ecraseur, 1, 1, PlayerClass::Ressort, 6, 1).attacker_won,
+            resolve_duel(
+                10,
+                1,
+                PlayerClass::Ecraseur,
+                1,
+                1,
+                PlayerClass::Ressort,
+                6,
+                1
+            )
+            .attacker_won,
             Some(true)
         );
     }
@@ -468,7 +545,19 @@ mod tests {
     }
     #[test]
     fn multi_round_combat_produces_a_result() {
-        let result = resolve_combat(25, 8, PlayerClass::Ecraseur, 1, 8, 25, PlayerClass::Couette, 1, &[(6, 1), (6, 1), (6, 1)], CombatRules::default()).unwrap();
+        let result = resolve_combat(
+            25,
+            8,
+            PlayerClass::Ecraseur,
+            1,
+            8,
+            25,
+            PlayerClass::Couette,
+            1,
+            &[(6, 1), (6, 1), (6, 1)],
+            CombatRules::default(),
+        )
+        .unwrap();
         assert!(result.attacker_damage > 0);
         assert!(result.rounds >= 1);
     }

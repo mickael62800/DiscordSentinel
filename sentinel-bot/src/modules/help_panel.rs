@@ -51,8 +51,12 @@ const MANAGE_ROLES: u64 = 1 << 28;
 const MODERATE_MEMBERS: u64 = 1 << 40;
 
 const ADMIN_MASK: u64 = ADMINISTRATOR | MANAGE_GUILD;
-const MOD_MASK: u64 =
-    KICK_MEMBERS | BAN_MEMBERS | MANAGE_CHANNELS | MANAGE_MESSAGES | MANAGE_ROLES | MODERATE_MEMBERS;
+const MOD_MASK: u64 = KICK_MEMBERS
+    | BAN_MEMBERS
+    | MANAGE_CHANNELS
+    | MANAGE_MESSAGES
+    | MANAGE_ROLES
+    | MODERATE_MEMBERS;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Audience {
@@ -124,7 +128,10 @@ const CATEGORIES: &[Section] = &[
     ("🛡️ Modération", &[("moderation-bot", "🛡️ Modération")]),
     (
         "🚨 Sécurité",
-        &[("security-bot", "🚨 Sécurité"), ("automod-bot", "🤖 Auto-modération")],
+        &[
+            ("security-bot", "🚨 Sécurité"),
+            ("automod-bot", "🤖 Auto-modération"),
+        ],
     ),
     ("🎫 Tickets", &[("ticket-bot", "🎫 Tickets")]),
     ("🙊 Confessions", &[("confessions", "🙊 Confessions")]),
@@ -134,10 +141,12 @@ const CATEGORIES: &[Section] = &[
             ("community-bot", "💬 Communauté"),
             ("progression-bot", "📈 Progression"),
             ("voice-bot", "🔊 Vocal"),
-            ("rotation-bot", "🔄 Rotation"),
         ],
     ),
-    ("🌌 Espace", &[("nasa-apod-bot", "🌌 Photo de l'espace (NASA)")]),
+    (
+        "🌌 Espace",
+        &[("nasa-apod-bot", "🌌 Photo de l'espace (NASA)")],
+    ),
     ("💾 Sauvegarde", &[("guild-backup-bot", "💾 Sauvegarde")]),
     ("📊 Audit", &[("audit-bot", "📊 Audit")]),
     ("🧹 Nettoyage", &[("cleanup", "🧹 Nettoyage")]),
@@ -501,7 +510,10 @@ mod tests {
         let admin = CreateCommand::new("backup")
             .description("x")
             .default_member_permissions(Permissions::ADMINISTRATOR);
-        assert!(matches!(classify(command_perms(&json(&admin))), Audience::Admin));
+        assert!(matches!(
+            classify(command_perms(&json(&admin))),
+            Audience::Admin
+        ));
 
         let modo = CreateCommand::new("ban")
             .description("x")
@@ -524,15 +536,20 @@ mod tests {
         let out = extract_commands(&simple);
         assert_eq!(out, vec![("/kick".to_string(), "Expulse".to_string())]);
 
-        let sub = json(&CreateCommand::new("security")
-            .description("Sécurité")
-            .add_option(CreateCommandOption::new(
-                CommandOptionType::SubCommand,
-                "panic",
-                "Panique",
-            )));
+        let sub = json(
+            &CreateCommand::new("security")
+                .description("Sécurité")
+                .add_option(CreateCommandOption::new(
+                    CommandOptionType::SubCommand,
+                    "panic",
+                    "Panique",
+                )),
+        );
         let out = extract_commands(&sub);
-        assert_eq!(out, vec![("/security panic".to_string(), "Panique".to_string())]);
+        assert_eq!(
+            out,
+            vec![("/security panic".to_string(), "Panique".to_string())]
+        );
     }
 
     #[test]
@@ -542,7 +559,10 @@ mod tests {
             let found = CATEGORIES
                 .iter()
                 .any(|(_, subs)| subs.iter().any(|(n, _)| n == bot_name));
-            assert!(found, "module sans sous-section dans le panneau : {bot_name}");
+            assert!(
+                found,
+                "module sans sous-section dans le panneau : {bot_name}"
+            );
         }
     }
 
@@ -554,7 +574,9 @@ mod tests {
         assert_eq!(one[0].0, "🛡️ Modération");
 
         // Beaucoup de lignes -> plusieurs champs numerotes, chacun <= 1024.
-        let many: Vec<String> = (0..200).map(|i| format!("**`/cmd{i}`** — description")).collect();
+        let many: Vec<String> = (0..200)
+            .map(|i| format!("**`/cmd{i}`** — description"))
+            .collect();
         let out = chunk_section("🛡️ Modération", &many);
         assert!(out.len() > 1, "doit deborder sur plusieurs champs");
         assert_eq!(out[0].0, format!("🛡️ Modération (1/{})", out.len()));

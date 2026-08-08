@@ -21,7 +21,8 @@ use crate::ports::{
 pub struct CoussinBetService {
     repo: Arc<dyn CoussinBetRepository>,
     config_repo: Arc<dyn BotConfigRepository>,
-    cooldowns: Arc<dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository>,
+    cooldowns:
+        Arc<dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository>,
 }
 
 impl CoussinBetService {
@@ -32,7 +33,11 @@ impl CoussinBetService {
             dyn crate::ports::outbound::coussin_cooldown_repository::CoussinCooldownRepository,
         >,
     ) -> Self {
-        Self { repo, config_repo, cooldowns }
+        Self {
+            repo,
+            config_repo,
+            cooldowns,
+        }
     }
 }
 

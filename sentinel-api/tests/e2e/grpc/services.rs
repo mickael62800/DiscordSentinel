@@ -46,6 +46,31 @@ use sentinel_api::adapters::inbound::grpc::community::roles::RolePanelsGrpc;
 use sentinel_api::adapters::inbound::grpc::community::voice::VoiceChannelsGrpc;
 use sentinel_api::adapters::inbound::grpc::moderation::actions::ModerationGrpc;
 use sentinel_api::adapters::outbound::ws::broadcaster::EventBroadcaster;
+use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
+use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
+use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
+use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
+use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
+use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
+use sentinel_core::domain::entities::audit::user_stats::UserStats;
+use sentinel_core::domain::entities::community::guild_member::GuildMember;
+use sentinel_core::domain::entities::community::guild_member::MemberSummary;
+use sentinel_core::domain::entities::community::level::UserLevel;
+use sentinel_core::domain::entities::community::level::XpSource;
+use sentinel_core::domain::entities::community::role_panel::AutoRole;
+use sentinel_core::domain::entities::community::role_panel::RolePanel;
+use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannelDetail;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
+use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
+use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
+use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
+use sentinel_core::domain::entities::system::discord_role::DiscordRole;
+use sentinel_core::domain::enums::community::voice_channel_kind::VoiceChannelKind;
+use sentinel_core::domain::enums::moderation::action::Action;
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 use sentinel_core::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
@@ -79,31 +104,6 @@ use sentinel_core::ports::inbound::community::manage_voice_channels::UseInviteLi
 use sentinel_core::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 use sentinel_core::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 use sentinel_core::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
-use sentinel_core::domain::entities::ai::image_analysis::ImageAnalysis;
-use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
-use sentinel_core::domain::entities::audit::dashboard_stats::DashboardStats;
-use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
-use sentinel_core::domain::entities::audit::user_stats::GuildStatsOverview;
-use sentinel_core::domain::entities::audit::user_stats::GuildVoiceStats;
-use sentinel_core::domain::entities::audit::user_stats::UserStats;
-use sentinel_core::domain::entities::community::guild_member::GuildMember;
-use sentinel_core::domain::entities::community::guild_member::MemberSummary;
-use sentinel_core::domain::entities::community::level::UserLevel;
-use sentinel_core::domain::entities::community::level::XpSource;
-use sentinel_core::domain::entities::community::role_panel::AutoRole;
-use sentinel_core::domain::entities::community::role_panel::RolePanel;
-use sentinel_core::domain::entities::community::role_panel::RolePanelDetail;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannel;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannelDetail;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInviteLink;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
-use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
-use sentinel_core::domain::entities::moderation::action::applied::ModerationAction;
-use sentinel_core::domain::entities::moderation::action::applied::UserModerationHistory;
-use sentinel_core::domain::entities::system::discord_role::DiscordRole;
-use sentinel_core::domain::enums::community::voice_channel_kind::VoiceChannelKind;
-use sentinel_core::domain::enums::moderation::action::Action;
-use sentinel_core::domain::errors::DomainError;
 use sentinel_proto::automod::v1 as automod_proto;
 use sentinel_proto::automod::v1::automod_service_client::AutomodServiceClient;
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
@@ -193,7 +193,8 @@ impl AnalyzeMessageUseCase for MockAnalyzeMessage {
         &self,
         _: &str,
         _: i32,
-    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::FloodDecision, DomainError> {
+    ) -> Result<sentinel_core::ports::inbound::ai::analyze_message::FloodDecision, DomainError>
+    {
         unimplemented!()
     }
     async fn evaluate_attachments(
@@ -732,7 +733,8 @@ async fn moderation_log_action_and_get_history() {
         evidence_repo: Arc::new(MockEvidenceRepo),
         review_repo: Arc::new(MockReviewRepo),
         pending_action_repo: Arc::new(MockPendingActionRepo),
-        infractions_uc: Arc::new(MockInfractionsUc),        reminders_uc: Arc::new(MockRemindersUc),
+        infractions_uc: Arc::new(MockInfractionsUc),
+        reminders_uc: Arc::new(MockRemindersUc),
         moderation_copilot_uc: Arc::new(MockCopilotUc),
     });
     let (url, shutdown) = spawn_one_service!(svc);

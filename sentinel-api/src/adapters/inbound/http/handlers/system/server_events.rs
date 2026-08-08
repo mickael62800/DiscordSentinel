@@ -69,7 +69,6 @@ pub async fn list_server_events(
     _user: Option<Extension<WebUser>>,
     Query(q): Query<ServerEventsQuery>,
 ) -> Result<Json<Vec<ServerEventDto>>, ApiError> {
-
     let events = state
         .server_events_uc
         .list(q.action_prefix, q.severity, q.limit)

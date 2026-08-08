@@ -129,16 +129,6 @@ fn voice_channel_to_proto_locked_with_no_limit() {
 
 // ── RPC tests avec mock ──
 
-use sentinel_core::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
-use sentinel_core::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
-use sentinel_core::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
-use sentinel_core::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
-use sentinel_core::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
-use sentinel_core::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
-use sentinel_core::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
-use sentinel_core::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
-use sentinel_core::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
-use sentinel_core::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
 use async_trait::async_trait;
 use chrono::Utc;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelBan;
@@ -149,6 +139,16 @@ use sentinel_core::domain::entities::community::voice_channel::VoiceChannelInvit
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelTheme;
 use sentinel_core::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+use sentinel_core::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use sentinel_core::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
 use std::sync::Arc;
 use std::sync::Mutex;
 #[derive(Default)]

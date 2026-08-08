@@ -5,10 +5,10 @@
 
 use async_trait::async_trait;
 
+use nexus_core::domain::errors::DomainError;
 use nexus_core::ports::outbound::game::container_runtime::{
     ContainerRuntime, ContainerSpec, ContainerStats, ContainerStatus, ManagedContainer,
 };
-use nexus_core::domain::errors::DomainError;
 
 pub struct NoopContainerRuntime;
 

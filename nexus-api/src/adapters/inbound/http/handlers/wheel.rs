@@ -139,5 +139,7 @@ pub async fn replace_cases(
             weight: c.weight,
         })
         .collect();
-    Ok(Json(state.wheel_cases.replace(&guild_id, cases).await?.into()))
+    Ok(Json(
+        state.wheel_cases.replace(&guild_id, cases).await?.into(),
+    ))
 }

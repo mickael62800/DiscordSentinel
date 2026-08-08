@@ -1,7 +1,7 @@
-use sentinel_core::ports::inbound::moderation::manage_rules::CreateRuleCommand;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::rule::Rule;
 use sentinel_core::domain::enums::moderation::flag_type::FlagType;
+use sentinel_core::ports::inbound::moderation::manage_rules::CreateRuleCommand;
 use serde::Deserialize;
 use serde::Serialize;
 

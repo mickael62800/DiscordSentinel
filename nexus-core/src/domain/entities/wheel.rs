@@ -153,7 +153,9 @@ pub fn validate_cases(cases: &[WheelCaseData]) -> Result<(), String> {
         // Un poids nul n'est pas une case rare : c'est une case qui ne sort
         // JAMAIS. Autant la supprimer, sinon elle occupe l'ecran pour rien.
         if case.weight == 0 {
-            return Err(format!("la case {key} a un poids nul : elle ne sortirait jamais"));
+            return Err(format!(
+                "la case {key} a un poids nul : elle ne sortirait jamais"
+            ));
         }
     }
     Ok(())

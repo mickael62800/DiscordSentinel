@@ -1,16 +1,17 @@
 //! Tests d'intégration bout-en-bout pour nexus-core (Domain & Application)
 
-use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
-use uuid::Uuid;
 use chrono::Utc;
+use std::sync::{Arc, Mutex};
+use uuid::Uuid;
 
 use nexus_core::application::deploy_panel_service::DeployGamesPanelUseCase;
-use nexus_core::application::game_mentions_service::DetectGameMentionsUseCase;
 use nexus_core::application::game::manage_templates_service::ManageGameTemplatesService;
+use nexus_core::application::game_mentions_service::DetectGameMentionsUseCase;
 use nexus_core::application::upload_emoji_service::UploadEmojiUseCase;
 use nexus_core::domain::entities::casino::game::{
-    format_custom_emoji, is_allowed_emoji_mime, normalize_game_name, parse_role_color_hex, slugify_emoji_name, DEFAULT_GAME_ROLE_COLOR,
+    format_custom_emoji, is_allowed_emoji_mime, normalize_game_name, parse_role_color_hex,
+    slugify_emoji_name, DEFAULT_GAME_ROLE_COLOR,
 };
 use nexus_core::domain::entities::coussin_shop::{item, ITEMS};
 use nexus_core::domain::entities::game::config::validate_config_key;
@@ -38,11 +39,21 @@ struct DummyBotConfigRepo;
 
 #[async_trait]
 impl BotConfigRepository for DummyBotConfigRepo {
-    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
-    async fn get_config(&self, _g: &str, _b: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn get_all_config(&self, _g: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn set_config(&self, _g: &str, _b: &str, _k: &str, _v: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_config(&self, _g: &str, _b: &str, _k: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_config(&self, _g: &str, _b: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_all_config(&self, _g: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _g: &str, _b: &str, _k: &str, _v: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _g: &str, _b: &str, _k: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 #[derive(Default)]
@@ -55,15 +66,63 @@ impl GameRepository for MemoryGameRepo {
     async fn list(&self, _guild_id: &str) -> Result<Vec<Game>, DomainError> {
         Ok(self.games.clone())
     }
-    async fn list_by_category(&self, _g: &str, _c: Option<&str>) -> Result<Vec<Game>, DomainError> { Ok(self.games.clone()) }
-    async fn create(&self, _g: &str, _n: &str, _s: &str, _d: Option<&str>, _c: Option<&str>, _i: Option<&str>) -> Result<Game, DomainError> { todo!() }
-    async fn update(&self, _g: &str, _s: &str, _d: Option<&str>, _c: Option<Option<&str>>, _i: Option<Option<&str>>) -> Result<Option<Game>, DomainError> { todo!() }
-    async fn delete(&self, _g: &str, _s: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn find_by_name(&self, _g: &str, _n: &str) -> Result<Option<Game>, DomainError> { Ok(None) }
-    async fn set_role_id(&self, _g: &str, _s: &str, _r: Option<&str>) -> Result<Option<Game>, DomainError> { Ok(None) }
-    async fn save_panel(&self, _g: &str, _m: &str, _c: &str, _cat: Option<&str>) -> Result<GamePanel, DomainError> { todo!() }
-    async fn find_panel_by_message(&self, _g: &str, _m: &str) -> Result<Option<GamePanel>, DomainError> { Ok(None) }
-    async fn list_panels(&self, _g: &str) -> Result<Vec<GamePanel>, DomainError> { Ok(vec![]) }
+    async fn list_by_category(&self, _g: &str, _c: Option<&str>) -> Result<Vec<Game>, DomainError> {
+        Ok(self.games.clone())
+    }
+    async fn create(
+        &self,
+        _g: &str,
+        _n: &str,
+        _s: &str,
+        _d: Option<&str>,
+        _c: Option<&str>,
+        _i: Option<&str>,
+    ) -> Result<Game, DomainError> {
+        todo!()
+    }
+    async fn update(
+        &self,
+        _g: &str,
+        _s: &str,
+        _d: Option<&str>,
+        _c: Option<Option<&str>>,
+        _i: Option<Option<&str>>,
+    ) -> Result<Option<Game>, DomainError> {
+        todo!()
+    }
+    async fn delete(&self, _g: &str, _s: &str) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn find_by_name(&self, _g: &str, _n: &str) -> Result<Option<Game>, DomainError> {
+        Ok(None)
+    }
+    async fn set_role_id(
+        &self,
+        _g: &str,
+        _s: &str,
+        _r: Option<&str>,
+    ) -> Result<Option<Game>, DomainError> {
+        Ok(None)
+    }
+    async fn save_panel(
+        &self,
+        _g: &str,
+        _m: &str,
+        _c: &str,
+        _cat: Option<&str>,
+    ) -> Result<GamePanel, DomainError> {
+        todo!()
+    }
+    async fn find_panel_by_message(
+        &self,
+        _g: &str,
+        _m: &str,
+    ) -> Result<Option<GamePanel>, DomainError> {
+        Ok(None)
+    }
+    async fn list_panels(&self, _g: &str) -> Result<Vec<GamePanel>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 #[derive(Default)]
@@ -74,7 +133,10 @@ struct MemoryEventPublisher {
 #[async_trait]
 impl EventPublisher for MemoryEventPublisher {
     async fn publish(&self, event: &str, data: serde_json::Value) {
-        self.published.lock().unwrap().push((event.to_string(), data));
+        self.published
+            .lock()
+            .unwrap()
+            .push((event.to_string(), data));
     }
 }
 
@@ -100,7 +162,13 @@ struct DummyDiscordApi;
 
 #[async_trait]
 impl DiscordApiRepository for DummyDiscordApi {
-    async fn upload_emoji(&self, _g: &str, name: &str, _bytes: &[u8], _m: &str) -> Result<(String, String), DomainError> {
+    async fn upload_emoji(
+        &self,
+        _g: &str,
+        name: &str,
+        _bytes: &[u8],
+        _m: &str,
+    ) -> Result<(String, String), DomainError> {
         Ok(("emoji_999".into(), name.into()))
     }
 }
@@ -127,12 +195,17 @@ async fn integration_detect_mentions_and_deploy_panel() {
     let deploy_uc = DeployGamesPanelUseCase::new(event_publisher.clone());
 
     // 1. Detect game mentions in chat
-    let detected = mentions_uc.execute("guild_100", "Qui joue a C++ ce soir ?").await.unwrap();
+    let detected = mentions_uc
+        .execute("guild_100", "Qui joue a C++ ce soir ?")
+        .await
+        .unwrap();
     assert_eq!(detected.len(), 1);
     assert_eq!(detected[0].game_name, "C++");
 
     // 2. Deploy games panel
-    deploy_uc.execute("guild_100", "channel_general", Some("programming")).await;
+    deploy_uc
+        .execute("guild_100", "channel_general", Some("programming"))
+        .await;
 
     let events = event_publisher.published.lock().unwrap();
     assert_eq!(events.len(), 1);
@@ -215,7 +288,10 @@ async fn integration_upload_emoji_and_mention_detection() {
     let upload_uc = UploadEmojiUseCase::new(api);
 
     let valid_bytes = vec![0u8; 100];
-    let (id, name) = upload_uc.execute("g1", "pepe_smirk", &valid_bytes, "image/png").await.unwrap();
+    let (id, name) = upload_uc
+        .execute("g1", "pepe_smirk", &valid_bytes, "image/png")
+        .await
+        .unwrap();
 
     assert_eq!(id, "emoji_999");
     assert_eq!(name, "pepe_smirk");
@@ -246,10 +322,12 @@ async fn integration_multi_container_concurrency_and_events() {
         let cid = runtime.create_container(&spec).await.unwrap();
         runtime.start_container(&cid).await.unwrap();
 
-        event_publisher.publish(
-            game_events::SERVER_STARTED,
-            serde_json::json!({ "container_id": cid, "server_index": i })
-        ).await;
+        event_publisher
+            .publish(
+                game_events::SERVER_STARTED,
+                serde_json::json!({ "container_id": cid, "server_index": i }),
+            )
+            .await;
     }
 
     let events = event_publisher.published.lock().unwrap();

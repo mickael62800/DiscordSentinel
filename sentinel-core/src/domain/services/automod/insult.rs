@@ -490,7 +490,11 @@ mod tests_gravite {
 
     #[test]
     fn message_anodin_ne_leve_rien() {
-        for m in ["bonjour tout le monde", "on se voit demain ?", "il est bete ce jeu"] {
+        for m in [
+            "bonjour tout le monde",
+            "on se voit demain ?",
+            "il est bete ce jeu",
+        ] {
             assert_eq!(g(m), None, "{m}");
         }
     }

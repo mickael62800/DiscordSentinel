@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::adapters::outbound::postgres::pg_err;
-use sentinel_core::ports::outbound::audit::snapshot_repository::SnapshotRepository;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::audit::snapshot_repository::SnapshotRepository;
 
 pub struct PgSnapshotRepository {
     pool: PgPool,
@@ -130,11 +130,7 @@ impl SnapshotRepository for PgSnapshotRepository {
         Ok(())
     }
 
-    async fn cleanup_daily(
-        &self,
-        guild_id: &str,
-        retention_days: i32,
-    ) -> Result<(), DomainError> {
+    async fn cleanup_daily(&self, guild_id: &str, retention_days: i32) -> Result<(), DomainError> {
         sqlx::query(
             "DELETE FROM daily_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int",
         )
@@ -162,11 +158,7 @@ impl SnapshotRepository for PgSnapshotRepository {
         Ok(())
     }
 
-    async fn cleanup_hourly(
-        &self,
-        guild_id: &str,
-        retention_days: i32,
-    ) -> Result<(), DomainError> {
+    async fn cleanup_hourly(&self, guild_id: &str, retention_days: i32) -> Result<(), DomainError> {
         sqlx::query(
             "DELETE FROM hourly_activity WHERE guild_id = $1 AND day < CURRENT_DATE - $2::int",
         )

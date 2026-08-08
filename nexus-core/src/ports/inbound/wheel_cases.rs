@@ -23,6 +23,9 @@ pub trait ManageWheelCasesUseCase: Send + Sync {
 
     /// Remplace la roue. Une liste VIDE efface la personnalisation et fait
     /// revenir la roue historique — c'est le « annuler mes modifications ».
-    async fn replace(&self, guild_id: &str, cases: Vec<WheelCaseData>)
-        -> Result<WheelCases, DomainError>;
+    async fn replace(
+        &self,
+        guild_id: &str,
+        cases: Vec<WheelCaseData>,
+    ) -> Result<WheelCases, DomainError>;
 }

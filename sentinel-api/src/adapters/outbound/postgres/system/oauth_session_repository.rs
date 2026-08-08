@@ -8,11 +8,11 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::super::pg_err_ctx;
-use sentinel_core::ports::outbound::system::oauth_session_repository::OAuthSessionRepository;
 use sentinel_core::domain::entities::system::oauth::{
     LoginTrace, NewOAuthSession, OAuthSession, SessionTokenUpdate,
 };
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::system::oauth_session_repository::OAuthSessionRepository;
 
 const TBL: &str = "web_oauth_sessions";
 fn pg_err(e: sqlx::Error) -> DomainError {

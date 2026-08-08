@@ -121,7 +121,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // DM AVANT l'expulsion (apres, le canal DM peut devenir injoignable).
     if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
         let dm_embed = warn_embed(format!("👢 Expulsion de **{guild_name}**"))
-            .description("Tu as ete expulse du serveur. Tu peux le rejoindre a nouveau via une invitation.")
+            .description(
+                "Tu as ete expulse du serveur. Tu peux le rejoindre a nouveau via une invitation.",
+            )
             .field("Raison", reason, false)
             .timestamp(serenity::model::Timestamp::now());
         if let Err(e) = dm

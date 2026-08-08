@@ -10,9 +10,7 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::community::public_guard::ensure_guild_id;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
 use crate::bootstrap::state::CommunityState;
-use sentinel_core::domain::entities::community::spotlight::{
-    Spotlight, UpsertSpotlightCommand,
-};
+use sentinel_core::domain::entities::community::spotlight::{Spotlight, UpsertSpotlightCommand};
 
 #[derive(Debug, Deserialize)]
 pub struct PeriodQuery {
@@ -61,7 +59,6 @@ pub async fn list_spotlight(
     _user: Option<Extension<WebUser>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<SpotlightDto>>, ApiError> {
-
     let items = state.spotlight_uc.list(&guild_id, 24).await?;
     Ok(Json(items.into_iter().map(Into::into).collect()))
 }
@@ -73,7 +70,6 @@ pub async fn designate_spotlight(
     Path(guild_id): Path<String>,
     Json(dto): Json<DesignateDto>,
 ) -> Result<Json<SpotlightDto>, ApiError> {
-
     // Pseudo et avatar resolus depuis `guild_members` : le staff saisit un
     // identifiant, pas un nom d'affichage, et un nom recopie a la main
     // devient faux des le prochain changement de pseudo. Le corps de la
@@ -104,7 +100,6 @@ pub async fn delete_spotlight(
     _user: Option<Extension<WebUser>>,
     Path((_guild_id, id)): Path<(String, Uuid)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-
     state.spotlight_uc.delete(id).await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
 }
@@ -131,7 +126,10 @@ pub async fn public_spotlight(
 ) -> Result<Json<Option<PublicSpotlightDto>>, ApiError> {
     ensure_guild_id(&guild_id)?;
 
-    let found = state.spotlight_uc.current(&guild_id, q.period.as_deref()).await?;
+    let found = state
+        .spotlight_uc
+        .current(&guild_id, q.period.as_deref())
+        .await?;
     Ok(Json(found.map(|s| PublicSpotlightDto {
         username: s.username,
         avatar: s.avatar,

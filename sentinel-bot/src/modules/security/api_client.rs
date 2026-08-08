@@ -13,6 +13,7 @@ use crate::shared::grpc_client::SentinelGrpcClient;
 
 use sentinel_proto::members::v1 as proto_members;
 use sentinel_proto::security::v1 as proto_security;
+use sentinel_proto::security_state::v1 as proto_state;
 
 #[derive(Debug, Serialize)]
 pub struct SecurityEvent {
@@ -100,6 +101,85 @@ impl ApiClient {
             user_ids: event.user_ids.clone(),
         };
         crate::grpc_call!(@unit self.grpc, security, report_event, req)
+    }
+
+    // ── Etat de securite : quarantaine / slowmode / lockdown (gRPC) ──
+    //
+    // Miroir de persistance durable (SecurityStateService). Le tracker RAM du
+    // bot reste source de verite pour les roles/overwrites a restaurer ; ces
+    // appels ne persistent que le timer + les states pour survivre a un reboot.
+
+    /// Rehydratation au demarrage : quarantaines encore actives `(guild_id, user_id)`.
+    pub async fn list_active_quarantines(&self) -> Result<Vec<(String, String)>, String> {
+        let req = proto_state::ListActiveQuarantinesRequest {};
+        let list = crate::grpc_call!(self.grpc, security_state, list_active_quarantines, req)?;
+        Ok(list
+            .entries
+            .into_iter()
+            .map(|e| (e.guild_id, e.user_id))
+            .collect())
+    }
+
+    /// Enregistre (UPSERT idempotent) une quarantaine avec son delai avant kick.
+    pub async fn mark_quarantine(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        timeout_secs: i64,
+    ) -> Result<(), String> {
+        let req = proto_state::MarkQuarantineRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            timeout_secs,
+        };
+        crate::grpc_call!(@unit self.grpc, security_state, mark_quarantine, req)
+    }
+
+    /// Leve la quarantaine (captcha valide ou retrait admin). Idempotent.
+    pub async fn lift_quarantine(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
+        let req = proto_state::LiftQuarantineRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        crate::grpc_call!(@unit self.grpc, security_state, lift_quarantine, req)
+    }
+
+    /// Enregistre (UPSERT idempotent) un slowmode actif. `previous_states` est le
+    /// JSON des rates d'origine par salon (a restaurer a l'expiration).
+    pub async fn mark_slowmode(
+        &self,
+        guild_id: &str,
+        previous_states: serde_json::Value,
+        duration_secs: i64,
+        imposed_rate: i32,
+    ) -> Result<(), String> {
+        let previous_states_json = serde_json::to_string(&previous_states)
+            .map_err(|e| format!("serialisation previous_states: {e}"))?;
+        let req = proto_state::MarkSlowmodeRequest {
+            guild_id: guild_id.to_string(),
+            previous_states_json,
+            duration_secs,
+            imposed_rate,
+        };
+        crate::grpc_call!(@unit self.grpc, security_state, mark_slowmode, req)
+    }
+
+    /// Enregistre (UPSERT idempotent) un lockdown actif. `saved_states` est le
+    /// JSON des overwrites originaux par salon (a restaurer a l'expiration).
+    pub async fn mark_lockdown(
+        &self,
+        guild_id: &str,
+        saved_states: serde_json::Value,
+        duration_secs: i64,
+    ) -> Result<(), String> {
+        let saved_states_json = serde_json::to_string(&saved_states)
+            .map_err(|e| format!("serialisation saved_states: {e}"))?;
+        let req = proto_state::MarkLockdownRequest {
+            guild_id: guild_id.to_string(),
+            saved_states_json,
+            duration_secs,
+        };
+        crate::grpc_call!(@unit self.grpc, security_state, mark_lockdown, req)
     }
 
     // ── Members CRUD (gRPC) ──

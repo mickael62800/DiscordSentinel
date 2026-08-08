@@ -93,7 +93,11 @@ pub async fn handle_role_change(
     if let Some((chan, msg, _)) = active {
         // Edite la carte existante.
         let _ = ChannelId::new(chan)
-            .edit_message(&ctx.http, MessageId::new(msg), EditMessage::new().embed(embed))
+            .edit_message(
+                &ctx.http,
+                MessageId::new(msg),
+                EditMessage::new().embed(embed),
+            )
             .await;
         tracker.update(&key, movements, expires_at);
     } else {
@@ -113,7 +117,11 @@ pub async fn handle_role_change(
 /// Salon cible : `profile_edit_channel_id` puis fallback `log_channel_id`.
 fn resolve_channel(cfg: &HashMap<String, String>) -> Option<ChannelId> {
     for key in ["profile_edit_channel_id", "log_channel_id"] {
-        if let Some(id) = cfg.get(key).and_then(|v| v.parse::<u64>().ok()).filter(|&n| n > 0) {
+        if let Some(id) = cfg
+            .get(key)
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&n| n > 0)
+        {
             return Some(ChannelId::new(id));
         }
     }

@@ -7,4 +7,5 @@
 pub mod docker_runtime;
 pub mod noop_runtime;
 pub mod rcon_minecraft;
+pub mod rcon_pooled;
 pub mod redis_port_allocator;

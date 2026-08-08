@@ -5,8 +5,10 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use crate::shared::api_client::BaseApiClient;
+use crate::shared::grpc_client::GrpcClientKey;
 use crate::shared::heartbeat::ApiClientKey;
 
+use super::super::api_client::{ApiClient, ReviewFacts};
 use super::cards::edit_ephemeral;
 use super::context::{fetch_context_after_ids, fetch_context_before_ids, render_incident_list};
 use super::labels::action_label;
@@ -45,13 +47,14 @@ pub(crate) async fn handle_discussion_button(
         return;
     }
 
-    let api = {
+    let (api, grpc) = {
         let d = ctx.data.read().await;
-        match d.get::<ApiClientKey>() {
-            Some(a) => a.clone(),
-            None => return,
+        match (d.get::<ApiClientKey>(), d.get::<GrpcClientKey>()) {
+            (Some(a), Some(g)) => (a.clone(), g.clone()),
+            _ => return,
         }
     };
+    let review_api = ApiClient::new(grpc);
     let config = api
         .get_guild_config_for(&guild_id.to_string(), super::super::MODULE_BOT_NAME)
         .await
@@ -71,21 +74,11 @@ pub(crate) async fn handle_discussion_button(
         .and_then(|v| v.parse::<u64>().ok())
         .filter(|x| *x > 0);
 
-    // Reponse de l'API discussion (GET existant + POST open). La REGLE d'acces
-    // est appliquee cote core (full hexa) ; le bot ne fait que relayer.
-    #[derive(serde::Deserialize)]
-    struct DiscussionResp {
-        channel_id: String,
-        #[serde(default)]
-        created: bool,
-    }
+    // La REGLE d'acces est appliquee cote core (full hexa) ; le bot relaie.
     // Idempotence : un salon existe deja ? On s'y refere sans rien creer.
     // MAIS si le salon Discord a ete supprime a la main, l'enregistrement est
     // orphelin -> on le purge cote API pour pouvoir en regenerer un neuf.
-    if let Ok(Some(existing)) = api
-        .get_json::<Option<DiscussionResp>>(&format!("/api/automod/reviews/{review_id}/discussion"))
-        .await
-    {
+    if let Ok(Some(existing)) = review_api.get_discussion(&review_id).await {
         let still_exists = match existing.channel_id.parse::<u64>() {
             Ok(cid) => ChannelId::new(cid).to_channel(&ctx.http).await.is_ok(),
             Err(_) => false,
@@ -103,12 +96,7 @@ pub(crate) async fn handle_discussion_button(
             return;
         }
         // Salon disparu : on purge l'enregistrement orphelin puis on recree.
-        if let Err(e) = api
-            .delete_json::<serde_json::Value>(&format!(
-                "/api/automod/reviews/{review_id}/discussion"
-            ))
-            .await
-        {
+        if let Err(e) = review_api.delete_discussion(&review_id).await {
             warn!(error = %e, review_id, "Echec purge discussion orpheline -> recreation annulee");
             edit_ephemeral(
                 ctx,
@@ -122,25 +110,7 @@ pub(crate) async fn handle_discussion_button(
     }
 
     // Recupere la review (cible + contexte + incidents agreges).
-    #[derive(serde::Deserialize)]
-    struct ReviewDto {
-        guild_id: String,
-        channel_id: String,
-        message_id: String,
-        user_id: String,
-        user_name: String,
-        suggested_action: Option<String>,
-        reason: String,
-        score: f64,
-        #[serde(default)]
-        incident_count: i32,
-        #[serde(default)]
-        incidents: serde_json::Value,
-    }
-    let review: ReviewDto = match api
-        .get_json(&format!("/api/automod/reviews/{review_id}"))
-        .await
-    {
+    let review = match review_api.get_review(&review_id).await {
         Ok(r) => r,
         Err(e) => {
             warn!(error = %e, review_id, "Echec fetch review (discussion)");
@@ -270,20 +240,21 @@ pub(crate) async fn handle_discussion_button(
         (Some(role), Some(m)) => m.roles.iter().any(|r| r.get() == role),
         _ => false,
     };
-    let open_body = serde_json::json!({
-        "guild_id": guild_id.to_string(),
-        "channel_id": channel.id.to_string(),
-        "opened_by_id": component.user.id.to_string(),
-        "opened_by_name": component.user.name,
-        "is_admin": has(Permissions::ADMINISTRATOR),
-        "has_moderate_members": has(Permissions::MODERATE_MEMBERS),
-        "has_manage_messages": has(Permissions::MANAGE_MESSAGES),
-        "has_mod_role": has_mod_role,
-    });
-    let opened: DiscussionResp = match api
-        .post_json(
-            &format!("/api/automod/reviews/{review_id}/discussion"),
-            &open_body,
+    let facts = ReviewFacts {
+        is_admin: has(Permissions::ADMINISTRATOR),
+        has_moderate_members: has(Permissions::MODERATE_MEMBERS),
+        has_manage_messages: has(Permissions::MANAGE_MESSAGES),
+        has_mod_role,
+        has_admin_role: false,
+    };
+    let opened = match review_api
+        .open_discussion(
+            &review_id,
+            &guild_id.to_string(),
+            &channel.id.to_string(),
+            &component.user.id.to_string(),
+            &component.user.name,
+            facts,
         )
         .await
     {
@@ -317,7 +288,11 @@ pub(crate) async fn handle_discussion_button(
     }
 
     // Message d'ancrage epingle (contexte de la moderation).
-    let action = review.suggested_action.as_deref().unwrap_or("warn");
+    let action = if review.suggested_action.is_empty() {
+        "warn"
+    } else {
+        review.suggested_action.as_str()
+    };
     let origin_url = format!(
         "https://discord.com/channels/{}/{}/{}",
         review.guild_id, review.channel_id, review.message_id

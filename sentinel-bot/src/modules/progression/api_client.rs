@@ -77,7 +77,6 @@ pub struct UserLevelResponse {
     pub xp_voice_needed: i64,
 }
 
-
 /// Reponse a un fait d'activite (texte/vocal) : l'API a calcule tout l'XP.
 ///
 /// Le bot ne lit que `skipped` (anti-spam XP) ; `xp_gained` et

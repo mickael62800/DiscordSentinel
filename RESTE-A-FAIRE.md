@@ -30,25 +30,41 @@ Les 7 crates Sentinel sont propres à clippy, tous targets compris. Mais **rien 
 
 ---
 
-## 3. Migration gRPC : 66 appels HTTP restants dans le bot
+## 3. Migration gRPC : ~12 appels HTTP restants dans le bot
+
+> Note : le module `rotation` (administrateur tournant, 5 appels) n'a **pas** été migré mais **entièrement supprimé** (bot + API + core + web + tables `admin_rotation*`, migration `018`).
+
 
 Les modules qui ont déjà un service proto sont terminés. Ce qui reste appartient à des modules **sans proto du tout** — chacun demande son `.proto`, son handler serveur, son câblage, ses tests.
 
 | Module | Appels | Remarque |
 |---|---|---|
-| `confessions` | 11 | Le plus gros bloc ; utilise aussi `base_url()` en direct |
-| `automod/vote` (6 fichiers) | 15 | `buttons`, `cards`, `discussion`, `events`, `finalize`, `post` |
-| `automod/review` | 5 | |
-| `rotation` | 5 | |
-| `bump` | 4 | |
-| `moderation/ban_sursis` | 4 | |
-| `security` (5 fichiers) | 6 | `background`, `captcha_handler`, `join_handler`, `detectors/{lockdown,slowmode}` |
-| `announcements` | 2 | |
+| ~~`confessions`~~ | ~~11~~ ✅ | **FAIT** — `ConfessionsService` (proto `confessions`, handler `grpc/community/confessions.rs`) : create/get/list/delete/message-refs/reply/reply-msg-id/report/config (9 RPC). Le `DELETE` reqwest brut (`.client()`/`.base_url()`/`.auth()`) est éliminé. Reste 1 `POST /api/bots/config` (`persist_confession_setting`) — config transverse, voir « laissé en HTTP ». |
+| `automod/vote` + `automod/review` | ✅ | **FAIT** via `AutomodReviewService` (proto `automod_review`, handler `grpc/moderation/reviews.rs`) : review-core (create/get/find-by-message/resolve/vote/ignore/reopen/list-votes) **+ discussions** (get/open/delete/append-messages). Plus aucun appel HTTP du cycle review. (Reste hors périmètre : `backend.rs` soumet les jobs vision à l'ai-worker via `POST /api/ai/jobs`.) |
+| ~~`bump`~~ | ~~4~~ ✅ | **FAIT** — `BumpService` (proto `bump`, handler `grpc/community/bump.rs`) : RecordBump / DueReminders / MarkReminderSent / GuildStatus. `ready_at` calculé server-side. |
+| ~~`moderation/ban_sursis`~~ | ~~4~~ ✅ | **FAIT** — `SursisService` (proto `sursis`, handler `grpc/moderation/sursis.rs`) : Create / Get / Resolve. Le délai d'appel reste lu server-side dans la config guild. |
+| ~~`security` (5 fichiers)~~ | ~~6~~ ✅ | **FAIT** — nouveau `SecurityStateService` (proto `security_state`, handler `grpc/system/security_state.rs`). Quarantine/slowmode/lockdown migrés. |
+| ~~`announcements`~~ | ~~2~~ ✅ | **FAIT** — `AnnouncementsService` (proto `announcements`, handler `grpc/community/announcements.rs`) : RecordRunResult + RecordButtonClick. |
 | `welcome/handler` | 2 | |
 | `handler.rs`, `sync.rs`, `logs_setup.rs` | 4 | Hors module |
 | divers (`audit/handlers/message`, `embeds`, `tickets`, `voice`, `moderation/appeal`) | 5 | 1 appel chacun |
 
-Estimation : ~8 nouveaux services proto.
+Estimation : ~6 nouveaux services proto restants (+ tranche 2 automod : discussions/discord-messages sur services existants).
+
+> **À nettoyer (suite security)** : les endpoints HTTP `POST/GET /api/security/quarantine`,
+> `/api/security/quarantine/active`, `DELETE .../{g}/{u}`, `POST /api/security/{slowmode,lockdown}`
+> ne sont plus appelés par le bot. Vérifier qu'aucun autre consommateur (worker) ne les utilise
+> avant de retirer routes + handlers. Les `DELETE .../slowmode/{g}` et `.../lockdown/{g}` restent
+> potentiellement utilisés côté worker/consumers — ne pas supprimer sans audit.
+
+### Ressource de sync transverse `discord-messages` — ✅ FAIT
+
+Table `discord_action_messages` (mapping `action_id ↔ (channel_id, message_id)`),
+migrée comme **service dédié** `DiscordActionMessagesService` (proto `discord_messages`,
+handler `grpc/audit/action_messages.rs`, `Register` + `ListForAction`). Le helper partagé
+`crate::sync::{register_action_message, list_action_messages}` passe désormais par gRPC ;
+tous les appelants (automod, tickets, voice) sont migrés. **Plus aucun appel HTTP
+`discord-messages` dans le bot.**
 
 ### Volontairement laissé en HTTP
 

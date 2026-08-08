@@ -1,7 +1,7 @@
-use sentinel_core::ports::inbound::moderation::manage_notes::AddNoteCommand;
 use sentinel_core::domain::entities::moderation::user_note::UserNote;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
 use sentinel_core::domain::entities::system::discord_ids::UserId;
+use sentinel_core::ports::inbound::moderation::manage_notes::AddNoteCommand;
 use serde::Deserialize;
 use serde::Serialize;
 

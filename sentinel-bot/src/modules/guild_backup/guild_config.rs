@@ -5,7 +5,6 @@
 //! Consommee surtout par le chemin EVENT (pilotage web) pour decider si le
 //! composant est actif et appliquer le quota de snapshots.
 
-
 use std::collections::HashMap;
 
 use crate::shared::api_client::BaseApiClient;

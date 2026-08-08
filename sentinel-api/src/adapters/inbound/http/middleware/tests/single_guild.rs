@@ -70,7 +70,9 @@ fn un_id_derriere_un_marqueur_d_entite_est_ignore() {
         None
     );
     assert_eq!(
-        guild_id_from_path(&format!("/api/voice-channels/by-channel/{chan}/bans/{user}")),
+        guild_id_from_path(&format!(
+            "/api/voice-channels/by-channel/{chan}/bans/{user}"
+        )),
         None
     );
     assert_eq!(

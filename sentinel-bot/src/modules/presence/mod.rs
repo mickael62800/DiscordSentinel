@@ -31,7 +31,10 @@ use crate::shared::presence::{VoiceChannelDto, VoiceMemberDto};
 /// selon l'appelant, un membre connecte ayant de toute facon acces a ces
 /// salons sur Discord. Le bot reste seul juge des permissions — l'API n'a
 /// aucune vue dessus — mais il ne decide plus du public.
-fn est_public(guild: &serenity::model::guild::Guild, channel_id: serenity::model::id::ChannelId) -> bool {
+fn est_public(
+    guild: &serenity::model::guild::Guild,
+    channel_id: serenity::model::id::ChannelId,
+) -> bool {
     let Some(channel) = guild.channels.get(&channel_id) else {
         // Salon inconnu du cache : on s'abstient plutot que de supposer.
         return false;
@@ -93,15 +96,18 @@ fn instantane(guild: &serenity::model::guild::Guild) -> Vec<VoiceChannelDto> {
             .filter(|n| !n.trim().is_empty())
             .unwrap_or_else(|| "Un membre".to_string());
 
-        par_salon.entry(channel_id).or_default().push(VoiceMemberDto {
-            user_id: etat.user_id.to_string(),
-            username: nom,
-            self_mute: etat.self_mute,
-            self_deaf: etat.self_deaf,
-            server_mute: etat.mute,
-            streaming: etat.self_stream.unwrap_or(false),
-            video: etat.self_video,
-        });
+        par_salon
+            .entry(channel_id)
+            .or_default()
+            .push(VoiceMemberDto {
+                user_id: etat.user_id.to_string(),
+                username: nom,
+                self_mute: etat.self_mute,
+                self_deaf: etat.self_deaf,
+                server_mute: etat.mute,
+                streaming: etat.self_stream.unwrap_or(false),
+                video: etat.self_video,
+            });
     }
 
     par_salon

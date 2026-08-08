@@ -1,5 +1,5 @@
+use crate::ports::outbound::events::{game_events, EventPublisher};
 use std::sync::Arc;
-use crate::ports::outbound::events::{EventPublisher, game_events};
 
 pub struct DeployGamesPanelUseCase {
     pub events: Arc<dyn EventPublisher>,
@@ -17,7 +17,9 @@ impl DeployGamesPanelUseCase {
             "channel_id": channel_id,
             "category": category,
         });
-        self.events.publish(game_events::GAMES_PANEL_DEPLOY, payload).await;
+        self.events
+            .publish(game_events::GAMES_PANEL_DEPLOY, payload)
+            .await;
     }
 }
 
@@ -35,7 +37,10 @@ mod tests {
     #[async_trait]
     impl EventPublisher for MockEventPublisher {
         async fn publish(&self, event: &str, data: serde_json::Value) {
-            self.published.lock().unwrap().push((event.to_string(), data));
+            self.published
+                .lock()
+                .unwrap()
+                .push((event.to_string(), data));
         }
     }
 

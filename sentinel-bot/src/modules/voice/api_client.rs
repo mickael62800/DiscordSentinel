@@ -381,9 +381,7 @@ impl ApiClient {
             Ok(list) => list
                 .bans
                 .into_iter()
-                .map(|b| OwnerBanResponse {
-                    user_id: b.user_id,
-                })
+                .map(|b| OwnerBanResponse { user_id: b.user_id })
                 .collect(),
             Err(_) => Vec::new(),
         }

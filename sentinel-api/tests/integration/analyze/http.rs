@@ -14,11 +14,11 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
-use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use sentinel_core::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_core::domain::enums::moderation::action::Action;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_core::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use test_helpers::build_test_state_analyze;
 
 // ══════════════════════════════════════════════════════════

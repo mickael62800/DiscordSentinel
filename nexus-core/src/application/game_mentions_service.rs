@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use regex::Regex;
+use std::sync::Arc;
 
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::casino::game_repository::{Game, GameRepository};
@@ -16,11 +16,7 @@ impl DetectGameMentionsUseCase {
     /// Detecte les jeux mentionnes dans un texte.
     /// Retourne la liste des jeux dont le `game_name` apparait dans `content`.
     /// On utilise une recherche avec limites de mots (word boundaries) insensible a la casse.
-    pub async fn execute(
-        &self,
-        guild_id: &str,
-        content: &str,
-    ) -> Result<Vec<Game>, DomainError> {
+    pub async fn execute(&self, guild_id: &str, content: &str) -> Result<Vec<Game>, DomainError> {
         let games = self.game_repo.list(guild_id).await?;
         let mut detected_games = Vec::new();
 
@@ -30,7 +26,7 @@ impl DetectGameMentionsUseCase {
             // Construction d'une regex insensible a la casse qui respecte les frontieres de mots/ponctuation
             // (supporte les jeux avec caracteres speciaux comme C++, C#, DotA 2)
             let pattern = format!(r"(?i)(?:^|[\s\p{{P}}]){}(?:$|[\s\p{{P}}])", escaped_name);
-            
+
             if let Ok(re) = Regex::new(&pattern) {
                 if re.is_match(content) {
                     detected_games.push(game);
@@ -45,8 +41,8 @@ impl DetectGameMentionsUseCase {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
     use crate::ports::outbound::casino::game_repository::{Game, GamePanel};
+    use async_trait::async_trait;
 
     struct MockGameRepo {
         games: Vec<Game>,
@@ -57,10 +53,18 @@ mod tests {
         async fn list(&self, _guild_id: &str) -> Result<Vec<Game>, DomainError> {
             Ok(self.games.clone())
         }
-        async fn list_by_category(&self, _guild_id: &str, _cat: Option<&str>) -> Result<Vec<Game>, DomainError> {
+        async fn list_by_category(
+            &self,
+            _guild_id: &str,
+            _cat: Option<&str>,
+        ) -> Result<Vec<Game>, DomainError> {
             Ok(self.games.clone())
         }
-        async fn find_by_name(&self, _guild_id: &str, _name: &str) -> Result<Option<Game>, DomainError> {
+        async fn find_by_name(
+            &self,
+            _guild_id: &str,
+            _name: &str,
+        ) -> Result<Option<Game>, DomainError> {
             Ok(None)
         }
         async fn create(
@@ -98,7 +102,11 @@ mod tests {
         async fn list_panels(&self, _guild_id: &str) -> Result<Vec<GamePanel>, DomainError> {
             Ok(vec![])
         }
-        async fn find_panel_by_message(&self, _guild_id: &str, _msg_id: &str) -> Result<Option<GamePanel>, DomainError> {
+        async fn find_panel_by_message(
+            &self,
+            _guild_id: &str,
+            _msg_id: &str,
+        ) -> Result<Option<GamePanel>, DomainError> {
             Ok(None)
         }
         async fn save_panel(
@@ -141,22 +149,34 @@ mod tests {
         let uc = DetectGameMentionsUseCase::new(repo);
 
         // Case insensitive match
-        let res = uc.execute("guild1", "Qui est chaud pour du MINECRAFT ce soir ?").await.unwrap();
+        let res = uc
+            .execute("guild1", "Qui est chaud pour du MINECRAFT ce soir ?")
+            .await
+            .unwrap();
         assert_eq!(res.len(), 1);
         assert_eq!(res[0].game_name, "Minecraft");
 
         // Substring boundary check: "remarkable" should not match "Ark"
-        let res2 = uc.execute("guild1", "C'est remarquable comme jeu !").await.unwrap();
+        let res2 = uc
+            .execute("guild1", "C'est remarquable comme jeu !")
+            .await
+            .unwrap();
         assert_eq!(res2.len(), 0);
 
         // Special characters match: "C++" and "C#"
-        let res3 = uc.execute("guild1", "Je developpe un jeu en C++ et C# !").await.unwrap();
+        let res3 = uc
+            .execute("guild1", "Je developpe un jeu en C++ et C# !")
+            .await
+            .unwrap();
         assert_eq!(res3.len(), 2);
         assert_eq!(res3[0].game_name, "C++");
         assert_eq!(res3[1].game_name, "C#");
 
         // Multiple match
-        let res4 = uc.execute("guild1", "Un minecraft ou un League of Legends ?").await.unwrap();
+        let res4 = uc
+            .execute("guild1", "Un minecraft ou un League of Legends ?")
+            .await
+            .unwrap();
         assert_eq!(res4.len(), 2);
     }
 }

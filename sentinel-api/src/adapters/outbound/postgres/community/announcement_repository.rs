@@ -4,12 +4,12 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::community::announcement_repository::AnnouncementRepository;
 use sentinel_core::domain::entities::community::announcement::{
     AnnouncementRun, ButtonInteraction, ChannelPostResult, ContentType, RecurrenceType, RunStatus,
     ScheduledAnnouncement,
 };
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::announcement_repository::AnnouncementRepository;
 
 pub struct PgAnnouncementRepository {
     pool: PgPool,
@@ -471,11 +471,7 @@ impl AnnouncementRepository for PgAnnouncementRepository {
         Ok(rows.into_iter().map(|(g,)| g).collect())
     }
 
-    async fn delete_runs_older_than(
-        &self,
-        guild_id: &str,
-        days: i32,
-    ) -> Result<u64, DomainError> {
+    async fn delete_runs_older_than(&self, guild_id: &str, days: i32) -> Result<u64, DomainError> {
         let res = sqlx::query(
             "DELETE FROM scheduled_announcement_runs WHERE guild_id = $1 AND ran_at < NOW() - ($2::int * INTERVAL '1 day')",
         )

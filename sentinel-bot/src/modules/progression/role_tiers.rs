@@ -163,7 +163,12 @@ async fn classement(ctx: &Context, guild_id: GuildId) -> Option<Vec<(UserId, i32
     Some(
         liste
             .into_iter()
-            .filter_map(|e| e.user_id.parse::<u64>().ok().map(|id| (UserId::new(id), e.level)))
+            .filter_map(|e| {
+                e.user_id
+                    .parse::<u64>()
+                    .ok()
+                    .map(|id| (UserId::new(id), e.level))
+            })
             .collect(),
     )
 }

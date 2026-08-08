@@ -29,7 +29,6 @@ fn command_module(name: &str) -> &'static str {
         "roles-panel" | "parrain" => "community",
         "audit" => "audit",
         "level" | "stats" | "progression-resync" | "classement" => "progression",
-        "rotation" => "rotation",
         "security" => "security",
         "automod" => "automod",
         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "ban-sursis" | "unban" | "history"
@@ -47,7 +46,7 @@ fn command_module(name: &str) -> &'static str {
 
 /// `true` si la commande est une commande admin/moderateur (loggue dans le
 /// salon dedie `command_log_channel_id`). Couvre automod + toutes les commandes
-/// de moderation/securite/nettoyage/audit/rotation, les `*-setup`, les `*-admin`
+/// de moderation/securite/nettoyage/audit, les `*-setup`, les `*-admin`
 /// et les panneaux de config communautaires.
 fn is_admin_command(name: &str) -> bool {
     // Les sanctions produisent DEJA une carte de moderation riche (cible,
@@ -59,7 +58,7 @@ fn is_admin_command(name: &str) -> bool {
     }
     matches!(
         command_module(name),
-        "moderation" | "automod" | "security" | "cleanup" | "audit" | "rotation"
+        "moderation" | "automod" | "security" | "cleanup" | "audit"
     ) || name.ends_with("-setup")
         || name.ends_with("-admin")
         || matches!(name, "roles-panel" | "parrain")
@@ -201,7 +200,6 @@ impl EventHandler for Handler {
 
         // Automod: background tasks (slowmode deactivation + cache cleanup)
         modules::automod::spawn_background_tasks(&ctx);
-        modules::rotation::spawn_background_tasks(&ctx);
 
         // Moderation: Redis consumer pour events externes
         modules::moderation::spawn_background(ctx.clone());
@@ -622,7 +620,6 @@ impl EventHandler for Handler {
                         "level" | "stats" | "progression-resync" | "classement" => {
                             modules::progression::handle_command(&ctx, &command).await
                         }
-                        "rotation" => modules::rotation::handle_command(&ctx, &command).await,
                         "security" => modules::security::handle_command(&ctx, &command).await,
                         "automod" => modules::automod::handle_command(&ctx, &command).await,
                         "warn" | "unwarn" | "mute" | "unmute" | "ban" | "ban-sursis" | "unban"
@@ -697,9 +694,6 @@ impl EventHandler for Handler {
                     modules::automod::on_component(&ctx, &component).await;
                 } else if modules::moderation::handles_component(cid) {
                     modules::moderation::on_component(&ctx, &component).await;
-                } else if modules::rotation::handles_component(cid) {
-                    // Boutons cliques en MP (validation admin tournant).
-                    modules::rotation::on_component(&ctx, &component).await;
                 } else if modules::voice::handles_component(cid) {
                     modules::voice::on_component(&ctx, &component).await;
                 } else if modules::tickets::handles_component(cid) {

@@ -13,9 +13,7 @@ use uuid::Uuid;
 
 /// Palette de repli, dans l'ordre des options. Une option sans couleur
 /// choisie reste lisible au lieu de tomber sur un gris indifferencie.
-pub const DEFAULT_COLORS: [&str; 6] = [
-    "a855f7", "22c55e", "f43f5e", "f39c12", "38bdf8", "14b8a6",
-];
+pub const DEFAULT_COLORS: [&str; 6] = ["a855f7", "22c55e", "f43f5e", "f39c12", "38bdf8", "14b8a6"];
 
 pub const MIN_OPTIONS: usize = 2;
 pub const MAX_OPTIONS: usize = 10;

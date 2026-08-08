@@ -21,7 +21,11 @@ use super::constants::*;
 ///
 /// Fail-closed : sans role configure ou sans membre resolu, seule la permission
 /// Discord « Gerer le serveur » ouvre les boutons.
-async fn is_staff(ctx: &Context, component: &ComponentInteraction, cfg: &HashMap<String, String>) -> bool {
+async fn is_staff(
+    ctx: &Context,
+    component: &ComponentInteraction,
+    cfg: &HashMap<String, String>,
+) -> bool {
     let member = match &component.member {
         Some(m) => m,
         None => return false,
@@ -204,7 +208,10 @@ async fn announce_decision(
     idea: &Idea,
     cfg: &HashMap<String, String>,
 ) {
-    let decided_by = idea.decided_by_name.clone().unwrap_or_else(|| "Staff".into());
+    let decided_by = idea
+        .decided_by_name
+        .clone()
+        .unwrap_or_else(|| "Staff".into());
     let embed = build_idea_embed_full(
         &idea.id,
         &idea.title,

@@ -10,16 +10,16 @@ use tracing::warn;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::bootstrap::state::CommunityState;
 use crate::adapters::outbound::discord_api::DiscordMember;
-use sentinel_core::ports::inbound::community::manage_members::RegisterMemberCommand;
-use sentinel_core::ports::inbound::community::manage_members::SyncMembersCommand;
-use sentinel_core::ports::inbound::community::manage_members::UpdateMemberCommand;
+use crate::bootstrap::state::CommunityState;
 use sentinel_core::domain::entities::community::guild_member::GuildMember;
 use sentinel_core::domain::entities::community::guild_member::MemberSummary;
 use sentinel_core::domain::entities::community::guild_member_reset::DISCORD_LIST_MEMBERS_CAP;
 use sentinel_core::domain::entities::community::guild_member_reset::MEMBERS_CACHE_TTL_SECS;
 use sentinel_core::domain::entities::system::discord_ids::GuildId;
+use sentinel_core::ports::inbound::community::manage_members::RegisterMemberCommand;
+use sentinel_core::ports::inbound::community::manage_members::SyncMembersCommand;
+use sentinel_core::ports::inbound::community::manage_members::UpdateMemberCommand;
 /// GET /api/guilds/{guild_id}/members — liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
     State(state): State<CommunityState>,
@@ -177,7 +177,6 @@ pub async fn reset_member(
     _user: Option<Extension<WebUser>>,
     ValidatedGuildUser { guild_id, user_id }: ValidatedGuildUser,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-
     let totals: serde_json::Map<String, serde_json::Value> = state
         .members_uc
         .reset_member(&guild_id, &user_id)

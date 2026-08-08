@@ -1,12 +1,12 @@
-﻿use crate::adapters::inbound::http::dto::moderation::notes::AddNoteDto;
+use crate::adapters::inbound::http::dto::moderation::notes::AddNoteDto;
 use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::extractors::ValidatedGuildUser;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::bootstrap::state::ModerationState;
 use crate::adapters::inbound::http::validation;
+use crate::bootstrap::state::ModerationState;
 use axum::extract::Path;
 use axum::extract::State;
 use axum::Json;
@@ -20,7 +20,6 @@ pub async fn add_note(
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_content(&dto.content).map_err(ApiError)?;
-
 
     let command = dto.into();
     let note = state.notes_uc.add_note(command).await?;

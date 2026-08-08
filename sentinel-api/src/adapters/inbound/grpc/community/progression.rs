@@ -13,15 +13,15 @@ use tonic::Status;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
+use sentinel_core::domain::entities::community::level::xp_progress;
+use sentinel_core::domain::entities::community::level::UserLevel;
+use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::ports::inbound::community::manage_levels::AddXpCommand;
 use sentinel_core::ports::inbound::community::manage_levels::AddXpResult;
 use sentinel_core::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 use sentinel_core::ports::inbound::community::manage_levels::RecordActivityResult;
 use sentinel_core::ports::inbound::community::manage_levels::RecordTextActivityCommand;
 use sentinel_core::ports::inbound::community::manage_levels::RecordVoiceActivityCommand;
-use sentinel_core::domain::entities::community::level::xp_progress;
-use sentinel_core::domain::entities::community::level::UserLevel;
-use sentinel_core::domain::entities::community::level::XpSource;
 pub struct ProgressionGrpc {
     pub levels_uc: Arc<dyn ManageLevelsUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,

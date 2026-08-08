@@ -4,9 +4,9 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 use sentinel_core::domain::entities::community::daily_activity::DailyActivity;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 
 pub struct PgDailyActivityRepository {
     pool: PgPool,

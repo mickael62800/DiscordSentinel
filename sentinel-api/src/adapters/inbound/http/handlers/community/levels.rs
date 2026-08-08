@@ -14,10 +14,10 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::bootstrap::state::CommunityState;
+use sentinel_core::domain::entities::community::level::XpSource;
 use sentinel_core::ports::inbound::community::manage_levels::AddXpCommand;
 use sentinel_core::ports::inbound::community::manage_levels::ResetTarget;
 use sentinel_core::ports::inbound::community::manage_levels::SetUserXpCommand;
-use sentinel_core::domain::entities::community::level::XpSource;
 
 pub async fn add_xp(
     State(state): State<CommunityState>,

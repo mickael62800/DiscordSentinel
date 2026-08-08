@@ -1036,8 +1036,12 @@ pub async fn handle_age_modal(
             Some(b) => b,
             None => {
                 warn!(guild = %guild_id, "API indisponible pour la verification d'age");
-                reply_modal(ctx, modal, "Verification d'age indisponible, reessaie plus tard.")
-                    .await;
+                reply_modal(
+                    ctx,
+                    modal,
+                    "Verification d'age indisponible, reessaie plus tard.",
+                )
+                .await;
                 return;
             }
         };
@@ -1046,12 +1050,19 @@ pub async fn handle_age_modal(
             "declared_age": age,
         });
         let path = format!("/api/welcome/{guild_id}/age-check");
-        match base.post_json::<_, AgeCheckDecisionResponse>(&path, &body).await {
+        match base
+            .post_json::<_, AgeCheckDecisionResponse>(&path, &body)
+            .await
+        {
             Ok(d) => d,
             Err(e) => {
                 warn!(error = %e, guild = %guild_id, "Echec decision age-check server-side");
-                reply_modal(ctx, modal, "Verification d'age indisponible, reessaie plus tard.")
-                    .await;
+                reply_modal(
+                    ctx,
+                    modal,
+                    "Verification d'age indisponible, reessaie plus tard.",
+                )
+                .await;
                 return;
             }
         }

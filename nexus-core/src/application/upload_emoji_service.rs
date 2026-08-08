@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::system::discord_api_repository::DiscordApiRepository;
+use std::sync::Arc;
 
 pub struct UploadEmojiUseCase {
     pub discord_api: Arc<dyn DiscordApiRepository>,
@@ -58,7 +58,9 @@ mod tests {
         let uc = UploadEmojiUseCase::new(Arc::new(MockDiscordApi));
         let large_bytes = vec![0u8; 256 * 1024 + 1];
 
-        let res = uc.execute("guild1", "custom_emoji", &large_bytes, "image/png").await;
+        let res = uc
+            .execute("guild1", "custom_emoji", &large_bytes, "image/png")
+            .await;
         assert!(res.is_err());
         if let Err(DomainError::ValidationError(msg)) = res {
             assert!(msg.contains("256 KB"));
@@ -72,7 +74,10 @@ mod tests {
         let uc = UploadEmojiUseCase::new(Arc::new(MockDiscordApi));
         let valid_bytes = vec![0u8; 100];
 
-        let (id, name) = uc.execute("guild1", "pepe_smirk", &valid_bytes, "image/png").await.unwrap();
+        let (id, name) = uc
+            .execute("guild1", "pepe_smirk", &valid_bytes, "image/png")
+            .await
+            .unwrap();
         assert_eq!(id, "emoji_123");
         assert_eq!(name, "pepe_smirk");
     }

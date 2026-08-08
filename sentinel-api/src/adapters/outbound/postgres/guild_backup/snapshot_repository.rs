@@ -124,12 +124,11 @@ impl SnapshotRepository for PgSnapshotRepository {
     }
 
     async fn count(&self, guild_id: &str) -> Result<u32, DomainError> {
-        let n: i64 =
-            sqlx::query_scalar("SELECT COUNT(*) FROM guild_snapshots WHERE guild_id = $1")
-                .bind(guild_id)
-                .fetch_one(&self.pool)
-                .await
-                .map_err(pg_ctx(TBL))?;
+        let n: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM guild_snapshots WHERE guild_id = $1")
+            .bind(guild_id)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(pg_ctx(TBL))?;
         Ok(n.max(0) as u32)
     }
 

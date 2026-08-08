@@ -8,8 +8,8 @@ use async_trait::async_trait;
 use redis::AsyncCommands;
 use redis::Client;
 
-use nexus_core::ports::outbound::game::port_allocator::{PortAllocator, PortKind};
 use nexus_core::domain::errors::DomainError;
+use nexus_core::ports::outbound::game::port_allocator::{PortAllocator, PortKind};
 
 /// TTL PAR DEFAUT d'une reservation de port (secondes = 7 jours). Global /
 /// infra : la reservation est un simple garde-fou anti-collision au niveau

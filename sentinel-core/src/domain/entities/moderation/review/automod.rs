@@ -510,7 +510,10 @@ pub fn compute_fp_stats(days: i64, rows: &[FpTerminalReview], capped: bool) -> F
         if let Some(map) = r.flags.as_object() {
             for (flag, val) in map {
                 if val.as_bool() == Some(true) {
-                    by_flag.entry(flag.clone()).or_default().add(overturned, ignored);
+                    by_flag
+                        .entry(flag.clone())
+                        .or_default()
+                        .add(overturned, ignored);
                 }
             }
         }

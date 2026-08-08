@@ -84,53 +84,209 @@ pub async fn ranking(
 }
 
 #[derive(Deserialize)]
-pub struct ClassRequest { pub username: String, pub class: String }
+pub struct ClassRequest {
+    pub username: String,
+    pub class: String,
+}
 
 fn profile_dto(p: nexus_core::ports::outbound::coussin_repository::CoussinProfile) -> ProfileDto {
-    ProfileDto { guild_id: p.guild_id, user_id: p.user_id, username: p.username, class: p.class.as_str().into(), level: p.level, xp: p.xp, atk: p.atk, def: p.def, hp_current: p.hp_current, hp_max: p.hp_max, coins: p.coins, stat_points: p.stat_points, title: p.title, total_wins: p.total_wins, total_losses: p.total_losses, total_draws: p.total_draws, total_stolen: p.total_stolen, cowardice_count: p.cowardice_count, chaos_events: p.chaos_events }
+    ProfileDto {
+        guild_id: p.guild_id,
+        user_id: p.user_id,
+        username: p.username,
+        class: p.class.as_str().into(),
+        level: p.level,
+        xp: p.xp,
+        atk: p.atk,
+        def: p.def,
+        hp_current: p.hp_current,
+        hp_max: p.hp_max,
+        coins: p.coins,
+        stat_points: p.stat_points,
+        title: p.title,
+        total_wins: p.total_wins,
+        total_losses: p.total_losses,
+        total_draws: p.total_draws,
+        total_stolen: p.total_stolen,
+        cowardice_count: p.cowardice_count,
+        chaos_events: p.chaos_events,
+    }
 }
-pub async fn choose_class(State(state): State<AppState>, Path((guild_id, user_id)): Path<(String, String)>, Json(req): Json<ClassRequest>) -> Result<Json<ProfileDto>, ApiError> {
-    Ok(Json(profile_dto(state.coussin_profile.choose_class(&guild_id, &user_id, &req.username, &req.class).await?)))
+pub async fn choose_class(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+    Json(req): Json<ClassRequest>,
+) -> Result<Json<ProfileDto>, ApiError> {
+    Ok(Json(profile_dto(
+        state
+            .coussin_profile
+            .choose_class(&guild_id, &user_id, &req.username, &req.class)
+            .await?,
+    )))
 }
 #[derive(Deserialize)]
-pub struct TrainRequest { pub username: String, pub stat: String }
-pub async fn train(State(state): State<AppState>, Path((guild_id, user_id)): Path<(String, String)>, Json(req): Json<TrainRequest>) -> Result<Json<ProfileDto>, ApiError> {
-    Ok(Json(profile_dto(state.coussin_profile.train(&guild_id, &user_id, &req.username, &req.stat).await?)))
+pub struct TrainRequest {
+    pub username: String,
+    pub stat: String,
+}
+pub async fn train(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+    Json(req): Json<TrainRequest>,
+) -> Result<Json<ProfileDto>, ApiError> {
+    Ok(Json(profile_dto(
+        state
+            .coussin_profile
+            .train(&guild_id, &user_id, &req.username, &req.stat)
+            .await?,
+    )))
 }
 
-#[derive(Serialize)] pub struct InventoryDto { pub item_key: String, pub quantity: i32 }
-pub async fn inventory(State(state): State<AppState>, Path((guild_id, user_id)): Path<(String, String)>) -> Result<Json<Vec<InventoryDto>>, ApiError> {
-    Ok(Json(state.coussin_inventory.inventory(&guild_id, &user_id).await?.into_iter().map(|item| InventoryDto { item_key: item.item_key, quantity: item.quantity }).collect()))
+#[derive(Serialize)]
+pub struct InventoryDto {
+    pub item_key: String,
+    pub quantity: i32,
 }
-#[derive(Deserialize)] pub struct BuyItemRequest { pub item_key: String }
-pub async fn buy_item(State(state): State<AppState>, Path((guild_id, user_id)): Path<(String, String)>, Json(req): Json<BuyItemRequest>) -> Result<Json<serde_json::Value>, ApiError> {
-    let balance = state.coussin_inventory.buy(&guild_id, &user_id, &req.item_key).await?;
+pub async fn inventory(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<Vec<InventoryDto>>, ApiError> {
+    Ok(Json(
+        state
+            .coussin_inventory
+            .inventory(&guild_id, &user_id)
+            .await?
+            .into_iter()
+            .map(|item| InventoryDto {
+                item_key: item.item_key,
+                quantity: item.quantity,
+            })
+            .collect(),
+    ))
+}
+#[derive(Deserialize)]
+pub struct BuyItemRequest {
+    pub item_key: String,
+}
+pub async fn buy_item(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+    Json(req): Json<BuyItemRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let balance = state
+        .coussin_inventory
+        .buy(&guild_id, &user_id, &req.item_key)
+        .await?;
     Ok(Json(serde_json::json!({"balance_after": balance})))
 }
-pub async fn buy_insurance(State(state): State<AppState>, Path((guild_id, user_id)): Path<(String, String)>) -> Result<Json<serde_json::Value>, ApiError> {
+pub async fn buy_insurance(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
     let insurance = state.coussin_insurance.buy(&guild_id, &user_id).await?;
-    Ok(Json(serde_json::json!({"is_scam": insurance.is_scam, "expires_at": insurance.expires_at})))
+    Ok(Json(
+        serde_json::json!({"is_scam": insurance.is_scam, "expires_at": insurance.expires_at}),
+    ))
 }
-pub async fn insurance(State(state): State<AppState>, Path((guild_id, user_id)): Path<(String, String)>) -> Result<Json<serde_json::Value>, ApiError> {
+pub async fn insurance(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
     let active = state.coussin_insurance.active(&guild_id, &user_id).await?;
-    Ok(Json(serde_json::json!({"active": active.is_some(), "is_scam": active.as_ref().map(|i| i.is_scam), "expires_at": active.map(|i| i.expires_at)})))
+    Ok(Json(
+        serde_json::json!({"active": active.is_some(), "is_scam": active.as_ref().map(|i| i.is_scam), "expires_at": active.map(|i| i.expires_at)}),
+    ))
 }
-#[derive(Deserialize)] pub struct StealRequest { pub thief_name: String, pub victim_id: String, pub victim_name: String }
-pub async fn steal(State(state): State<AppState>, Path((guild_id, thief_id)): Path<(String, String)>, Json(req): Json<StealRequest>) -> Result<Json<serde_json::Value>, ApiError> {
-    let profile = state.coussin_profile.profile(&guild_id, &thief_id, &req.thief_name).await?;
-    state.coussin_profile.profile(&guild_id, &req.victim_id, &req.victim_name).await?;
-    let result = state.coussin_steal.steal(&guild_id, &thief_id, &req.victim_id, profile.class == nexus_core::domain::entities::coussin::PlayerClass::Piegeur).await?;
-    Ok(Json(serde_json::json!({"success":result.success,"amount":result.amount})))
+#[derive(Deserialize)]
+pub struct StealRequest {
+    pub thief_name: String,
+    pub victim_id: String,
+    pub victim_name: String,
 }
-#[derive(Deserialize)] pub struct PrimeRequest { pub target_id: String, pub target_name: String, pub placer_name: String, pub amount: i64 }
-pub async fn place_prime(State(state): State<AppState>, Path((guild_id, placer_id)): Path<(String, String)>, Json(req): Json<PrimeRequest>) -> Result<Json<serde_json::Value>, ApiError> {
-    state.coussin_profile.profile(&guild_id, &placer_id, &req.placer_name).await?;
-    state.coussin_profile.profile(&guild_id, &req.target_id, &req.target_name).await?;
-    state.coussin_prime.place(&guild_id, &req.target_id, &req.target_name, &placer_id, &req.placer_name, req.amount).await?;
+pub async fn steal(
+    State(state): State<AppState>,
+    Path((guild_id, thief_id)): Path<(String, String)>,
+    Json(req): Json<StealRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let profile = state
+        .coussin_profile
+        .profile(&guild_id, &thief_id, &req.thief_name)
+        .await?;
+    state
+        .coussin_profile
+        .profile(&guild_id, &req.victim_id, &req.victim_name)
+        .await?;
+    let result = state
+        .coussin_steal
+        .steal(
+            &guild_id,
+            &thief_id,
+            &req.victim_id,
+            profile.class == nexus_core::domain::entities::coussin::PlayerClass::Piegeur,
+        )
+        .await?;
+    Ok(Json(
+        serde_json::json!({"success":result.success,"amount":result.amount}),
+    ))
+}
+#[derive(Deserialize)]
+pub struct PrimeRequest {
+    pub target_id: String,
+    pub target_name: String,
+    pub placer_name: String,
+    pub amount: i64,
+}
+pub async fn place_prime(
+    State(state): State<AppState>,
+    Path((guild_id, placer_id)): Path<(String, String)>,
+    Json(req): Json<PrimeRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state
+        .coussin_profile
+        .profile(&guild_id, &placer_id, &req.placer_name)
+        .await?;
+    state
+        .coussin_profile
+        .profile(&guild_id, &req.target_id, &req.target_name)
+        .await?;
+    state
+        .coussin_prime
+        .place(
+            &guild_id,
+            &req.target_id,
+            &req.target_name,
+            &placer_id,
+            &req.placer_name,
+            req.amount,
+        )
+        .await?;
     Ok(Json(serde_json::json!({"ok":true})))
 }
-#[derive(Deserialize)] pub struct BetRequest { pub combat_id: uuid::Uuid, pub bettor_name: String, pub backed_id: String, pub amount: i64 }
-pub async fn place_bet(State(state): State<AppState>, Path((guild_id, bettor_id)): Path<(String, String)>, Json(req): Json<BetRequest>) -> Result<Json<serde_json::Value>, ApiError> { state.coussin_bet.place(&guild_id,req.combat_id,&bettor_id,&req.bettor_name,&req.backed_id,req.amount).await?; Ok(Json(serde_json::json!({"ok":true}))) }
+#[derive(Deserialize)]
+pub struct BetRequest {
+    pub combat_id: uuid::Uuid,
+    pub bettor_name: String,
+    pub backed_id: String,
+    pub amount: i64,
+}
+pub async fn place_bet(
+    State(state): State<AppState>,
+    Path((guild_id, bettor_id)): Path<(String, String)>,
+    Json(req): Json<BetRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state
+        .coussin_bet
+        .place(
+            &guild_id,
+            req.combat_id,
+            &bettor_id,
+            &req.bettor_name,
+            &req.backed_id,
+            req.amount,
+        )
+        .await?;
+    Ok(Json(serde_json::json!({"ok":true})))
+}
 
 #[derive(Deserialize)]
 pub struct ChallengeRequest {
@@ -171,10 +327,33 @@ pub async fn challenge(
     }))
 }
 
-#[derive(Deserialize)] pub struct DefenderRequest { pub defender_id: String }
-pub async fn accept(State(state): State<AppState>, Path(id): Path<uuid::Uuid>, Json(req): Json<DefenderRequest>) -> Result<Json<serde_json::Value>, ApiError> { let ok = state.coussin_combat.accept(id, &req.defender_id).await?; Ok(Json(serde_json::json!({"ok": ok}))) }
-pub async fn refuse(State(state): State<AppState>, Path(id): Path<uuid::Uuid>, Json(req): Json<DefenderRequest>) -> Result<Json<serde_json::Value>, ApiError> { let ok = state.coussin_combat.refuse(id, &req.defender_id).await?; Ok(Json(serde_json::json!({"ok": ok}))) }
-pub async fn resolve(State(state): State<AppState>, Path(id): Path<uuid::Uuid>) -> Result<Json<serde_json::Value>, ApiError> { let ok=state.coussin_combat.resolve(id).await?; Ok(Json(serde_json::json!({"ok":ok}))) }
+#[derive(Deserialize)]
+pub struct DefenderRequest {
+    pub defender_id: String,
+}
+pub async fn accept(
+    State(state): State<AppState>,
+    Path(id): Path<uuid::Uuid>,
+    Json(req): Json<DefenderRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let ok = state.coussin_combat.accept(id, &req.defender_id).await?;
+    Ok(Json(serde_json::json!({"ok": ok})))
+}
+pub async fn refuse(
+    State(state): State<AppState>,
+    Path(id): Path<uuid::Uuid>,
+    Json(req): Json<DefenderRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let ok = state.coussin_combat.refuse(id, &req.defender_id).await?;
+    Ok(Json(serde_json::json!({"ok": ok})))
+}
+pub async fn resolve(
+    State(state): State<AppState>,
+    Path(id): Path<uuid::Uuid>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let ok = state.coussin_combat.resolve(id).await?;
+    Ok(Json(serde_json::json!({"ok":ok})))
+}
 
 #[derive(Debug, Serialize)]
 pub struct CombatDto {

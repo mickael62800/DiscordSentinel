@@ -5,9 +5,9 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::moderation::reminder_repository::ReminderRepository;
 use sentinel_core::domain::entities::moderation::action::sanction_reminder::SanctionReminder;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::moderation::reminder_repository::ReminderRepository;
 
 pub struct PgReminderRepository {
     pool: PgPool,

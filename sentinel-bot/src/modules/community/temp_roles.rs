@@ -52,7 +52,6 @@ impl TempRoleTracker {
     pub fn remove(&self, guild_id: u64, user_id: u64, role_id: u64) {
         self.roles.remove(&(guild_id, user_id, role_id));
     }
-
 }
 
 /// Parse les roles temporaires depuis la config : "role_id:duration_secs" par ligne.

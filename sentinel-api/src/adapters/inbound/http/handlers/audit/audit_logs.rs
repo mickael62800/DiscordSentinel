@@ -8,12 +8,12 @@ use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::bootstrap::state::AuditState;
-use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 
 pub async fn create_audit_log(
     State(state): State<AuditState>,
@@ -27,9 +27,10 @@ pub async fn create_audit_log(
     // et declenchait `log_entry_created`. Indispensable des lors que le web
     // remplace les salons de logs Discord : un evenement manque n'a plus
     // aucune autre trace visible.
-    state
-        .broadcaster
-        .broadcast("audit_log_created", serde_json::to_value(&response.0).unwrap_or_default());
+    state.broadcaster.broadcast(
+        "audit_log_created",
+        serde_json::to_value(&response.0).unwrap_or_default(),
+    );
 
     Ok(response)
 }
@@ -40,7 +41,6 @@ pub async fn purge_audit_logs(
     State(state): State<AuditState>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-
     let deleted = state
         .audit_logs_uc
         .delete_older_than_days(&guild_id, 0)
@@ -86,7 +86,10 @@ pub async fn list_audit_logs(
         target_id: params.target_id,
         from: parse_date(params.from),
         to: parse_date(params.to),
-        search: params.search.map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
+        search: params
+            .search
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty()),
         limit: normalize_limit(params.limit, 100, 500),
         offset: normalize_offset(params.offset),
     };

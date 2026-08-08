@@ -3,9 +3,9 @@ use crate::adapters::outbound::postgres::pg_err;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
+use sentinel_core::domain::errors::DomainError;
 use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use sentinel_core::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
-use sentinel_core::domain::errors::DomainError;
 pub struct PgWelcomeConfigRepository {
     pool: PgPool,
 }
@@ -178,40 +178,33 @@ fn overlay_with_bot_config(
             "welcome_channel_id" => {
                 d.welcome_channel_id = if v.is_empty() { None } else { Some(v) }
             }
-            "welcome_message"
-                if !v.is_empty() => {
-                    d.welcome_message = v;
-                }
-            "welcome_embed_color"
-                if !v.is_empty() => {
-                    d.welcome_embed_color = v;
-                }
+            "welcome_message" if !v.is_empty() => {
+                d.welcome_message = v;
+            }
+            "welcome_embed_color" if !v.is_empty() => {
+                d.welcome_embed_color = v;
+            }
             "welcome_dm_enabled" => d.welcome_dm_enabled = parse_bool(&v, d.welcome_dm_enabled),
-            "welcome_dm_message"
-                if !v.is_empty() => {
-                    d.welcome_dm_message = v;
-                }
-            "rejoin_message"
-                if !v.is_empty() => {
-                    d.rejoin_message = v;
-                }
+            "welcome_dm_message" if !v.is_empty() => {
+                d.welcome_dm_message = v;
+            }
+            "rejoin_message" if !v.is_empty() => {
+                d.rejoin_message = v;
+            }
             "leave_enabled" => d.leave_enabled = parse_bool(&v, d.leave_enabled),
             "leave_channel_id" => d.leave_channel_id = if v.is_empty() { None } else { Some(v) },
-            "leave_message"
-                if !v.is_empty() => {
-                    d.leave_message = v;
-                }
+            "leave_message" if !v.is_empty() => {
+                d.leave_message = v;
+            }
             "rules_enabled" => d.rules_enabled = parse_bool(&v, d.rules_enabled),
             "rules_channel_id" => d.rules_channel_id = if v.is_empty() { None } else { Some(v) },
-            "rules_message"
-                if !v.is_empty() => {
-                    d.rules_message = v;
-                }
+            "rules_message" if !v.is_empty() => {
+                d.rules_message = v;
+            }
             "rules_role_id" => d.rules_role_id = if v.is_empty() { None } else { Some(v) },
-            "rules_button_label"
-                if !v.is_empty() => {
-                    d.rules_button_label = v;
-                }
+            "rules_button_label" if !v.is_empty() => {
+                d.rules_button_label = v;
+            }
             "age_check_enabled" => d.age_check_enabled = parse_bool(&v, d.age_check_enabled),
             "age_minimum" => {
                 if let Ok(n) = v.parse::<i32>() {
@@ -221,14 +214,12 @@ fn overlay_with_bot_config(
             "unverified_role_id" => {
                 d.unverified_role_id = if v.is_empty() { None } else { Some(v) }
             }
-            "age_modal_question"
-                if !v.is_empty() => {
-                    d.age_modal_question = v;
-                }
-            "age_ban_message"
-                if !v.is_empty() => {
-                    d.age_ban_message = v;
-                }
+            "age_modal_question" if !v.is_empty() => {
+                d.age_modal_question = v;
+            }
+            "age_ban_message" if !v.is_empty() => {
+                d.age_ban_message = v;
+            }
             "age_min" => {
                 if let Ok(n) = v.parse::<i32>() {
                     d.age_min = n;
@@ -247,76 +238,63 @@ fn overlay_with_bot_config(
             "age_ban_log_channel_id" => {
                 d.age_ban_log_channel_id = if v.is_empty() { None } else { Some(v) }
             }
-            "leave_embed_color"
-                if !v.is_empty() => {
-                    d.leave_embed_color = v;
-                }
-            "rules_embed_color"
-                if !v.is_empty() => {
-                    d.rules_embed_color = v;
-                }
+            "leave_embed_color" if !v.is_empty() => {
+                d.leave_embed_color = v;
+            }
+            "rules_embed_color" if !v.is_empty() => {
+                d.rules_embed_color = v;
+            }
             "counter_enabled" => d.counter_enabled = parse_bool(&v, d.counter_enabled),
             "counter_channel_id" => {
                 d.counter_channel_id = if v.is_empty() { None } else { Some(v) }
             }
-            "counter_format"
-                if !v.is_empty() => {
-                    d.counter_format = v;
-                }
+            "counter_format" if !v.is_empty() => {
+                d.counter_format = v;
+            }
             "voice_counter_enabled" => {
                 d.voice_counter_enabled = parse_bool(&v, d.voice_counter_enabled)
             }
             "voice_counter_channel_id" => {
                 d.voice_counter_channel_id = if v.is_empty() { None } else { Some(v) }
             }
-            "voice_counter_format"
-                if !v.is_empty() => {
-                    d.voice_counter_format = v;
-                }
+            "voice_counter_format" if !v.is_empty() => {
+                d.voice_counter_format = v;
+            }
             "anniversary_enabled" => d.anniversary_enabled = parse_bool(&v, d.anniversary_enabled),
             "anniversary_channel_id" => {
                 d.anniversary_channel_id = if v.is_empty() { None } else { Some(v) }
             }
-            "anniversary_message"
-                if !v.is_empty() => {
-                    d.anniversary_message = v;
-                }
-            "welcome_title"
-                if !v.is_empty() => {
-                    d.welcome_title = v;
-                }
+            "anniversary_message" if !v.is_empty() => {
+                d.anniversary_message = v;
+            }
+            "welcome_title" if !v.is_empty() => {
+                d.welcome_title = v;
+            }
             "welcome_image_url" => d.welcome_image_url = v,
-            "welcome_footer_text"
-                if !v.is_empty() => {
-                    d.welcome_footer_text = v;
-                }
-            "rejoin_title"
-                if !v.is_empty() => {
-                    d.rejoin_title = v;
-                }
+            "welcome_footer_text" if !v.is_empty() => {
+                d.welcome_footer_text = v;
+            }
+            "rejoin_title" if !v.is_empty() => {
+                d.rejoin_title = v;
+            }
             "rejoin_image_url" => d.rejoin_image_url = v,
-            "rejoin_footer_text"
-                if !v.is_empty() => {
-                    d.rejoin_footer_text = v;
-                }
-            "leave_title"
-                if !v.is_empty() => {
-                    d.leave_title = v;
-                }
+            "rejoin_footer_text" if !v.is_empty() => {
+                d.rejoin_footer_text = v;
+            }
+            "leave_title" if !v.is_empty() => {
+                d.leave_title = v;
+            }
             "leave_image_url" => d.leave_image_url = v,
-            "leave_footer_text"
-                if !v.is_empty() => {
-                    d.leave_footer_text = v;
-                }
-            "anniversary_title"
-                if !v.is_empty() => {
-                    d.anniversary_title = v;
-                }
+            "leave_footer_text" if !v.is_empty() => {
+                d.leave_footer_text = v;
+            }
+            "anniversary_title" if !v.is_empty() => {
+                d.anniversary_title = v;
+            }
             "anniversary_image_url" => d.anniversary_image_url = v,
-            "anniversary_footer_text"
-                if !v.is_empty() => {
-                    d.anniversary_footer_text = v;
-                }
+            "anniversary_footer_text" if !v.is_empty() => {
+                d.anniversary_footer_text = v;
+            }
             _ => {}
         }
     }

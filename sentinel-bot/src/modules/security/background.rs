@@ -18,16 +18,13 @@ pub fn spawn_background(ctx: Context) {
     let ctx_q = ctx.clone();
     tokio::spawn(async move {
         let data = ctx_q.data.read().await;
-        let (Some(base), Some(quarantine)) = (
-            data.get::<crate::shared::heartbeat::ApiClientKey>(),
+        let (Some(sec_api), Some(quarantine)) = (
+            data.get::<super::SecurityApiKey>(),
             data.get::<QuarantineKey>(),
         ) else {
             return;
         };
-        match base
-            .get_json::<Vec<(String, String)>>("/api/security/quarantine/active")
-            .await
-        {
+        match sec_api.list_active_quarantines().await {
             Ok(list) => {
                 let mut n = 0u32;
                 for (g, u) in list {

@@ -62,7 +62,10 @@ async fn reset_ok_with_exact_name_sums_rows_and_keeps_context() {
     assert!(repo.wiped.load(Ordering::SeqCst));
     assert_eq!(out.tables_wiped.len(), 3);
     assert_eq!(out.total_rows, 42);
-    assert_eq!(out.discord_context.quarantine_role_id.as_deref(), Some("q-role"));
+    assert_eq!(
+        out.discord_context.quarantine_role_id.as_deref(),
+        Some("q-role")
+    );
     assert_eq!(out.discord_context.temp_role_ids, vec!["t1", "t2"]);
 }
 
@@ -71,7 +74,9 @@ async fn reset_trims_confirmation_whitespace() {
     let repo = Arc::new(MockResetRepo::new(Some("Mon Serveur")));
     let svc = ResetGuildService::new(repo.clone());
 
-    svc.reset(GUILD, "  Mon Serveur \n").await.expect("reset ok");
+    svc.reset(GUILD, "  Mon Serveur \n")
+        .await
+        .expect("reset ok");
     assert!(repo.wiped.load(Ordering::SeqCst));
 }
 
@@ -82,7 +87,10 @@ async fn reset_wrong_confirmation_is_forbidden_and_does_not_wipe() {
 
     let err = svc.reset(GUILD, "mon serveur").await.unwrap_err();
     assert!(matches!(err, DomainError::Forbidden(_)), "{err:?}");
-    assert!(!repo.wiped.load(Ordering::SeqCst), "wipe ne doit PAS etre appele");
+    assert!(
+        !repo.wiped.load(Ordering::SeqCst),
+        "wipe ne doit PAS etre appele"
+    );
 }
 
 #[tokio::test]

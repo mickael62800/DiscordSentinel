@@ -48,7 +48,11 @@ fn date_depassee_ferme_le_sondage_sans_action_manuelle() {
 #[test]
 fn total_additionne_les_voix() {
     let p = poll(
-        vec![option("A", 18, None), option("B", 13, None), option("C", 9, None)],
+        vec![
+            option("A", 18, None),
+            option("B", 13, None),
+            option("C", 9, None),
+        ],
         false,
         10,
     );

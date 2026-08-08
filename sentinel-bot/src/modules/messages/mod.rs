@@ -122,7 +122,10 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
         }
     }
 
-    match ChannelId::new(channel_id).send_message(&ctx.http, message).await {
+    match ChannelId::new(channel_id)
+        .send_message(&ctx.http, message)
+        .await
+    {
         Ok(m) => info!(
             guild = %payload.guild_id,
             channel = %payload.channel_id,

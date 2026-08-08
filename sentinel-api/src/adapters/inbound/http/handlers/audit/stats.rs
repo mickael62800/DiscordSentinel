@@ -4,7 +4,6 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 
-
 use crate::adapters::inbound::http::dto::audit::stats::GuildOverviewDto;
 use crate::adapters::inbound::http::dto::audit::stats::GuildVoiceStatsDto;
 use crate::adapters::inbound::http::dto::audit::stats::LeaderboardQuery;

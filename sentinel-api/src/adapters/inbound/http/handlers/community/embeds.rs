@@ -21,16 +21,19 @@ const EMBED_STREAM_KEY: &str = "sentinel:events";
 const EMBED_STREAM_MAXLEN: usize = 10_000;
 
 /// Publie un `embed_publish` sur le stream Redis pour que le bot poste/edite.
-async fn publish_embed(state: &CommunityState, payload: &RenderedEmbedPost) -> Result<(), ApiError> {
+async fn publish_embed(
+    state: &CommunityState,
+    payload: &RenderedEmbedPost,
+) -> Result<(), ApiError> {
     let envelope = serde_json::json!({ "event": "embed_publish", "data": payload }).to_string();
     let mut conn = state
         .redis_client
         .get_multiplexed_async_connection()
         .await
         .map_err(|e| {
-            ApiError(sentinel_core::domain::errors::DomainError::Internal(format!(
-                "Redis indisponible: {e}"
-            )))
+            ApiError(sentinel_core::domain::errors::DomainError::Internal(
+                format!("Redis indisponible: {e}"),
+            ))
         })?;
     let _: String = conn
         .xadd_maxlen(
@@ -41,9 +44,9 @@ async fn publish_embed(state: &CommunityState, payload: &RenderedEmbedPost) -> R
         )
         .await
         .map_err(|e| {
-            ApiError(sentinel_core::domain::errors::DomainError::Internal(format!(
-                "XADD embed_publish: {e}"
-            )))
+            ApiError(sentinel_core::domain::errors::DomainError::Internal(
+                format!("XADD embed_publish: {e}"),
+            ))
         })?;
     Ok(())
 }

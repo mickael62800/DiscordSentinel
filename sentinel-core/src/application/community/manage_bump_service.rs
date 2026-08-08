@@ -61,11 +61,18 @@ impl ManageBumpUseCase for ManageBumpService {
             "spacebump" => 360,
             _ => cfg_i64(&cfg, "bump_cooldown_minutes", 120),
         };
-        let cooldown = cfg_i64(&cfg, &format!("{provider}_cooldown_minutes"), cooldown_default)
-            .clamp(1, 1440);
+        let cooldown = cfg_i64(
+            &cfg,
+            &format!("{provider}_cooldown_minutes"),
+            cooldown_default,
+        )
+        .clamp(1, 1440);
         let reminder_enabled = cfg_bool(&cfg, "bump_reminder_enabled", true);
         let channel = {
-            let c = cfg_str(&cfg, "bump_channel_id").unwrap_or("").trim().to_string();
+            let c = cfg_str(&cfg, "bump_channel_id")
+                .unwrap_or("")
+                .trim()
+                .to_string();
             if c.is_empty() {
                 cmd.channel_id.clone()
             } else {
@@ -77,7 +84,13 @@ impl ManageBumpUseCase for ManageBumpService {
         // libre (dernier bump du (guild, provider) > cooldown).
         let slot_won = self
             .repo
-            .try_claim_slot(&cmd.guild_id, &provider, &channel, cooldown, reminder_enabled)
+            .try_claim_slot(
+                &cmd.guild_id,
+                &provider,
+                &channel,
+                cooldown,
+                reminder_enabled,
+            )
             .await?;
         if !slot_won {
             return Ok(BumpReward::none());
@@ -107,7 +120,10 @@ impl ManageBumpUseCase for ManageBumpService {
         let mut vip_role_id: Option<String> = None;
         let mut vip_just_unlocked = false;
         if cfg_bool(&cfg, "vip_enabled", false) {
-            let vip_role = cfg_str(&cfg, "vip_role_id").unwrap_or("").trim().to_string();
+            let vip_role = cfg_str(&cfg, "vip_role_id")
+                .unwrap_or("")
+                .trim()
+                .to_string();
             let vip_threshold = cfg_i64(&cfg, "vip_bump_threshold", 10).max(1);
             if !vip_role.is_empty() {
                 let total_bumps = self

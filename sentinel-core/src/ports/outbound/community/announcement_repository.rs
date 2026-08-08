@@ -77,9 +77,5 @@ pub trait AnnouncementRepository: Send + Sync {
 
     /// Supprime les runs d'annonces plus vieux que `days` jours pour une
     /// guild. Retourne le nombre de lignes supprimees.
-    async fn delete_runs_older_than(
-        &self,
-        guild_id: &str,
-        days: i32,
-    ) -> Result<u64, DomainError>;
+    async fn delete_runs_older_than(&self, guild_id: &str, days: i32) -> Result<u64, DomainError>;
 }

@@ -3,9 +3,9 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 use sentinel_core::domain::entities::audit::security_event::SecurityEvent;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 
 pub struct PgSecurityEventRepository {
     pool: PgPool,
@@ -93,13 +93,14 @@ impl SecurityEventRepository for PgSecurityEventRepository {
     async fn purge_guild(&self, guild_id: &str) -> Result<(u64, u64), DomainError> {
         // Source de verite : audit_logs (event_type 'security_%'). La table
         // security_events est deprecated (best-effort, plus de writes).
-        let events =
-            sqlx::query("DELETE FROM audit_logs WHERE guild_id = $1 AND event_type LIKE 'security_%'")
-                .bind(guild_id)
-                .execute(&self.pool)
-                .await
-                .map_err(pg_err)?
-                .rows_affected();
+        let events = sqlx::query(
+            "DELETE FROM audit_logs WHERE guild_id = $1 AND event_type LIKE 'security_%'",
+        )
+        .bind(guild_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?
+        .rows_affected();
 
         let _ = sqlx::query("DELETE FROM security_events WHERE guild_id = $1")
             .bind(guild_id)

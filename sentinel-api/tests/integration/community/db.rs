@@ -292,7 +292,7 @@ mod community_grpc {
                 Arc::new(sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository::new(p.clone())),
             ),
         );
-                // Ce test de base couvre sponsorships + temp-roles. L'eligibilite et
+        // Ce test de base couvre sponsorships + temp-roles. L'eligibilite et
         // le classement mensuel ont leurs propres tests : ils sont cables sur
         // des doubles qui echouent bruyamment si on les emprunte ici.
         CommunityGrpc {

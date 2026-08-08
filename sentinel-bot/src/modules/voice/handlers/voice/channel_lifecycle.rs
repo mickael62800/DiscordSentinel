@@ -399,14 +399,14 @@ pub(super) async fn create_temp_channel(
     // declencher un re-render quand un admin change l etat du salon.
     if let (Some(record_uuid), Some(msg_id)) = (voice_record_uuid, panel_msg_id) {
         let data = ctx.data.read().await;
-        if let Some(api) = data.get::<crate::shared::heartbeat::ApiClientKey>() {
-            let api = std::sync::Arc::clone(api);
+        if let Some(grpc) = data.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            let grpc = std::sync::Arc::clone(grpc);
             let guild_str = guild_id.to_string();
             let ch_str = voice_channel_id.to_string();
             let msg_str = msg_id.to_string();
             drop(data);
             crate::sync::register_action_message(
-                &api,
+                &grpc,
                 record_uuid,
                 "voice_panel",
                 &guild_str,
@@ -661,24 +661,14 @@ pub async fn handle_voice_redis_event(ctx: &Context, payload: &str) {
         return;
     }
 
-    let api = {
+    let grpc = {
         let data_lock = ctx.data.read().await;
-        match data_lock.get::<crate::shared::heartbeat::ApiClientKey>() {
-            Some(a) => a.clone(),
+        match data_lock.get::<crate::shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
             None => return,
         }
     };
-
-    #[derive(serde::Deserialize)]
-    struct Mapping {
-        kind: String,
-        channel_id: String,
-        message_id: String,
-    }
-    let mappings: Vec<Mapping> = match api
-        .get_json(&format!("/api/discord-messages/{action_id}"))
-        .await
-    {
+    let mappings = match crate::sync::list_action_messages(&grpc, action_id).await {
         Ok(list) => list,
         Err(e) => {
             warn!(error = %e, action_id, "Echec fetch mapping voice_panel");

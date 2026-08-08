@@ -158,7 +158,10 @@ fn evaluate(rule: &AlertRule, m: &Metrics) -> Vec<(String, String)> {
         "tls_expiry_days" => match m.tls_expiry_days {
             Some(days) if rule.triggers(days) => vec![(
                 format!("{days:.0}"),
-                format!("🔐 **{}** : cert TLS expire dans {:.0} jours", rule.label, days),
+                format!(
+                    "🔐 **{}** : cert TLS expire dans {:.0} jours",
+                    rule.label, days
+                ),
             )],
             _ => vec![],
         },

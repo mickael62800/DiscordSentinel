@@ -39,19 +39,26 @@ use tonic::{Request, Status};
 use tracing::{error, info, warn};
 
 use sentinel_proto::ai_dataset::v1::ai_dataset_service_client::AiDatasetServiceClient;
+use sentinel_proto::audit::v1::audit_service_client::AuditServiceClient;
 use sentinel_proto::automod::v1::automod_service_client::AutomodServiceClient;
+use sentinel_proto::automod_review::v1::automod_review_service_client::AutomodReviewServiceClient;
+use sentinel_proto::bump::v1::bump_service_client::BumpServiceClient;
 use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
+use sentinel_proto::confessions::v1::confessions_service_client::ConfessionsServiceClient;
+use sentinel_proto::announcements::v1::announcements_service_client::AnnouncementsServiceClient;
+use sentinel_proto::discord_messages::v1::discord_action_messages_service_client::DiscordActionMessagesServiceClient;
+use sentinel_proto::guild_backup::v1::guild_backup_service_client::GuildBackupServiceClient;
+use sentinel_proto::ideas::v1::ideas_service_client::IdeasServiceClient;
 use sentinel_proto::members::v1::members_service_client::MembersServiceClient;
 use sentinel_proto::moderation::v1::moderation_service_client::ModerationServiceClient;
 use sentinel_proto::progression::v1::progression_service_client::ProgressionServiceClient;
+use sentinel_proto::purge::v1::purge_service_client::PurgeServiceClient;
 use sentinel_proto::roles::v1::role_panels_service_client::RolePanelsServiceClient;
 use sentinel_proto::security::v1::security_service_client::SecurityServiceClient;
+use sentinel_proto::security_state::v1::security_state_service_client::SecurityStateServiceClient;
 use sentinel_proto::stats::v1::stats_service_client::StatsServiceClient;
+use sentinel_proto::sursis::v1::sursis_service_client::SursisServiceClient;
 use sentinel_proto::tickets::v1::tickets_service_client::TicketsServiceClient;
-use sentinel_proto::audit::v1::audit_service_client::AuditServiceClient;
-use sentinel_proto::guild_backup::v1::guild_backup_service_client::GuildBackupServiceClient;
-use sentinel_proto::ideas::v1::ideas_service_client::IdeasServiceClient;
-use sentinel_proto::purge::v1::purge_service_client::PurgeServiceClient;
 use sentinel_proto::voice::v1::voice_channels_service_client::VoiceChannelsServiceClient;
 use sentinel_proto::welcome::v1::welcome_service_client::WelcomeServiceClient;
 
@@ -324,6 +331,68 @@ impl SentinelGrpcClient {
     /// Retourne un client `SecurityService` pret a l'emploi.
     pub fn security(&self) -> SecurityServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         SecurityServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `SecurityStateService` (miroir quarantaine/slowmode/lockdown).
+    pub fn security_state(
+        &self,
+    ) -> SecurityStateServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        SecurityStateServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `AutomodReviewService` (cartes de review/vote).
+    pub fn automod_review(
+        &self,
+    ) -> AutomodReviewServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        AutomodReviewServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `DiscordActionMessagesService` (mapping de sync).
+    pub fn discord_messages(
+        &self,
+    ) -> DiscordActionMessagesServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        DiscordActionMessagesServiceClient::with_interceptor(
+            self.channel.clone(),
+            self.interceptor.clone(),
+        )
+        .send_compressed(CompressionEncoding::Gzip)
+        .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `AnnouncementsService` (callbacks d'annonces).
+    pub fn announcements(
+        &self,
+    ) -> AnnouncementsServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        AnnouncementsServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `ConfessionsService` (confessions anonymes).
+    pub fn confessions(
+        &self,
+    ) -> ConfessionsServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        ConfessionsServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `BumpService` (recompenses /bump).
+    pub fn bump(&self) -> BumpServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        BumpServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `SursisService` (« ban en sursis »).
+    pub fn sursis(&self) -> SursisServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        SursisServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
     }

@@ -320,7 +320,9 @@ pub async fn container_logs(
 
 // ── Images ────────────────────────────────────────────────────────────────
 
-pub async fn list_images(State(state): State<SystemState>) -> Result<Json<Vec<ImageDto>>, ApiError> {
+pub async fn list_images(
+    State(state): State<SystemState>,
+) -> Result<Json<Vec<ImageDto>>, ApiError> {
     let list = state.docker_host.list_images().await?;
     let out: Vec<ImageDto> = list
         .into_iter()
@@ -367,7 +369,9 @@ pub async fn remove_image(
 
 // ── Volumes ───────────────────────────────────────────────────────────────
 
-pub async fn list_volumes(State(state): State<SystemState>) -> Result<Json<Vec<VolumeDto>>, ApiError> {
+pub async fn list_volumes(
+    State(state): State<SystemState>,
+) -> Result<Json<Vec<VolumeDto>>, ApiError> {
     let list = state.docker_host.list_volumes().await?;
     let out: Vec<VolumeDto> = list
         .into_iter()

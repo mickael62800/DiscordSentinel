@@ -119,7 +119,10 @@ async fn periode_absente_prend_le_mois_courant() {
     svc.designate(cmd()).await.unwrap();
 
     let saved = repo.upserted.lock().unwrap()[0].clone();
-    assert_eq!(saved.period.as_deref(), Some(period_of(Utc::now()).as_str()));
+    assert_eq!(
+        saved.period.as_deref(),
+        Some(period_of(Utc::now()).as_str())
+    );
 }
 
 #[tokio::test]

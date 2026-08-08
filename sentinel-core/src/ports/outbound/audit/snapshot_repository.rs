@@ -29,8 +29,7 @@ pub trait SnapshotRepository: Send + Sync {
     ) -> Result<(), DomainError>;
 
     /// Purge `daily_activity` au dela de `retention_days`.
-    async fn cleanup_daily(&self, guild_id: &str, retention_days: i32)
-        -> Result<(), DomainError>;
+    async fn cleanup_daily(&self, guild_id: &str, retention_days: i32) -> Result<(), DomainError>;
 
     /// Purge `analytics_daily_baseline` au dela de `retention_days`.
     async fn cleanup_baseline(
@@ -40,9 +39,5 @@ pub trait SnapshotRepository: Send + Sync {
     ) -> Result<(), DomainError>;
 
     /// Purge `hourly_activity` au dela de `retention_days`.
-    async fn cleanup_hourly(
-        &self,
-        guild_id: &str,
-        retention_days: i32,
-    ) -> Result<(), DomainError>;
+    async fn cleanup_hourly(&self, guild_id: &str, retention_days: i32) -> Result<(), DomainError>;
 }

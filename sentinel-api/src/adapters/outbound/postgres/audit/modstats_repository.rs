@@ -2,10 +2,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use super::super::pg_err;
-use sentinel_core::ports::outbound::audit::modstats_repository::ModeratorStat;
-use sentinel_core::ports::outbound::audit::modstats_repository::ModstatsRepository;
 use sentinel_core::domain::entities::moderation::modstats::ModeratorBreakdown;
 use sentinel_core::domain::entities::moderation::modstats::ModstatsTrendDay;
+use sentinel_core::ports::outbound::audit::modstats_repository::ModeratorStat;
+use sentinel_core::ports::outbound::audit::modstats_repository::ModstatsRepository;
 
 pub struct PgModstatsRepository {
     pool: PgPool,

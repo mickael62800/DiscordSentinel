@@ -7,8 +7,6 @@ use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use tracing::{error, info};
 
-use crate::shared::heartbeat::ApiClientKey;
-
 /// Gere l'activation automatique du slowmode pendant un raid.
 pub struct SlowmodeManager {
     /// guild_id -> (timestamp d'activation, rate IMPOSE par le raid, ancien
@@ -87,15 +85,18 @@ impl SlowmodeManager {
                 })
             })
             .collect();
-        if let Some(base) = ctx.data.read().await.get::<ApiClientKey>() {
-            let body = serde_json::json!({
-                "guild_id": guild_id.to_string(),
-                "previous_states": states_json,
-                "duration_secs": persist_duration_secs,
-                "imposed_rate": slowmode_secs,
-            });
-            base.post_fire_and_forget("/api/security/slowmode", &body)
-                .await;
+        if let Some(sec_api) = ctx.data.read().await.get::<super::super::SecurityApiKey>() {
+            if let Err(e) = sec_api
+                .mark_slowmode(
+                    &guild_id.to_string(),
+                    serde_json::Value::Array(states_json),
+                    persist_duration_secs as i64,
+                    slowmode_secs as i32,
+                )
+                .await
+            {
+                tracing::warn!(error = %e, "Echec persistance slowmode (best-effort)");
+            }
         }
 
         self.active

@@ -39,7 +39,12 @@ impl<K: Eq + Hash> CooldownMap<K> {
     /// enregistré). `purge_max_age_secs` borne l'âge au-delà duquel une entrée
     /// est évincée lors de la purge amortie — il doit couvrir le plus long
     /// cooldown utilisé sur cette map.
-    pub fn check_and_set(&self, key: K, cooldown_secs: u64, purge_max_age_secs: u64) -> Option<u64> {
+    pub fn check_and_set(
+        &self,
+        key: K,
+        cooldown_secs: u64,
+        purge_max_age_secs: u64,
+    ) -> Option<u64> {
         let now = Instant::now();
 
         if self.map.len() > self.max_entries {

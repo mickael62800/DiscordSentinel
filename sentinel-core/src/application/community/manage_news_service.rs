@@ -54,8 +54,7 @@ impl ManageNewsService {
                     Ok(u)
                 } else {
                     Err(DomainError::ValidationError(
-                        "l'image doit etre un chemin relatif, par exemple /imgs/annonce.jpg"
-                            .into(),
+                        "l'image doit etre un chemin relatif, par exemple /imgs/annonce.jpg".into(),
                     ))
                 }
             })
@@ -89,11 +88,7 @@ impl ManageNewsUseCase for ManageNewsService {
         self.repo.create(&Self::sanitize(cmd)?).await
     }
 
-    async fn update(
-        &self,
-        id: Uuid,
-        cmd: UpsertNewsCommand,
-    ) -> Result<NewsPost, DomainError> {
+    async fn update(&self, id: Uuid, cmd: UpsertNewsCommand) -> Result<NewsPost, DomainError> {
         self.repo
             .update(id, &Self::sanitize(cmd)?)
             .await?

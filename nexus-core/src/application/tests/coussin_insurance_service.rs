@@ -1,11 +1,13 @@
-use std::sync::{Arc, Mutex};
 use async_trait::async_trait;
+use std::sync::{Arc, Mutex};
 
-use crate::domain::errors::DomainError;
-use crate::ports::inbound::coussin_insurance::CoussinInsuranceUseCase;
-use crate::ports::outbound::coussin_insurance_repository::{CoussinInsurance, CoussinInsuranceRepository};
 use crate::application::coussin_insurance_service::CoussinInsuranceService;
 use crate::application::economy_config::EmptyBotConfigRepository;
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::coussin_insurance::CoussinInsuranceUseCase;
+use crate::ports::outbound::coussin_insurance_repository::{
+    CoussinInsurance, CoussinInsuranceRepository,
+};
 
 #[derive(Default)]
 struct MockInsuranceRepo {

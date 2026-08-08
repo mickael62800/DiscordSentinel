@@ -171,4 +171,3 @@ async fn live_community_list_sponsorships_and_temp_roles() {
         .into_inner();
     assert!(temp_roles.roles.is_empty(), "guild aleatoire = vide");
 }
-

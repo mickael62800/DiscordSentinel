@@ -5,8 +5,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::system::guild_repository::PgGuildRepository;
-use sentinel_core::ports::outbound::system::guild_repository::GuildRepository;
 use sentinel_core::domain::entities::system::guild::Guild;
+use sentinel_core::ports::outbound::system::guild_repository::GuildRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()
@@ -73,4 +73,3 @@ async fn guild_find_all_includes_inserted() {
     let all = repo.find_all().await.unwrap();
     assert!(all.iter().any(|g| g.guild_id.as_str() == id));
 }
-

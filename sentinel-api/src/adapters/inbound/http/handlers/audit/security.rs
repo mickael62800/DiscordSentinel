@@ -6,8 +6,8 @@ use crate::adapters::inbound::http::extractors::ValidatedGuild;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::middleware::superadmin::WebUser;
-use crate::bootstrap::state::AuditState;
 use crate::adapters::inbound::http::validation;
+use crate::bootstrap::state::AuditState;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::Extension;
@@ -52,7 +52,6 @@ pub async fn purge_events(
     _user: Option<Extension<WebUser>>,
     ValidatedGuild { guild_id }: ValidatedGuild,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-
     // La purge (SQL) vit dans le use case / repo (plus de SQL inline).
     let (deleted_events, deleted_watches) = state.security_uc.purge_events(&guild_id).await?;
 

@@ -147,7 +147,10 @@ impl ManageSecurityUseCase for ManageSecurityService {
         // Charger config guild.
         let configs = self
             .bot_config_repo
-            .get_config(&cmd.guild_id, crate::domain::entities::system::bot_names::SECURITY_BOT)
+            .get_config(
+                &cmd.guild_id,
+                crate::domain::entities::system::bot_names::SECURITY_BOT,
+            )
             .await
             .unwrap_or_default();
         let cfg = |key: &str, default: u64| -> u64 {

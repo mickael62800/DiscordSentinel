@@ -234,7 +234,6 @@ pub async fn handle_autocomplete(ctx: &Context, autocomplete: &CommandInteractio
     }
 }
 
-
 /// Cree un salon d'appel PRIVE sous la categorie `appeal_category_id` : visible
 /// seulement par l'appelant et le role moderateur. Retourne l'id du salon cree,
 /// ou `None` si la categorie n'est pas configuree (l'appelant retombe alors sur
@@ -285,7 +284,11 @@ pub async fn create_appeal_channel(
         },
     ];
     for key in ["moderator_role_id", "mod_role_id"] {
-        if let Some(rid) = cfg.get(key).and_then(|v| v.parse::<u64>().ok()).filter(|&n| n > 0) {
+        if let Some(rid) = cfg
+            .get(key)
+            .and_then(|v| v.parse::<u64>().ok())
+            .filter(|&n| n > 0)
+        {
             overwrites.push(PermissionOverwrite {
                 allow: Permissions::VIEW_CHANNEL
                     | Permissions::SEND_MESSAGES
@@ -307,7 +310,14 @@ pub async fn create_appeal_channel(
         .chars()
         .take(90)
         .collect();
-    let channel_name = format!("appel-{}", if slug.is_empty() { "membre".into() } else { slug });
+    let channel_name = format!(
+        "appel-{}",
+        if slug.is_empty() {
+            "membre".into()
+        } else {
+            slug
+        }
+    );
 
     let create = CreateChannel::new(&channel_name)
         .kind(ChannelType::Text)

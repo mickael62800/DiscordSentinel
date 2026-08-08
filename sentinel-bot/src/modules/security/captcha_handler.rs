@@ -117,9 +117,10 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
 
                 // Phase 5F — supprime la row DB pour eviter que le worker
                 // ne kick le user qui vient juste de valider.
-                if let Some(base) = data.get::<crate::shared::heartbeat::ApiClientKey>() {
-                    let path = format!("/api/security/quarantine/{}/{}", guild_id, user_id);
-                    let _ = base.delete_json::<serde_json::Value>(&path).await;
+                if let Some(sec_api) = data.get::<super::SecurityApiKey>() {
+                    let _ = sec_api
+                        .lift_quarantine(&guild_id.to_string(), &user_id.to_string())
+                        .await;
                 }
 
                 let event = SecurityEvent {
@@ -181,8 +182,9 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                         captcha_pending,
                     )
                     .await;
-                    let embed = warn_embed("\u{1f504} Nouveau captcha envoye")
-                        .description("Un nouveau captcha vient de vous etre envoye en message prive.");
+                    let embed = warn_embed("\u{1f504} Nouveau captcha envoye").description(
+                        "Un nouveau captcha vient de vous etre envoye en message prive.",
+                    );
                     let response = serenity::builder::CreateInteractionResponse::Message(
                         serenity::builder::CreateInteractionResponseMessage::new()
                             .embed(embed)
@@ -267,9 +269,10 @@ pub(super) async fn on_component(ctx: &Context, component: &ComponentInteraction
                     .await;
 
                 // Phase 5F — supprime la row DB pour eviter kick worker.
-                if let Some(base) = data.get::<crate::shared::heartbeat::ApiClientKey>() {
-                    let path = format!("/api/security/quarantine/{}/{}", guild_id, user_id);
-                    let _ = base.delete_json::<serde_json::Value>(&path).await;
+                if let Some(sec_api) = data.get::<super::SecurityApiKey>() {
+                    let _ = sec_api
+                        .lift_quarantine(&guild_id.to_string(), &user_id.to_string())
+                        .await;
                 }
 
                 let event = SecurityEvent {

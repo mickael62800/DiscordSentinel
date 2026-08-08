@@ -4,11 +4,11 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use sentinel_core::ports::outbound::community::confession_repository::ConfessionRepository;
 use sentinel_core::domain::entities::community::confession::{
     Confession, ConfessionConfig, ConfessionReply, ConfessionReport, ReportStatus,
 };
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::community::confession_repository::ConfessionRepository;
 
 pub struct PgConfessionRepository {
     pool: PgPool,

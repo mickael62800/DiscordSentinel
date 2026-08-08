@@ -560,7 +560,13 @@ mod tests {
     #[test]
     fn oversized_plan_is_rejected() {
         let items = (0..=MAX_PLAN_ITEMS)
-            .map(|i| item(&format!("k{i}"), &format!("salon-{i}"), PlannedChannelKind::Text))
+            .map(|i| {
+                item(
+                    &format!("k{i}"),
+                    &format!("salon-{i}"),
+                    PlannedChannelKind::Text,
+                )
+            })
             .collect();
         assert!(ChannelPlan { items }.validate_and_order(GUILD).is_err());
     }

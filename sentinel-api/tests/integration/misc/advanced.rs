@@ -393,4 +393,3 @@ async fn invite_link_unique_code() {
     ).bind(vc2).bind(&gid).bind(&ch2).bind(&unique_code).execute(&p).await;
     assert!(dup.is_err(), "Duplicate code doit etre rejete");
 }
-

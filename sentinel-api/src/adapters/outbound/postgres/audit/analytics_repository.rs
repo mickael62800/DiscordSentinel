@@ -3,9 +3,9 @@ use crate::adapters::outbound::postgres::pg_err;
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use sentinel_core::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 use sentinel_core::domain::entities::system::analytics::*;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 
 pub struct PgAnalyticsRepository {
     pool: PgPool,

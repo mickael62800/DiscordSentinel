@@ -22,10 +22,7 @@ impl PgPollRepository {
     /// Options de plusieurs sondages, decompte des voix inclus, en une
     /// requete. Le LEFT JOIN garde les options sans aucune voix — sans lui,
     /// un choix a zero disparaitrait du sondage.
-    async fn load_options(
-        &self,
-        ids: &[Uuid],
-    ) -> Result<Vec<(Uuid, PollOption)>, DomainError> {
+    async fn load_options(&self, ids: &[Uuid]) -> Result<Vec<(Uuid, PollOption)>, DomainError> {
         if ids.is_empty() {
             return Ok(vec![]);
         }
@@ -257,11 +254,7 @@ impl PollRepository for PgPollRepository {
         Ok(res.rows_affected() > 0)
     }
 
-    async fn vote_of(
-        &self,
-        poll_id: Uuid,
-        user_id: &str,
-    ) -> Result<Option<Uuid>, DomainError> {
+    async fn vote_of(&self, poll_id: Uuid, user_id: &str) -> Result<Option<Uuid>, DomainError> {
         let row: Option<(Uuid,)> = sqlx::query_as(
             "SELECT option_id FROM community_poll_votes \
              WHERE poll_id = $1 AND user_id = $2",

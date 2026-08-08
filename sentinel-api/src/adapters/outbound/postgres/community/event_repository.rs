@@ -98,12 +98,13 @@ impl EventRepository for PgEventRepository {
     }
 
     async fn find_by_id(&self, id: Uuid) -> Result<Option<CommunityEvent>, DomainError> {
-        let row: Option<EventRow> =
-            sqlx::query_as(&format!("SELECT {COLS} FROM community_events WHERE id = $1"))
-                .bind(id)
-                .fetch_optional(&self.pool)
-                .await
-                .map_err(pg_err)?;
+        let row: Option<EventRow> = sqlx::query_as(&format!(
+            "SELECT {COLS} FROM community_events WHERE id = $1"
+        ))
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
         Ok(row.map(Into::into))
     }
 

@@ -476,20 +476,21 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
                     // Running mais container mort -> crash. L'etat DESIRE est
                     // Running (l'utilisateur ne l'a pas stoppe) : on tente un
                     // auto-restart borne + backoff plutot que de juste stopper.
-                    GameServerStatus::Running if exited
-                        && handle_running_crash(
-                            ctx,
-                            s,
-                            now,
-                            cfg.max_auto_restart_attempts,
-                            cfg.auto_restart_on_crash,
-                            cfg.restart_backoff_base_secs,
-                            cfg.restart_backoff_cap_secs,
-                        )
-                        .await
-                        => {
-                            errors += 1;
-                        }
+                    GameServerStatus::Running
+                        if exited
+                            && handle_running_crash(
+                                ctx,
+                                s,
+                                now,
+                                cfg.max_auto_restart_attempts,
+                                cfg.auto_restart_on_crash,
+                                cfg.restart_backoff_base_secs,
+                                cfg.restart_backoff_cap_secs,
+                            )
+                            .await =>
+                    {
+                        errors += 1;
+                    }
                     // Running et container running : observation saine. Si des
                     // tentatives de redemarrage etaient en cours, on les remet
                     // a 0 (cheap : seulement si restart_attempts > 0). Couvre
@@ -721,15 +722,12 @@ pub async fn run_reveal_ip(ctx: &JobContext) -> Result<JobReport, DomainError> {
 // ════════════════════════════════════════════════════════════════════════
 
 pub async fn run_daily_ping(ctx: &JobContext) -> Result<JobReport, DomainError> {
-    use chrono::Timelike;
     use crate::domain::entities::system::bot_config::{cfg_bool, cfg_i64};
     use crate::ports::outbound::events::game_events::DAILY_PING;
+    use chrono::Timelike;
 
     let now_hour = chrono::Utc::now().hour() as i64;
-    let awaiting = ctx
-        .server_repo
-        .list_awaiting_reveal_no_ping_today()
-        .await?;
+    let awaiting = ctx.server_repo.list_awaiting_reveal_no_ping_today().await?;
     let mut processed = 0usize;
     let mut errors = 0usize;
     let mut servers = Vec::new();
@@ -770,6 +768,16 @@ pub async fn run_daily_ping(ctx: &JobContext) -> Result<JobReport, DomainError> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::entities::game::audit::{GameAuditAction, GameAuditEntry};
+    use crate::domain::entities::game::player_session::PlayerSession;
+    use crate::domain::entities::game::server::{GameServer, GameServerStatus};
+    use crate::domain::entities::system::bot_config::{BotDefinition, BotGuildConfig};
+    use crate::ports::outbound::game::container_runtime::{
+        ContainerSpec, ContainerStats, ContainerStatus, ManagedContainer,
+    };
+    use crate::ports::outbound::game::game_server_repository::{
+        GameServerRuntimeUpdate, NewGameServer, TemplateUsage,
+    };
 
     #[test]
     fn test_parse_minecraft_list() {
@@ -787,23 +795,92 @@ mod tests {
     struct DummyServerRepo;
     #[async_trait::async_trait]
     impl GameServerRepository for DummyServerRepo {
-        async fn create(&self, _: crate::ports::outbound::game::game_server_repository::NewGameServer) -> Result<crate::domain::entities::game::server::GameServer, DomainError> { todo!() }
-        async fn find_by_id(&self, _: Uuid) -> Result<Option<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(None) }
-        async fn list_by_guild(&self, _: &str) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
-        async fn list_running(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
-        async fn list_active_non_deleted(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
-        async fn update_runtime_state(&self, _: Uuid, _: GameServerRuntimeUpdate) -> Result<(), DomainError> { Ok(()) }
-        async fn update_player_activity(&self, _: Uuid, _: i32) -> Result<(), DomainError> { Ok(()) }
-        async fn delete(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
-        async fn list_ip_reveal_due(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
-        async fn mark_ip_revealed(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
-        async fn set_ip_reveal_at(&self, _: Uuid, _: Option<chrono::DateTime<chrono::Utc>>) -> Result<(), DomainError> { Ok(()) }
-        async fn list_awaiting_reveal_no_ping_today(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
-        async fn mark_daily_ping(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
-        async fn set_auto_restart(&self, _: Uuid, _: bool) -> Result<(), DomainError> { Ok(()) }
-        async fn list_public_active(&self) -> Result<Vec<crate::domain::entities::game::server::GameServer>, DomainError> { Ok(vec![]) }
-        async fn sum_active_memory_mb(&self, _: &str) -> Result<i32, DomainError> { Ok(0) }
-        async fn count_active_servers(&self, _: &str) -> Result<i32, DomainError> { Ok(0) }
+        async fn create(&self, _: NewGameServer) -> Result<GameServer, DomainError> {
+            todo!()
+        }
+        async fn find_by_id(&self, _: Uuid) -> Result<Option<GameServer>, DomainError> {
+            Ok(None)
+        }
+        async fn list_by_guild(&self, _: &str) -> Result<Vec<GameServer>, DomainError> {
+            Ok(vec![])
+        }
+        async fn list_running(&self) -> Result<Vec<GameServer>, DomainError> {
+            Ok(vec![])
+        }
+        async fn list_active(&self) -> Result<Vec<GameServer>, DomainError> {
+            Ok(vec![])
+        }
+        async fn update_runtime(
+            &self,
+            _: Uuid,
+            _: GameServerRuntimeUpdate,
+        ) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn update_status(
+            &self,
+            _: Uuid,
+            _: GameServerStatus,
+            _: Option<&str>,
+        ) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn try_transition_status(
+            &self,
+            _: Uuid,
+            _: &[GameServerStatus],
+            _: GameServerStatus,
+        ) -> Result<bool, DomainError> {
+            Ok(true)
+        }
+        async fn update_player_activity(&self, _: Uuid, _: i32) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn record_restart_attempt(&self, _: Uuid) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn reset_restart_attempts(&self, _: Uuid) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn soft_delete(&self, _: Uuid) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn count_active_for_guild(&self, _: &str) -> Result<(i32, i32), DomainError> {
+            Ok((0, 0))
+        }
+        async fn template_usage(&self, _: Uuid) -> Result<TemplateUsage, DomainError> {
+            Ok(TemplateUsage {
+                active_count: 0,
+                last_activity_at: None,
+            })
+        }
+        async fn set_session_channels(
+            &self,
+            _: Uuid,
+            _: Option<&str>,
+            _: Option<&str>,
+        ) -> Result<bool, DomainError> {
+            Ok(true)
+        }
+        async fn mark_ip_revealed(&self, _: Uuid) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn list_ip_reveal_due(&self) -> Result<Vec<GameServer>, DomainError> {
+            Ok(vec![])
+        }
+        async fn list_awaiting_reveal_no_ping_today(&self) -> Result<Vec<GameServer>, DomainError> {
+            Ok(vec![])
+        }
+        async fn mark_daily_ping(&self, _: Uuid) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn set_ip_reveal_at(
+            &self,
+            _: Uuid,
+            _: Option<chrono::DateTime<chrono::Utc>>,
+        ) -> Result<(), DomainError> {
+            Ok(())
+        }
     }
 
     struct DummyEventPublisher;
@@ -815,61 +892,184 @@ mod tests {
     struct DummyBotConfig;
     #[async_trait::async_trait]
     impl BotConfigRepository for DummyBotConfig {
-        async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
-        async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-        async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-        async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-        async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+            Ok(vec![])
+        }
+        async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+            Ok(vec![])
+        }
+        async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+            Ok(vec![])
+        }
+        async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+            Ok(())
+        }
     }
 
     struct DummyTemplateRepo;
     #[async_trait::async_trait]
-    impl crate::ports::outbound::game::game_template_repository::GameTemplateRepository for DummyTemplateRepo {
-        async fn list(&self) -> Result<Vec<crate::domain::entities::game::template::GameTemplate>, DomainError> { Ok(vec![]) }
-        async fn find_by_id(&self, _: Uuid) -> Result<Option<crate::domain::entities::game::template::GameTemplate>, DomainError> { Ok(None) }
-        async fn find_by_slug(&self, _: &str) -> Result<Option<crate::domain::entities::game::template::GameTemplate>, DomainError> { Ok(None) }
+    impl crate::ports::outbound::game::game_template_repository::GameTemplateRepository
+        for DummyTemplateRepo
+    {
+        async fn list(
+            &self,
+        ) -> Result<Vec<crate::domain::entities::game::template::GameTemplate>, DomainError>
+        {
+            Ok(vec![])
+        }
+        async fn find_by_id(
+            &self,
+            _: Uuid,
+        ) -> Result<Option<crate::domain::entities::game::template::GameTemplate>, DomainError>
+        {
+            Ok(None)
+        }
+        async fn find_by_slug(
+            &self,
+            _: &str,
+        ) -> Result<Option<crate::domain::entities::game::template::GameTemplate>, DomainError>
+        {
+            Ok(None)
+        }
     }
 
     struct DummyAuditRepo;
     #[async_trait::async_trait]
     impl GameAuditRepository for DummyAuditRepo {
-        async fn log(&self, _: &str, _: Option<Uuid>, _: Option<String>, _: crate::domain::entities::game::audit::GameAuditAction, _: serde_json::Value) {}
+        async fn log(
+            &self,
+            _: &str,
+            _: Option<Uuid>,
+            _: Option<&str>,
+            _: GameAuditAction,
+            _: serde_json::Value,
+        ) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn list_for_server(
+            &self,
+            _: Uuid,
+            _: i64,
+        ) -> Result<Vec<GameAuditEntry>, DomainError> {
+            Ok(vec![])
+        }
+        async fn list_for_guild(
+            &self,
+            _: &str,
+            _: i64,
+            _: i64,
+        ) -> Result<Vec<GameAuditEntry>, DomainError> {
+            Ok(vec![])
+        }
     }
 
     struct DummySessionRepo;
     #[async_trait::async_trait]
     impl PlayerSessionRepository for DummySessionRepo {
-        async fn record_join(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
-        async fn record_leave(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
-        async fn list_active(&self, _: Uuid) -> Result<Vec<crate::domain::entities::game::player_session::PlayerSession>, DomainError> { Ok(vec![]) }
-        async fn list_history(&self, _: Uuid, _: i64, _: i64) -> Result<Vec<crate::domain::entities::game::player_session::PlayerSession>, DomainError> { Ok(vec![]) }
+        async fn open(&self, _: Uuid, _: &str) -> Result<Uuid, DomainError> {
+            Ok(Uuid::new_v4())
+        }
+        async fn close(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn list_active(&self, _: Uuid) -> Result<Vec<PlayerSession>, DomainError> {
+            Ok(vec![])
+        }
+        async fn list_history(
+            &self,
+            _: Uuid,
+            _: i64,
+            _: i64,
+        ) -> Result<Vec<PlayerSession>, DomainError> {
+            Ok(vec![])
+        }
+        async fn close_all_active(&self, _: Uuid) -> Result<(), DomainError> {
+            Ok(())
+        }
     }
 
     struct DummyRuntime;
     #[async_trait::async_trait]
     impl ContainerRuntime for DummyRuntime {
-        async fn create_container(&self, _: &ContainerSpec) -> Result<String, DomainError> { Ok("id".into()) }
-        async fn start_container(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-        async fn stop_container(&self, _: &str, _: u32) -> Result<(), DomainError> { Ok(()) }
-        async fn delete_container(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-        async fn inspect(&self, _: &str) -> Result<Option<crate::ports::outbound::game::container_runtime::ContainerStatus>, DomainError> { Ok(None) }
-        async fn logs(&self, _: &str, _: u32) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
-        async fn stats(&self, _: &str) -> Result<crate::ports::outbound::game::container_runtime::ContainerStats, DomainError> { todo!() }
-        async fn image_exists(&self, _: &str) -> Result<bool, DomainError> { Ok(true) }
-        async fn remove_image(&self, _: &str) -> Result<bool, DomainError> { Ok(true) }
+        async fn ensure_network(&self, _: &str) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn ensure_volume(&self, _: &str) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn pull_image_if_missing(&self, _: &str) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn create_container(&self, _: &ContainerSpec) -> Result<String, DomainError> {
+            Ok("id".into())
+        }
+        async fn start_container(&self, _: &str) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn upload_file_to_container(
+            &self,
+            _: &str,
+            _: &str,
+            _: &str,
+        ) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn stop_container(&self, _: &str, _: u32) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn restart_container(&self, _: &str, _: u32) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn remove_container(&self, _: &str) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn remove_volume(&self, _: &str) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn remove_image(&self, _: &str, _: bool) -> Result<bool, DomainError> {
+            Ok(true)
+        }
+        async fn inspect(&self, _: &str) -> Result<Option<ContainerStatus>, DomainError> {
+            Ok(None)
+        }
+        async fn stats(&self, _: &str) -> Result<ContainerStats, DomainError> {
+            todo!()
+        }
+        async fn logs(&self, _: &str, _: u32) -> Result<Vec<String>, DomainError> {
+            Ok(vec![])
+        }
+        async fn list_managed_containers(&self) -> Result<Vec<ManagedContainer>, DomainError> {
+            Ok(vec![])
+        }
     }
 
     struct DummyRcon;
     #[async_trait::async_trait]
     impl RconClient for DummyRcon {
-        async fn execute(&self, _: &RconConnectionParams, _: &str) -> Result<crate::ports::outbound::game::rcon_client::RconResponse, DomainError> { todo!() }
+        async fn execute(
+            &self,
+            _: &RconConnectionParams,
+            _: &str,
+        ) -> Result<crate::ports::outbound::game::rcon_client::RconResponse, DomainError> {
+            todo!()
+        }
     }
 
     struct DummyPortAllocator;
     #[async_trait::async_trait]
     impl PortAllocator for DummyPortAllocator {
-        async fn allocate(&self, _: &str, _: PortKind, _: i32, _: i32) -> Result<i32, DomainError> { Ok(25565) }
-        async fn release(&self, _: &str, _: PortKind, _: i32) -> Result<(), DomainError> { Ok(()) }
+        async fn allocate(&self, _: PortKind, _: u16, _: u16, _: &str) -> Result<u16, DomainError> {
+            Ok(25565)
+        }
+        async fn release(&self, _: PortKind, _: u16) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn is_available(&self, _: PortKind, _: u16) -> Result<bool, DomainError> {
+            Ok(true)
+        }
     }
 
     #[tokio::test]

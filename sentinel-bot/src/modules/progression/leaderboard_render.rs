@@ -125,9 +125,21 @@ fn layout_for(cat: Category) -> Layout {
             // Rayon un peu > trou : l'avatar remplit le trou, le template masque
             // le surplus (effet encastre).
             podium: [
-                Circle { cx: 768.0, cy: 406.0, r: 121.0 }, // #1 centre
-                Circle { cx: 420.0, cy: 422.0, r: 103.0 }, // #2 gauche
-                Circle { cx: 1080.0, cy: 436.0, r: 96.0 }, // #3 droite
+                Circle {
+                    cx: 768.0,
+                    cy: 406.0,
+                    r: 121.0,
+                }, // #1 centre
+                Circle {
+                    cx: 420.0,
+                    cy: 422.0,
+                    r: 103.0,
+                }, // #2 gauche
+                Circle {
+                    cx: 1080.0,
+                    cy: 436.0,
+                    r: 96.0,
+                }, // #3 droite
             ],
             row_ys: [656.0, 724.0, 792.0, 860.0, 928.0],
             row_avatar_r: 33.0,
@@ -144,9 +156,21 @@ fn layout_for(cat: Category) -> Layout {
             h: 1122.0,
             // Centres exacts detectes via les trous transparents (alpha=0).
             podium: [
-                Circle { cx: 700.0, cy: 444.0, r: 100.0 }, // #1 centre
-                Circle { cx: 374.0, cy: 478.0, r: 86.0 },  // #2 gauche
-                Circle { cx: 1022.0, cy: 476.0, r: 87.0 }, // #3 droite
+                Circle {
+                    cx: 700.0,
+                    cy: 444.0,
+                    r: 100.0,
+                }, // #1 centre
+                Circle {
+                    cx: 374.0,
+                    cy: 478.0,
+                    r: 86.0,
+                }, // #2 gauche
+                Circle {
+                    cx: 1022.0,
+                    cy: 476.0,
+                    r: 87.0,
+                }, // #3 droite
             ],
             // Y des lignes detectes sur les trous alpha.
             row_ys: [772.0, 836.0, 900.0, 964.0, 1026.0],
@@ -163,9 +187,21 @@ fn layout_for(cat: Category) -> Layout {
             w: 1402.0,
             h: 1122.0,
             podium: [
-                Circle { cx: 700.0, cy: 446.0, r: 103.0 }, // #1 centre
-                Circle { cx: 374.0, cy: 482.0, r: 90.0 },  // #2 gauche
-                Circle { cx: 1024.0, cy: 482.0, r: 89.0 }, // #3 droite
+                Circle {
+                    cx: 700.0,
+                    cy: 446.0,
+                    r: 103.0,
+                }, // #1 centre
+                Circle {
+                    cx: 374.0,
+                    cy: 482.0,
+                    r: 90.0,
+                }, // #2 gauche
+                Circle {
+                    cx: 1024.0,
+                    cy: 482.0,
+                    r: 89.0,
+                }, // #3 droite
             ],
             row_ys: [770.0, 830.0, 892.0, 954.0, 1016.0],
             row_avatar_r: 27.0,
@@ -206,7 +242,12 @@ fn text(x: f32, y: f32, anchor: &str, size: f32, s: &str) -> String {
     )
 }
 
-fn build_svg(template_b64: &str, entries: &[LbEntry], lay: &Layout, template_on_top: bool) -> String {
+fn build_svg(
+    template_b64: &str,
+    entries: &[LbEntry],
+    lay: &Layout,
+    template_on_top: bool,
+) -> String {
     let mut avatars = String::new();
     let mut labels = String::new();
 
@@ -234,7 +275,11 @@ fn build_svg(template_b64: &str, entries: &[LbEntry], lay: &Layout, template_on_
             } else {
                 (lay.r_avatar_x, lay.r_name_x, lay.r_xp_x)
             };
-            let c = Circle { cx: ax, cy: y, r: lay.row_avatar_r };
+            let c = Circle {
+                cx: ax,
+                cy: y,
+                r: lay.row_avatar_r,
+            };
             avatars.push_str(&avatar_svg(i, &c, &av));
             labels.push_str(&text(nx, y + 8.0, "start", 24.0, &e.name));
             labels.push_str(&text(xx, y + 8.0, "middle", 22.0, &fmt_xp(e.xp)));

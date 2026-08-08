@@ -145,8 +145,10 @@ impl PresenceRepository for RedisPresenceRepository {
             return Ok(vec![]);
         };
 
-        let index: std::collections::HashMap<String, String> =
-            conn.hgetall(text_index_key(guild_id)).await.unwrap_or_default();
+        let index: std::collections::HashMap<String, String> = conn
+            .hgetall(text_index_key(guild_id))
+            .await
+            .unwrap_or_default();
 
         let seuil = Utc::now().timestamp() - TEXT_WINDOW_SECONDS;
 

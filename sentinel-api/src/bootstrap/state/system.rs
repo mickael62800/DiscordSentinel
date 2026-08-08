@@ -1,6 +1,6 @@
 //! Etat du domaine system : exploitation de l'installation elle-meme.
 //!
-//! Tickets, OAuth, securite de l'hote, Docker, exports, rotation d'admin,
+//! Tickets, OAuth, securite de l'hote, Docker, exports,
 //! sondes de sante. Tout ce qui concerne la machine et le service plutot que
 //! le contenu du serveur Discord.
 //!
@@ -20,7 +20,6 @@ use sentinel_core::ports::inbound::system::manage_ip_bans::ManageIpBansUseCase;
 use sentinel_core::ports::inbound::system::manage_lockdown::ManageLockdownUseCase;
 use sentinel_core::ports::inbound::system::manage_oauth::ManageOAuthUseCase;
 use sentinel_core::ports::inbound::system::manage_quarantine::ManageQuarantineUseCase;
-use sentinel_core::ports::inbound::system::manage_rotation::ManageRotationUseCase;
 use sentinel_core::ports::inbound::system::manage_security_audit::ManageSecurityAuditUseCase;
 use sentinel_core::ports::inbound::system::manage_server_events::ManageServerEventsUseCase;
 use sentinel_core::ports::inbound::system::manage_slowmode::ManageSlowmodeUseCase;
@@ -47,7 +46,6 @@ pub struct SystemState {
     pub tickets_uc: Arc<dyn ManageTicketsUseCase>,
     pub system_logs_uc: Arc<dyn ManageSystemLogsUseCase>,
     pub server_events_uc: Arc<dyn ManageServerEventsUseCase>,
-    pub rotation_uc: Arc<dyn ManageRotationUseCase>,
     pub reset_guild_uc: Arc<dyn ResetGuildUseCase>,
     pub bot_persistence_uc: Arc<dyn ManageBotPersistenceUseCase>,
     pub alert_rules_uc: Arc<dyn ManageAlertRulesUseCase>,
@@ -65,7 +63,8 @@ pub struct SystemState {
     pub geoip_uc: Arc<dyn LookupGeoIpUseCase>,
 
     // ── Exports et infrastructure ──
-    pub export_uc: Arc<dyn sentinel_core::application::system::export_service::ExecuteExportUseCase>,
+    pub export_uc:
+        Arc<dyn sentinel_core::application::system::export_service::ExecuteExportUseCase>,
     pub export_jobs_uc: Arc<dyn ManageExportJobsUseCase>,
     /// Daemon Docker de l'hote (listing, actions, prune, df).
     pub docker_host: Arc<dyn DockerHost>,

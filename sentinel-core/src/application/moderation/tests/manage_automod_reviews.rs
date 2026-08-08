@@ -254,7 +254,10 @@ async fn cast_vote_admin_peut_agir_sur_son_propre_dossier() {
             requester: moderator_facts(),
         })
         .await;
-    assert!(res.is_ok(), "un admin doit pouvoir voter sur son propre dossier");
+    assert!(
+        res.is_ok(),
+        "un admin doit pouvoir voter sur son propre dossier"
+    );
     assert!(*repo.upsert_called.lock().unwrap());
 }
 
@@ -274,7 +277,10 @@ async fn resolve_admin_peut_finaliser_son_propre_dossier() {
             requester: Some(moderator_facts()),
         })
         .await;
-    assert!(res.is_ok(), "un admin/fondateur doit pouvoir finaliser son propre dossier");
+    assert!(
+        res.is_ok(),
+        "un admin/fondateur doit pouvoir finaliser son propre dossier"
+    );
 }
 
 #[tokio::test]

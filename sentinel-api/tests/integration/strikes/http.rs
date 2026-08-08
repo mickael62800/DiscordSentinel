@@ -15,9 +15,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::inbound::moderation::manage_strikes::*;
 use sentinel_core::domain::entities::moderation::action::strikes::*;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::moderation::manage_strikes::*;
 
 use test_helpers::build_test_state_strikes;
 

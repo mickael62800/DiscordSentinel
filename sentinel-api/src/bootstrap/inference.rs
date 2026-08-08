@@ -2,9 +2,9 @@
 
 use std::sync::Arc;
 
-use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::inference_service::InferenceService;
 use crate::adapters::outbound::text_tokenizer::TextTokenizer;
+use crate::adapters::outbound::ws::broadcaster::EventBroadcaster;
 use sentinel_core::domain::services::ai::inference_limiter::InferenceRateLimiter;
 use tracing::info;
 

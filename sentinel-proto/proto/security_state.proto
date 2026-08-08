@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package sentinel.security_state.v1;
+
+// Service security_state : miroir de persistance de l'etat de securite actif
+// (quarantaines, slowmode, lockdown). Le bot detecte/agit en memoire ; l'API
+// est la source de verite durable qui survit aux redemarrages du bot.
+//
+// Distinct de `SecurityService` (package sentinel.security.v1) qui wrappe le
+// domaine AUDIT (report d'evenements + analyse de nouveau membre). Ici on
+// wrappe les use cases du domaine SYSTEM : `ManageQuarantineUseCase`,
+// `ManageSlowmodeUseCase`, `ManageLockdownUseCase`.
+service SecurityStateService {
+  // Quarantaine : enregistre (UPSERT idempotent, reset le timer) et leve.
+  rpc MarkQuarantine(MarkQuarantineRequest) returns (SecurityStateAck);
+  rpc LiftQuarantine(LiftQuarantineRequest) returns (SecurityStateAck);
+  // Rehydratation au demarrage du bot : liste les quarantaines encore actives.
+  rpc ListActiveQuarantines(ListActiveQuarantinesRequest) returns (ActiveQuarantineList);
+
+  // Slowmode adaptatif de securite : enregistre l'etat actif (UPSERT idempotent).
+  rpc MarkSlowmode(MarkSlowmodeRequest) returns (SecurityStateAck);
+
+  // Lockdown de securite : enregistre l'etat actif (UPSERT idempotent).
+  rpc MarkLockdown(MarkLockdownRequest) returns (SecurityStateAck);
+}
+
+message SecurityStateAck {}
+
+message MarkQuarantineRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  // Delai avant kick automatique (secondes).
+  int64 timeout_secs = 3;
+}
+
+message LiftQuarantineRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message ListActiveQuarantinesRequest {}
+
+message ActiveQuarantineEntry {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message ActiveQuarantineList {
+  repeated ActiveQuarantineEntry entries = 1;
+}
+
+message MarkSlowmodeRequest {
+  string guild_id = 1;
+  // JSON array : [{channel_id, rate}, ...] — rates d'origine a restaurer.
+  string previous_states_json = 2;
+  int64 duration_secs = 3;
+  // Rate impose par le raid (pour ne restaurer que si le salon le porte encore).
+  int32 imposed_rate = 4;
+}
+
+message MarkLockdownRequest {
+  string guild_id = 1;
+  // JSON array decrivant les overwrites originaux par salon.
+  string saved_states_json = 2;
+  int64 duration_secs = 3;
+}

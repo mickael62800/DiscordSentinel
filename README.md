@@ -232,10 +232,6 @@ Publie qui est dans quel salon vocal, **uniquement** pour les salons visibles pa
 
 Publie chaque jour l'APOD de la NASA dans un salon configuré, traduite en français via DeepL si une clé est fournie (repli en anglais sinon). Idempotent : ne republie pas si la photo du jour est déjà présente.
 
-### 🔁 rotation — Administrateur tournant
-
-Chaque période, un modérateur devient administrateur à tour de rôle, après acceptation en MP + validation de l'owner. Le précédent redevient modérateur.
-
 ### 🤫 confessions · ⬆️ bump · 💬 command_channel · 🧠 ai_dataset · 😀 emoji · ❓ help_panel · 🗂️ logs_setup
 
 - **confessions** — `/confess` (anonyme), `/confess-admin deploy-panel|delete|reveal`.
@@ -331,7 +327,6 @@ Provisioning de serveurs de jeux dédiés en conteneurs Docker, piloté depuis l
 | `guild_backup.rs` · `guild_structure.rs` | Snapshots de serveur, structure Discord |
 | `members.rs` | Membres, guilds, salons, présence |
 | `bump.rs` | Récompenses Disboard |
-| `rotation.rs` | Administrateur tournant |
 | `bot.rs` · `bot_persistence.rs` | Config per-guild, définitions de modules, persistance bot |
 | `system.rs` | Health, metrics, exports, OAuth, logs, alertes, GeoIP, TLS, host probe |
 

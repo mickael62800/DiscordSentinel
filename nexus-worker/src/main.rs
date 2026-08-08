@@ -26,7 +26,10 @@ async fn main() {
 
     let api_url =
         std::env::var("NEXUS_API_URL").unwrap_or_else(|_| "http://localhost:3100".to_string());
-    if std::env::var("NEXUS_API_KEY").unwrap_or_default().is_empty() {
+    if std::env::var("NEXUS_API_KEY")
+        .unwrap_or_default()
+        .is_empty()
+    {
         tracing::warn!("NEXUS_API_KEY absente — les appels internes partiront sans Authorization");
     }
 

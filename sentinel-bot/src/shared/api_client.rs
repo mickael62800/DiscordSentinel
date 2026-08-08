@@ -542,29 +542,10 @@ impl BaseApiClient {
     // tous passes en gRPC. Les routes HTTP correspondantes restent servies pour
     // le dashboard web.
 
-    /// DELETE JSON vers l'API. Retourne le body deserialise.
-    pub async fn delete_json<T: serde::de::DeserializeOwned>(
-        &self,
-        path: &str,
-    ) -> Result<T, String> {
-        let req = self.client.delete(format!("{}{}", self.base_url, path));
-        let resp = self
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| network_error_message("DELETE", path, &e.to_string()))?;
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(friendly_api_error("DELETE", path, status, &body));
-        }
-        resp.json::<T>()
-            .await
-            .map_err(|e| parse_error_message("DELETE", path, &e.to_string()))
-    }
-
-    // `delete_with_body` a ete supprime : seul le module `cleanup` l'utilisait,
-    // et ses trois purges sont passees en gRPC (`PurgeService`).
+    // `delete_json` a ete supprime : son seul appelant (purge d'un salon de
+    // discussion orphelin, module automod) est passe en gRPC
+    // (`AutomodReviewService::DeleteDiscussion`). `delete_with_body` avant lui,
+    // idem (`PurgeService`). Le bot n'emet plus aucun DELETE HTTP.
 
     // ── Config Helpers ──
 

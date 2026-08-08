@@ -15,9 +15,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::inbound::moderation::manage_notes::*;
 use sentinel_core::domain::entities::moderation::user_note::*;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::moderation::manage_notes::*;
 
 // ══════════════════════════════════════════════════════════
 // Mock Notes Use Case

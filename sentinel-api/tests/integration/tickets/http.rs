@@ -15,9 +15,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::inbound::system::manage_tickets::*;
 use sentinel_core::domain::entities::system::ticket::*;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::inbound::system::manage_tickets::*;
 
 use test_helpers::build_test_state_tickets;
 

@@ -263,8 +263,7 @@ pub fn routes() -> Router<AppState> {
         )
         .route(
             "/api/lfg/{guild_id}",
-            get(handlers::community::lfg::list_lfg)
-                .post(handlers::community::lfg::create_lfg),
+            get(handlers::community::lfg::list_lfg).post(handlers::community::lfg::create_lfg),
         )
         .route(
             "/api/lfg/detail/{id}",
@@ -276,8 +275,7 @@ pub fn routes() -> Router<AppState> {
         )
         .route(
             "/api/lfg/detail/{id}/join",
-            post(handlers::community::lfg::join_lfg)
-                .delete(handlers::community::lfg::leave_lfg),
+            post(handlers::community::lfg::join_lfg).delete(handlers::community::lfg::leave_lfg),
         )
         .route(
             "/api/polls/{guild_id}",
@@ -341,8 +339,7 @@ pub fn routes() -> Router<AppState> {
         )
         .route(
             "/api/news/{guild_id}",
-            get(handlers::community::news::list_news)
-                .post(handlers::community::news::create_news),
+            get(handlers::community::news::list_news).post(handlers::community::news::create_news),
         )
         .route(
             "/api/news/detail/{id}",

@@ -82,8 +82,9 @@ pub async fn handle_panel_click(ctx: &Context, component: &ComponentInteraction)
         .map(|(value, label, desc)| CreateSelectMenuOption::new(*label, *value).description(*desc))
         .collect();
 
-    let select = CreateSelectMenu::new(CATEGORY_SELECT_ID, CreateSelectMenuKind::String { options })
-        .placeholder("Choisis la categorie de ton idee...");
+    let select =
+        CreateSelectMenu::new(CATEGORY_SELECT_ID, CreateSelectMenuKind::String { options })
+            .placeholder("Choisis la categorie de ton idee...");
 
     let response = CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
@@ -129,7 +130,8 @@ pub async fn handle_category_select(ctx: &Context, component: &ComponentInteract
 
     // Bornes reglables par serveur. Gardes : min <= max sinon defauts, et max
     // plafonne a 4000 (limite Discord des champs de modale).
-    let bound = |key: &str, default: u64| BaseApiClient::config_u64(&cfg, key, default).clamp(1, 4000);
+    let bound =
+        |key: &str, default: u64| BaseApiClient::config_u64(&cfg, key, default).clamp(1, 4000);
     let (t_min, t_max) = {
         let (a, b) = (bound("title_min_len", 5), bound("title_max_len", 100));
         if a <= b {
@@ -221,7 +223,12 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     let _guard = match OpenGuard::try_acquire(guild_id.get(), author.id.get()) {
         Some(g) => g,
         None => {
-            reply(ctx, modal, "Une proposition est deja en cours d'enregistrement. Patiente un instant.").await;
+            reply(
+                ctx,
+                modal,
+                "Une proposition est deja en cours d'enregistrement. Patiente un instant.",
+            )
+            .await;
             return;
         }
     };
@@ -316,12 +323,23 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     };
 
-    if let Err(e) = api.set_channel(&idea.id, Some(&channel_id.to_string())).await {
+    if let Err(e) = api
+        .set_channel(&idea.id, Some(&channel_id.to_string()))
+        .await
+    {
         warn!(error = %e, idea = %idea.id, "Salon cree mais non rattache a l'idee");
     }
 
     // Carte de l'idee + boutons de decision pour le staff.
-    let embed = build_idea_embed(&idea.id, &title, &description, &category, "nouvelle", author, &cfg);
+    let embed = build_idea_embed(
+        &idea.id,
+        &title,
+        &description,
+        &category,
+        "nouvelle",
+        author,
+        &cfg,
+    );
     let welcome = BaseApiClient::config_or(&cfg, "welcome_message", "");
     let intro = if welcome.trim().is_empty() {
         format!(
@@ -371,7 +389,13 @@ async fn create_idea_channel(
     // Nom lisible et unique : slug du titre + debut de l'uuid de l'idee.
     let slug: String = title
         .chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .trim_matches('-')
         .chars()

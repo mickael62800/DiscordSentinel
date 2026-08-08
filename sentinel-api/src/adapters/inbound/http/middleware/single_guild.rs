@@ -117,8 +117,7 @@ const NON_GUILD_MARKERS: &[&str] = &[
 fn guild_id_from_path(path: &str) -> Option<String> {
     let segs: Vec<&str> = path.split('/').collect();
     segs.iter().enumerate().find_map(|(i, seg)| {
-        let ressemble =
-            (17..=20).contains(&seg.len()) && seg.chars().all(|c| c.is_ascii_digit());
+        let ressemble = (17..=20).contains(&seg.len()) && seg.chars().all(|c| c.is_ascii_digit());
         if !ressemble {
             return None;
         }

@@ -44,10 +44,8 @@ pub trait EventRepository: Send + Sync {
 
     // ── Inscriptions ──
 
-    async fn list_participants(
-        &self,
-        event_id: Uuid,
-    ) -> Result<Vec<EventParticipant>, DomainError>;
+    async fn list_participants(&self, event_id: Uuid)
+        -> Result<Vec<EventParticipant>, DomainError>;
 
     /// Idempotent : reinscrire quelqu'un met simplement sa reponse a jour.
     async fn set_participation(

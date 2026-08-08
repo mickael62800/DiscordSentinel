@@ -123,8 +123,13 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
     match channel_id.send_message(&ctx.http, msg).await {
         Ok(message) => {
             info!(embed_id = %payload.embed_id, "Embed poste");
-            report_posted(ctx, &payload.embed_id, &payload.channel_id, &message.id.to_string())
-                .await;
+            report_posted(
+                ctx,
+                &payload.embed_id,
+                &payload.channel_id,
+                &message.id.to_string(),
+            )
+            .await;
         }
         Err(e) => warn!(embed_id = %payload.embed_id, error = %e, "Echec post embed"),
     }

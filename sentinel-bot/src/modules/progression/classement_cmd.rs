@@ -169,11 +169,19 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Fallback embed texte si aucun template dispo / rendu impossible.
     if sent == 0 {
         let _ = target
-            .send_message(&ctx.http, CreateMessage::new().embed(build_ranking_embed(&ranking)))
+            .send_message(
+                &ctx.http,
+                CreateMessage::new().embed(build_ranking_embed(&ranking)),
+            )
             .await;
     }
 
-    followup(ctx, command, &format!("Classement publie dans <#{target}>.")).await;
+    followup(
+        ctx,
+        command,
+        &format!("Classement publie dans <#{target}>."),
+    )
+    .await;
 }
 
 /// Resout pseudo + avatar PNG pour les 13 premieres entrees (avec cache).
@@ -189,13 +197,14 @@ async fn resolve_entries(
             c.clone()
         } else {
             let resolved = match e.user_id.parse::<u64>() {
-                Ok(uid) => match ctx.http.get_user(serenity::model::id::UserId::new(uid)).await {
+                Ok(uid) => match ctx
+                    .http
+                    .get_user(serenity::model::id::UserId::new(uid))
+                    .await
+                {
                     Ok(u) => {
                         let name = u.global_name.clone().unwrap_or_else(|| u.name.clone());
-                        let url = u
-                            .face()
-                            .replace(".webp", ".png")
-                            .replace(".gif", ".png");
+                        let url = u.face().replace(".webp", ".png").replace(".gif", ".png");
                         (name, fetch_png(&url).await)
                     }
                     Err(_) => ("Inconnu".to_string(), None),
@@ -205,7 +214,11 @@ async fn resolve_entries(
             cache.insert(e.user_id.clone(), resolved.clone());
             resolved
         };
-        out.push(LbEntry { name, xp: e.xp, avatar_png: avatar });
+        out.push(LbEntry {
+            name,
+            xp: e.xp,
+            avatar_png: avatar,
+        });
     }
     out
 }

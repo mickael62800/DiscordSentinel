@@ -127,7 +127,6 @@ pub async fn list_polls(
     Path(guild_id): Path<String>,
     Query(q): Query<ListQuery>,
 ) -> Result<Json<Vec<PollDto>>, ApiError> {
-
     let polls = state
         .polls_uc
         .list(
@@ -146,7 +145,6 @@ pub async fn create_poll(
     Path(guild_id): Path<String>,
     Json(dto): Json<CreatePollDto>,
 ) -> Result<Json<PollDto>, ApiError> {
-
     let closes_at = chrono::DateTime::parse_from_rfc3339(&dto.closes_at)
         .map(|d| d.with_timezone(&chrono::Utc))
         .map_err(|_| {
@@ -241,10 +239,7 @@ pub async fn my_polls(
 
     // L'appartenance a la guilde est deja verifiee par `guild_auth_middleware`
     // sur les routes portant `{guild_id}` : inutile de la revalider ici.
-    let polls = state
-        .polls_uc
-        .list(&guild_id, true, DEFAULT_LIMIT)
-        .await?;
+    let polls = state.polls_uc.list(&guild_id, true, DEFAULT_LIMIT).await?;
 
     // Le vote personnel se recupere sondage par sondage : le port de liste ne
     // le porte pas, et l'ajouter obligerait tous les appelants a fournir une
@@ -280,7 +275,11 @@ pub async fn public_polls(
     // `open_only` force a true : `?all=1` ne doit pas exposer les archives.
     let polls = state
         .polls_uc
-        .list(&guild_id, true, clamp_limit(q.limit, DEFAULT_LIMIT, MAX_LIMIT))
+        .list(
+            &guild_id,
+            true,
+            clamp_limit(q.limit, DEFAULT_LIMIT, MAX_LIMIT),
+        )
         .await?;
 
     // Un sondage marque non public reste hors de la vue publique.

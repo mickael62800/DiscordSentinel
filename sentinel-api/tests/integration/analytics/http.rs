@@ -15,13 +15,13 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 use sentinel_core::domain::entities::system::analytics::ActionDistribution;
 use sentinel_core::domain::entities::system::analytics::HourlyActivity;
 use sentinel_core::domain::entities::system::analytics::ModerationTrend;
 use sentinel_core::domain::entities::system::analytics::PeakActivity;
 use sentinel_core::domain::entities::system::analytics::TopInfractor;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 
 use test_helpers::build_test_state_analytics;
 

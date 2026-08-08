@@ -40,7 +40,11 @@ async fn run_once(state: &AppState) -> Result<(), sqlx::Error> {
         .await?;
 
     for gid in guilds {
-        let cfg = match state.bot_config_repo.get_config(&gid, "guild-backup-bot").await {
+        let cfg = match state
+            .bot_config_repo
+            .get_config(&gid, "guild-backup-bot")
+            .await
+        {
             Ok(c) => c,
             Err(_) => continue,
         };
@@ -67,7 +71,12 @@ async fn run_once(state: &AppState) -> Result<(), sqlx::Error> {
             .unwrap_or(24);
 
         // Age de la sauvegarde la plus recente.
-        let snaps = match state.guild_backup.guild_snapshots_uc.list_snapshots(&gid).await {
+        let snaps = match state
+            .guild_backup
+            .guild_snapshots_uc
+            .list_snapshots(&gid)
+            .await
+        {
             Ok(s) => s,
             Err(_) => continue,
         };

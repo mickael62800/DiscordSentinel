@@ -4,11 +4,11 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use nexus_core::ports::outbound::game::game_template_repository::GameTemplateRepository;
 use nexus_core::domain::entities::game::template::{
     ConfigField, GameTemplate, InitFile, PortProtocol,
 };
 use nexus_core::domain::errors::DomainError;
+use nexus_core::ports::outbound::game::game_template_repository::GameTemplateRepository;
 
 pub struct PgGameTemplateRepository {
     pool: PgPool,

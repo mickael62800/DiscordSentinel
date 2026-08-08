@@ -15,9 +15,9 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_core::ports::outbound::audit::user_activity_repository::UserActivityRepository;
 use sentinel_core::domain::entities::audit::user_activity::UserActivity;
 use sentinel_core::domain::errors::DomainError;
+use sentinel_core::ports::outbound::audit::user_activity_repository::UserActivityRepository;
 
 use test_helpers::build_test_state_user_activity;
 

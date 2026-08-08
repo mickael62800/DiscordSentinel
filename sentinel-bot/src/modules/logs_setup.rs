@@ -20,8 +20,8 @@
 use std::sync::Arc;
 
 use serenity::all::{
-    ChannelId, ChannelType, CommandInteraction, Context, CreateChannel, CreateCommand,
-    CreateEmbed, GuildId, PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId,
+    ChannelId, ChannelType, CommandInteraction, Context, CreateChannel, CreateCommand, CreateEmbed,
+    GuildId, PermissionOverwrite, PermissionOverwriteType, Permissions, RoleId,
 };
 use tracing::warn;
 
@@ -209,10 +209,7 @@ pub async fn handle(ctx: &Context, cmd: &CommandInteraction) {
 }
 
 /// Categorie des logs : reutilise celle qui porte le nom attendu, sinon la cree.
-async fn trouver_ou_creer_categorie(
-    ctx: &Context,
-    guild_id: GuildId,
-) -> Result<ChannelId, String> {
+async fn trouver_ou_creer_categorie(ctx: &Context, guild_id: GuildId) -> Result<ChannelId, String> {
     let salons = guild_id
         .channels(&ctx.http)
         .await
@@ -308,7 +305,11 @@ async fn repondre_rapport(
             "Categorie <#{categorie}>\n\
              **{crees}** cree(s), **{reutilises}** deja en place.\n\n{lignes}"
         ))
-        .colour(if echecs.is_empty() { 0x2ECC71 } else { 0xE67E22 });
+        .colour(if echecs.is_empty() {
+            0x2ECC71
+        } else {
+            0xE67E22
+        });
 
     if !echecs.is_empty() {
         embed = embed.field("Echecs", echecs.join("\n"), false);
@@ -376,8 +377,7 @@ mod tests {
     fn aucune_cle_de_reglage_en_double_dans_un_module() {
         // Deux journaux ecrivant la meme cle du meme module : le second
         // ecraserait le premier, un salon resterait muet sans explication.
-        let mut paires: Vec<(&str, &str)> =
-            JOURNAUX.iter().map(|j| (j.module, j.cle)).collect();
+        let mut paires: Vec<(&str, &str)> = JOURNAUX.iter().map(|j| (j.module, j.cle)).collect();
         paires.sort_unstable();
         let avant = paires.len();
         paires.dedup();

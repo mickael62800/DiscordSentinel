@@ -152,7 +152,12 @@ pub trait CoussinRepository: Send + Sync {
         hp_max: i32,
         cooldown_minutes: i64,
     ) -> Result<(), DomainError>;
-    async fn spend_stat_point(&self, guild_id: &str, user_id: &str, stat: &str) -> Result<CoussinProfile, DomainError>;
+    async fn spend_stat_point(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        stat: &str,
+    ) -> Result<CoussinProfile, DomainError>;
     async fn create_combat(
         &self,
         guild_id: &str,
@@ -164,7 +169,10 @@ pub trait CoussinRepository: Send + Sync {
     ) -> Result<CoussinCombat, DomainError>;
     async fn accept_combat(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError>;
     async fn refuse_combat(&self, id: uuid::Uuid, defender_id: &str) -> Result<bool, DomainError>;
-    async fn resolution_snapshot(&self, id: uuid::Uuid) -> Result<Option<CoussinCombatSnapshot>, DomainError>;
+    async fn resolution_snapshot(
+        &self,
+        id: uuid::Uuid,
+    ) -> Result<Option<CoussinCombatSnapshot>, DomainError>;
     /// Regle une bagarre : transfert de la mise, primes, paris, statistiques.
     ///
     /// `bet_payout_pct` est le gain d'un pari gagnant en pourcentage de la

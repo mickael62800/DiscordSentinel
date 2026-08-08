@@ -4,9 +4,7 @@ use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
 use crate::adapters::outbound::postgres::pg_err;
-use nexus_core::domain::entities::game::session::{
-    GameSessionRegistration, GameTemplateSettings,
-};
+use nexus_core::domain::entities::game::session::{GameSessionRegistration, GameTemplateSettings};
 use nexus_core::domain::errors::DomainError;
 use nexus_core::ports::outbound::game::game_session_repository::{
     GameSessionRegistrationRepository, GameTemplateSettingsRepository,
@@ -141,14 +139,12 @@ impl GameSessionRegistrationRepository for PgGameSessionRegistrationRepository {
     }
 
     async fn unregister(&self, server_id: Uuid, user_id: &str) -> Result<(), DomainError> {
-        sqlx::query(
-            "DELETE FROM game_session_registrations WHERE server_id = $1 AND user_id = $2",
-        )
-        .bind(server_id)
-        .bind(user_id)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        sqlx::query("DELETE FROM game_session_registrations WHERE server_id = $1 AND user_id = $2")
+            .bind(server_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(pg_err)?;
         Ok(())
     }
 
@@ -161,6 +157,9 @@ impl GameSessionRegistrationRepository for PgGameSessionRegistrationRepository {
         .fetch_all(&self.pool)
         .await
         .map_err(pg_err)?;
-        Ok(rows.into_iter().map(GameSessionRegistration::from).collect())
+        Ok(rows
+            .into_iter()
+            .map(GameSessionRegistration::from)
+            .collect())
     }
 }

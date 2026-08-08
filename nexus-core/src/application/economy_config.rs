@@ -277,8 +277,6 @@ impl CoussinConfig {
     pub fn steal_penalty(&self, thief_coins: i64) -> i64 {
         (thief_coins.saturating_mul(self.steal_penalty_pct) / 100).max(1)
     }
-
-
 }
 
 /// Refuse une action si son delai n'est pas ecoule.
@@ -366,7 +364,11 @@ fn load_classes(items: &[BotGuildConfig]) -> crate::domain::entities::coussin::C
         ),
         ecraseur_rage_bonus_pct: n(items, "ecraseur_rage_bonus_pct", d.ecraseur_rage_bonus_pct),
         couette_hp_pct: n(items, "couette_hp_pct", d.couette_hp_pct),
-        couette_damage_taken_pct: n(items, "couette_damage_taken_pct", d.couette_damage_taken_pct),
+        couette_damage_taken_pct: n(
+            items,
+            "couette_damage_taken_pct",
+            d.couette_damage_taken_pct,
+        ),
         couette_flat_reduction: n(items, "couette_flat_reduction", d.couette_flat_reduction),
         hp_base: n(items, "hp_base", d.hp_base),
         hp_per_def: n(items, "hp_per_def", d.hp_per_def),

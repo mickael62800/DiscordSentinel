@@ -89,10 +89,8 @@ impl MemberRepository for MockMemberRepo {
         &self,
         _: &str,
         _: i32,
-    ) -> Result<
-        Vec<crate::domain::entities::community::milestone::JoinAnniversary>,
-        DomainError,
-    > {
+    ) -> Result<Vec<crate::domain::entities::community::milestone::JoinAnniversary>, DomainError>
+    {
         Ok(vec![])
     }
 

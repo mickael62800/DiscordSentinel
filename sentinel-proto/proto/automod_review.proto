@@ -1,0 +1,212 @@
+syntax = "proto3";
+
+package sentinel.automod_review.v1;
+
+// Service automod_review : cycle de vie des cartes de review AutoMod
+// (creation, vote, ignore, reopen, resolution). Wrappe `ManageAutomodReviewsUseCase`.
+//
+// Distinct de `AutomodService` (package sentinel.automod.v1) qui est le hot path
+// d'analyse de message. Ici on gere l'aval : la carte postee dans le salon de
+// logs, les votes des moderateurs, la finalisation.
+//
+// Tranche 1 (review-core) : create / get / find-by-message / resolve / vote /
+// ignore / reopen / list-votes. Les salons de discussion + le mapping
+// discord-messages restent en HTTP tant que la tranche 2 n'est pas faite.
+service AutomodReviewService {
+  rpc CreateReview(CreateReviewRequest) returns (AutomodReview);
+  rpc GetReview(GetReviewRequest) returns (AutomodReview);
+  // Retrouve la review liee a un message Discord ; absente => `review` non set.
+  rpc FindReviewByMessage(FindReviewByMessageRequest) returns (FindReviewByMessageResponse);
+  rpc ResolveReview(ResolveReviewRequest) returns (AutomodReview);
+  rpc IgnoreReview(IgnoreReviewRequest) returns (AutomodReview);
+  rpc ReopenReview(ReopenReviewRequest) returns (AutomodReview);
+  rpc Vote(VoteRequest) returns (ReviewVoteList);
+  rpc ListVotes(ListVotesRequest) returns (ReviewVoteList);
+
+  // ── Salons de discussion (tranche 2) ──
+  // Salon prive membre+moderateurs attache a une carte. `channel` absent si aucun.
+  rpc GetDiscussion(GetDiscussionRequest) returns (GetDiscussionResponse);
+  // Enregistre (idempotent) le salon apres la regle d'acces `can_open_discussion`.
+  rpc OpenDiscussion(OpenDiscussionRequest) returns (DiscussionChannel);
+  // Purge l'enregistrement (salon Discord supprime a la main) pour en rouvrir un.
+  rpc DeleteDiscussion(DeleteDiscussionRequest) returns (DeleteDiscussionResponse);
+  // Persiste le transcript (batch idempotent) a l'archivage du salon.
+  rpc AppendDiscussionMessages(AppendDiscussionMessagesRequest) returns (AppendDiscussionMessagesResponse);
+}
+
+message GetDiscussionRequest {
+  string review_id = 1;
+}
+
+message GetDiscussionResponse {
+  optional DiscussionChannel channel = 1;
+}
+
+// Le bot ne consomme que le salon + le flag de creation ; on ne modelise pas
+// tout le DTO web (id, opened_by, created_at) inutile ici.
+message DiscussionChannel {
+  string channel_id = 1;
+  // true si l'appel vient de creer l'enregistrement (false = existait deja).
+  bool created = 2;
+}
+
+message OpenDiscussionRequest {
+  string review_id = 1;
+  string guild_id = 2;
+  string channel_id = 3;
+  string opened_by_id = 4;
+  string opened_by_name = 5;
+  ModeratorFacts requester = 6;
+}
+
+message DeleteDiscussionRequest {
+  string review_id = 1;
+}
+
+message DeleteDiscussionResponse {}
+
+message DiscussionMessageIn {
+  string discord_message_id = 1;
+  string author_id = 2;
+  string author_name = 3;
+  bool author_is_bot = 4;
+  string content = 5;
+  // RFC3339.
+  string sent_at = 6;
+}
+
+message AppendDiscussionMessagesRequest {
+  string review_id = 1;
+  repeated DiscussionMessageIn messages = 2;
+}
+
+message AppendDiscussionMessagesResponse {
+  uint64 inserted = 1;
+}
+
+// Faits Discord du demandeur, evalues par le domaine (can_finalize_review,
+// is_moderator...). Le bot passe les vraies permissions gateway.
+message ModeratorFacts {
+  bool is_admin = 1;
+  bool has_moderate_members = 2;
+  bool has_manage_messages = 3;
+  bool has_mod_role = 4;
+  bool has_admin_role = 5;
+}
+
+// Miroir complet de `AutomodReviewDto`. Les champs JSON (flags, incidents)
+// transitent en string ; le bot ne lit qu'un sous-ensemble mais on modelise
+// tout pour que get/create/resolve partagent le meme type.
+message AutomodReview {
+  string id = 1;
+  string guild_id = 2;
+  string channel_id = 3;
+  string message_id = 4;
+  string user_id = 5;
+  string user_name = 6;
+  string content_preview = 7;
+  string suggested_action = 8;
+  double score = 9;
+  string reason = 10;
+  string flags_json = 11;
+  string status = 12;
+  optional string applied_action = 13;
+  optional string resolved_by_id = 14;
+  optional string resolved_by_name = 15;
+  optional string resolved_source = 16;
+  string created_at = 17;
+  optional string resolved_at = 18;
+  optional string voting_deadline = 19;
+  optional string decided_action = 20;
+  bool quorum_met = 21;
+  optional string decided_at = 22;
+  int32 incident_count = 23;
+  double cumulative_score = 24;
+  string incidents_json = 25;
+  // True si ce POST a ete agrege dans une carte existante (pas une creation).
+  bool merged = 26;
+  optional string discussion_channel_id = 27;
+}
+
+message ReviewVote {
+  string voter_id = 1;
+  string voter_name = 2;
+  string vote_action = 3;
+}
+
+message ReviewVoteList {
+  repeated ReviewVote votes = 1;
+}
+
+message CreateReviewRequest {
+  string guild_id = 1;
+  string channel_id = 2;
+  string message_id = 3;
+  string user_id = 4;
+  string user_name = 5;
+  string content_preview = 6;
+  string suggested_action = 7;
+  double score = 8;
+  string reason = 9;
+  // JSON objet des flags de detection ; vide => {}.
+  string flags_json = 10;
+  // Si fourni (RFC3339), ouvre la review en mode VOTE avec cette echeance.
+  optional string voting_deadline = 11;
+  // Agrege dans la carte 'voting' ouverte du meme utilisateur (anti-flood).
+  bool aggregate = 12;
+  // Fenetre d'inactivite (minutes) au-dela de laquelle on n'agrege plus. 0 = illimite.
+  optional int64 aggregate_window_minutes = 13;
+  // true si l'auto-protection severe a DEJA journalise la sanction (anti double-strike).
+  bool already_sanctioned = 14;
+}
+
+message GetReviewRequest {
+  string review_id = 1;
+}
+
+message FindReviewByMessageRequest {
+  string guild_id = 1;
+  string message_id = 2;
+}
+
+message FindReviewByMessageResponse {
+  optional AutomodReview review = 1;
+}
+
+message ResolveReviewRequest {
+  string review_id = 1;
+  // "warn" | "delete" | "mute" | "ban" | "ignore".
+  string applied_action = 2;
+  string resolved_by_id = 3;
+  string resolved_by_name = 4;
+  ModeratorFacts requester = 5;
+}
+
+message IgnoreReviewRequest {
+  string review_id = 1;
+  string actor_id = 2;
+  string actor_name = 3;
+  ModeratorFacts requester = 4;
+}
+
+message ReopenReviewRequest {
+  string review_id = 1;
+  string actor_id = 2;
+  string actor_name = 3;
+  // Duree (heures) de la nouvelle fenetre de vote. 0 => defaut 72.
+  int64 deadline_hours = 4;
+  ModeratorFacts requester = 5;
+}
+
+message VoteRequest {
+  string review_id = 1;
+  string voter_id = 2;
+  string voter_name = 3;
+  // "warn" | "delete" | "mute" | "ban" | "ignore".
+  string vote_action = 4;
+  ModeratorFacts requester = 5;
+}
+
+message ListVotesRequest {
+  string review_id = 1;
+}
