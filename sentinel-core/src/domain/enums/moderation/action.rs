@@ -7,6 +7,7 @@ pub enum Action {
     Warn,
     Delete,
     Mute,
+    Kick,
     Ban,
 }
 
@@ -17,6 +18,7 @@ impl Action {
             Action::Warn => "warn",
             Action::Delete => "delete",
             Action::Mute => "mute",
+            Action::Kick => "kick",
             Action::Ban => "ban",
         }
     }
@@ -26,6 +28,7 @@ impl Action {
             "warn" => Action::Warn,
             "delete" => Action::Delete,
             "mute" => Action::Mute,
+            "kick" => Action::Kick,
             "ban" => Action::Ban,
             _ => Action::None,
         }

@@ -27,6 +27,7 @@ fn card_suggested_action(action: &Action) -> Action {
         Action::Warn => Action::Warn,
         Action::Delete => Action::Delete,
         Action::Mute => Action::Mute,
+        Action::Kick => Action::Kick,
         Action::Ban => Action::Ban,
     }
 }

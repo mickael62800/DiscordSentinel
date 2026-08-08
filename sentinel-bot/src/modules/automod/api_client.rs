@@ -227,6 +227,7 @@ pub enum Action {
     Warn,
     Delete,
     Mute,
+    Kick,
     Ban,
 }
 
@@ -570,6 +571,7 @@ fn proto_action_to_action(value: i32) -> Action {
         proto::Action::Warn => Action::Warn,
         proto::Action::Delete => Action::Delete,
         proto::Action::Mute => Action::Mute,
+        proto::Action::Kick => Action::Kick,
         proto::Action::Ban => Action::Ban,
     }
 }

@@ -244,6 +244,7 @@ fn action_to_proto(a: Action) -> i32 {
         Action::Warn => proto::Action::Warn as i32,
         Action::Delete => proto::Action::Delete as i32,
         Action::Mute => proto::Action::Mute as i32,
+        Action::Kick => proto::Action::Kick as i32,
         Action::Ban => proto::Action::Ban as i32,
     }
 }

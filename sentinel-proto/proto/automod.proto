@@ -107,6 +107,7 @@ enum Action {
   ACTION_DELETE = 2;
   ACTION_MUTE = 3;
   ACTION_BAN = 4;
+  ACTION_KICK = 5;
 }
 
 // Decision de routage calculee COTE SERVEUR (l'API connait la config guild).

@@ -112,6 +112,7 @@ pub(super) async fn send_review_card(
         Action::Warn => "Avertissement",
         Action::Delete => "Suppression",
         Action::Mute => "Mute",
+        Action::Kick => "Kick",
         Action::Ban => "Bannissement",
         Action::None => return,
     };
@@ -120,6 +121,7 @@ pub(super) async fn send_review_card(
         Action::Warn => colors.warn,
         Action::Delete => colors.delete,
         Action::Mute => colors.mute,
+        Action::Kick => colors.ban,
         Action::Ban => colors.ban,
         Action::None => 0x95a5a6,
     };
@@ -315,6 +317,7 @@ async fn create_review_in_api(
         Action::Warn => "warn",
         Action::Delete => "delete",
         Action::Mute => "mute",
+        Action::Kick => "kick",
         Action::Ban => "ban",
         Action::None => return None,
     };
@@ -396,6 +399,7 @@ fn action_char(action: &Action) -> char {
         Action::Warn => 'w',
         Action::Delete => 'd',
         Action::Mute => 'm',
+        Action::Kick => 'k',
         Action::Ban => 'b',
         Action::None => 'i',
     }
@@ -406,6 +410,7 @@ fn char_to_action(c: char) -> Action {
         'w' => Action::Warn,
         'd' => Action::Delete,
         'm' => Action::Mute,
+        'k' => Action::Kick,
         'b' => Action::Ban,
         _ => Action::None,
     }
@@ -548,6 +553,7 @@ pub(super) async fn handle_review_button(
         Action::Warn => "Avertissement",
         Action::Delete => "Suppression",
         Action::Mute => "Mute",
+        Action::Kick => "Kick",
         Action::Ban => "Bannissement",
         Action::None => "Aucune",
     };
@@ -677,6 +683,21 @@ pub(super) async fn handle_review_button(
                 )
                 .await;
         }
+        Action::Kick => {
+            if let (Some(guild_id_val), Ok(uid)) = (component.guild_id, user_id_str.parse::<u64>())
+            {
+                if let Err(e) = guild_id_val
+                    .kick_with_reason(
+                        &ctx.http,
+                        serenity::model::id::UserId::new(uid),
+                        "Sanction validee par un moderateur (AutoMod review)",
+                    )
+                    .await
+                {
+                    error!(error = %e, user_id = %uid, "Echec kick via review");
+                }
+            }
+        }
         Action::Ban => {
             // Decision humaine -> ban reel (coherent avec la finalisation de vote).
             let _ = super::vote::apply_member_sanction(
@@ -715,6 +736,7 @@ pub(super) async fn handle_review_button(
     let action_type = match action {
         Action::Warn => "warn",
         Action::Mute => "mute",
+        Action::Kick => "kick",
         Action::Ban => "ban",
         _ => "",
     };
@@ -792,6 +814,7 @@ pub(super) async fn handle_review_button(
             Action::Warn => colors.warn,
             Action::Delete => colors.delete,
             Action::Mute => colors.mute,
+            Action::Kick => colors.ban,
             Action::Ban => colors.ban,
             Action::None => 0x95a5a6,
         })

@@ -51,6 +51,10 @@ fn action_to_proto(a: Action) -> i32 {
         Action::Warn => proto::Action::Warn as i32,
         Action::Delete => proto::Action::Delete as i32,
         Action::Mute => proto::Action::Mute as i32,
+        // L'analyse image ne produit jamais Kick (seulement le texte peut
+        // convertir un ban en kick autorise) ; conserver le protocole image
+        // historique en repliant ce cas theorique vers Ban.
+        Action::Kick => proto::Action::Ban as i32,
         Action::Ban => proto::Action::Ban as i32,
     }
 }

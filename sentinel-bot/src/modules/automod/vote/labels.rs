@@ -7,6 +7,7 @@ pub(super) fn action_char(action: &Action) -> char {
         Action::Warn => 'w',
         Action::Delete => 'd',
         Action::Mute => 'm',
+        Action::Kick => 'k',
         Action::Ban => 'b',
         Action::None => 'i',
     }

@@ -24,6 +24,12 @@ fn base<'a>(f: &'a DetectionFlags, content: &'a str) -> RoutingInputs<'a> {
         human_only: false,
         auto_protect: false,
         auto_delete_links: false,
+        selective_auto_actions: false,
+        auto_warn: true,
+        auto_delete: true,
+        auto_mute: true,
+        auto_kick: false,
+        auto_ban: false,
         ai_review_mode: false,
         review_min_score: 0.5,
         log_channel_set: false,
@@ -171,6 +177,29 @@ fn decide_human_only_with_zero_score_does_not_create_an_empty_card() {
     i.human_only = true;
     i.log_channel_set = true;
     assert_eq!(decide(&i).route, Routing::None);
+}
+
+#[test]
+fn decide_unapproved_auto_action_is_sent_to_review_card() {
+    let f = flags(false, true, false, false);
+    let mut i = base(&f, "insulte");
+    i.action = Action::Mute;
+    i.score = 6.0;
+    i.log_channel_set = true;
+    i.selective_auto_actions = true;
+    i.auto_mute = false;
+    assert_eq!(decide(&i).route, Routing::Card);
+}
+
+#[test]
+fn decide_approved_auto_action_is_applied() {
+    let f = flags(false, true, false, false);
+    let mut i = base(&f, "insulte");
+    i.action = Action::Mute;
+    i.score = 6.0;
+    i.selective_auto_actions = true;
+    i.auto_mute = true;
+    assert_eq!(decide(&i).route, Routing::Auto);
 }
 
 // ── decide : ai_review_mode + seuil ──────────────────────────────────────

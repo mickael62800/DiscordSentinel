@@ -360,7 +360,8 @@ pub(super) async fn send_to_backend(
                     Action::Warn => "Avertissement",
                     Action::Delete => "Suppression",
                     Action::Mute => "Mute",
-                    Action::Ban => "Proposition de ban",
+                    Action::Kick => "Kick",
+                    Action::Ban => "Bannissement",
                     Action::None => "",
                 };
                 let log_message = format!(
@@ -588,9 +589,29 @@ pub(super) async fn execute_action(
                 warn!(error = %e, message_id = %msg.id, "Echec suppression message apres mute automod");
             }
         }
+        Action::Kick => {
+            if let Some(guild_id) = msg.guild_id {
+                let embed = sanction_notice("kick", reason_text, None, None, appeal)
+                    .thumbnail(msg.author.face());
+                if let Err(e) = msg
+                    .channel_id
+                    .send_message(
+                        &ctx.http,
+                        serenity::builder::CreateMessage::new().embed(embed),
+                    )
+                    .await
+                {
+                    warn!(error = %e, "Echec envoi notification kick");
+                }
+                guild_id
+                    .kick_with_reason(&ctx.http, msg.author.id, reason_text)
+                    .await?;
+                info!(user = %msg.author.name, "Utilisateur kick automatiquement");
+            }
+        }
         Action::Ban => {
-            if let Some(_guild_id) = msg.guild_id {
-                let mut embed = critical_embed("Signalement pour bannissement")
+            if let Some(guild_id) = msg.guild_id {
+                let mut embed = critical_embed("Bannissement automatique")
                     .color(colors.ban)
                     .field("Raison", reason_text, false)
                     .thumbnail(msg.author.face());
@@ -605,8 +626,13 @@ pub(super) async fn execute_action(
                 if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
                     warn!(error = %e, "Echec envoi notification ban");
                 }
-                msg.delete(&ctx.http).await?;
-                info!(user = %msg.author.name, "Proposition de ban enregistree (ban non execute)");
+                guild_id
+                    .ban_with_reason(&ctx.http, msg.author.id, 0, reason_text)
+                    .await?;
+                if let Err(e) = msg.delete(&ctx.http).await {
+                    warn!(error = %e, message_id = %msg.id, "Echec suppression message apres ban automod");
+                }
+                info!(user = %msg.author.name, "Utilisateur banni automatiquement");
             }
         }
     }

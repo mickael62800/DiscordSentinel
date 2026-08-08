@@ -304,7 +304,8 @@ fn tension_is_stronger(current: &Action, tension: TensionAction) -> bool {
             Action::Warn => 1,
             Action::Delete => 2,
             Action::Mute => 3,
-            Action::Ban => 4,
+            Action::Kick => 4,
+            Action::Ban => 5,
         }
     };
     let tsev = match tension {
@@ -818,6 +819,17 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 |k: &str, d: f64| cfg_str(k).and_then(|v| v.parse::<f64>().ok()).unwrap_or(d);
             let cfg_u64 =
                 |k: &str, d: u64| cfg_str(k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(d);
+            // Un kick est le repli explicite d'un ban non autorise. Il ne
+            // peut jamais apparaitre sans que l'admin ait active ce toggle.
+            if matches!(result.action, Action::Ban)
+                && cfg_bool("auto_actions_selective_enabled", false)
+                && !cfg_bool("auto_ban_enabled", false)
+                && cfg_bool("auto_kick_enabled", false)
+                && !cfg_bool("human_only_enabled", false)
+            {
+                result.action = Action::Kick;
+                result.reason = format!("{} | Ban converti en kick autorise", result.reason);
+            }
             decide(&RoutingInputs {
                 flags: &cmd.flags,
                 content: &cmd.content,
@@ -826,6 +838,12 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 human_only: cfg_bool("human_only_enabled", false),
                 auto_protect: cfg_bool("auto_protect_enabled", true),
                 auto_delete_links: cfg_bool("auto_delete_links_enabled", false),
+                selective_auto_actions: cfg_bool("auto_actions_selective_enabled", false),
+                auto_warn: cfg_bool("auto_warn_enabled", true),
+                auto_delete: cfg_bool("auto_delete_enabled", true),
+                auto_mute: cfg_bool("auto_mute_enabled", true),
+                auto_kick: cfg_bool("auto_kick_enabled", false),
+                auto_ban: cfg_bool("auto_ban_enabled", false),
                 ai_review_mode: cfg_bool("ai_review_mode", true),
                 review_min_score: cfg_f64("review_min_score", 0.0),
                 log_channel_set: cfg_u64("log_channel_id", 0) != 0,

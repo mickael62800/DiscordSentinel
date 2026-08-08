@@ -37,6 +37,13 @@ pub struct RoutingInputs<'a> {
     pub human_only: bool,
     pub auto_protect: bool,
     pub auto_delete_links: bool,
+    /// Autorisations explicites des sanctions executees sans carte.
+    pub selective_auto_actions: bool,
+    pub auto_warn: bool,
+    pub auto_delete: bool,
+    pub auto_mute: bool,
+    pub auto_kick: bool,
+    pub auto_ban: bool,
     pub ai_review_mode: bool,
     pub review_min_score: f64,
     /// `true` si un salon de review est configure (log_channel_id != 0).
@@ -96,6 +103,22 @@ pub fn decide(i: &RoutingInputs) -> RoutingDecision {
     let link_needs_card = generic_link && !auto_delete_link;
 
     let above_threshold = i.score > 0.0 && i.score >= i.review_min_score;
+    let action_is_authorized = match i.action {
+        Action::None => false,
+        // Warn/delete/mute preservent le mode auto historique tant que le
+        // controle selectif n'a pas ete active.
+        Action::Warn => !i.selective_auto_actions || i.auto_warn,
+        Action::Delete => !i.selective_auto_actions || i.auto_delete,
+        Action::Mute => !i.selective_auto_actions || i.auto_mute,
+        Action::Kick => i.selective_auto_actions && i.auto_kick,
+        // Le ban est toujours opt-in : il etait auparavant une proposition,
+        // jamais un vrai bannissement automatique.
+        Action::Ban => i.selective_auto_actions && i.auto_ban,
+    };
+    // Dans ce mode, une action explicitement autorisee est executee sans
+    // attendre une carte, meme si la review IA globale reste activee.
+    let force_authorized_auto =
+        i.selective_auto_actions && action_is_authorized && i.action != Action::None;
     // `human_only` choisit le destinataire (une carte) mais ne transforme pas
     // chaque message normal en incident. Un score positif est indispensable :
     // sinon une IA indisponible ou sous son seuil produit des cartes à 0.00.
@@ -103,7 +126,10 @@ pub fn decide(i: &RoutingInputs) -> RoutingDecision {
         && ((i.human_only && i.score > 0.0)
             || severe
             || link_needs_card
-            || (i.ai_review_mode && above_threshold));
+            || (i.ai_review_mode && above_threshold && !force_authorized_auto)
+            // Une sanction non autorisee n'est jamais appliquee en silence :
+            // elle attend la decision des moderateurs dans la carte.
+            || (!action_is_authorized && i.action != Action::None));
 
     let route = if auto_delete_link {
         // Le bot supprime via `auto_delete_link` ; pas d'autre action.
@@ -113,7 +139,7 @@ pub fn decide(i: &RoutingInputs) -> RoutingDecision {
     } else if i.human_only {
         // Pas de carte (pas de salon) + human_only : aucune action auto.
         Routing::None
-    } else if matches!(i.action, Action::None) {
+    } else if matches!(i.action, Action::None) || !action_is_authorized {
         Routing::None
     } else {
         Routing::Auto
