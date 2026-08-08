@@ -120,7 +120,7 @@ async fn channel_name(
 ) -> Option<String> {
     let id = channel?;
     match id.to_channel(&ctx).await {
-        Ok(ch) => ch.guild().map(|g| g.name),
+        Ok(ch) => ch.guild().map(|g| g.name().to_string()),
         Err(_) => None,
     }
 }
