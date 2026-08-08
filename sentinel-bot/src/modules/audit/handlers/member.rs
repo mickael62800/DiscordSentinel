@@ -4,7 +4,8 @@ use serenity::model::user::User;
 use serenity::prelude::*;
 
 use crate::shared::embeds::{critical_embed, danger_embed, info_embed, warn_embed};
-use crate::shared::heartbeat::ApiClientKey;
+use crate::shared::grpc_client::{grpc_err_to_string, GrpcClientKey};
+use sentinel_proto::audit::v1 as proto_audit;
 
 use tracing::warn;
 
@@ -330,19 +331,16 @@ pub async fn handle_update(ctx: &Context, old: Option<Member>, new_member: &Memb
         )
         .await;
 
-        // Envoyer l'historique pseudos au backend
-        let data = ctx.data.read().await;
-        if let Some(base) = data.get::<ApiClientKey>() {
-            let req = base
-                .client()
-                .post(format!("{}/api/name-history", base.base_url()))
-                .json(&serde_json::json!({
-                    "guild_id": gid_str,
-                    "user_id": user_id,
-                    "old_name": old_label,
-                    "new_name": new_label,
-                }));
-            if let Err(e) = base.auth(req).send().await {
+        // Envoyer l'historique pseudos au backend (best-effort).
+        let grpc = ctx.data.read().await.get::<GrpcClientKey>().cloned();
+        if let Some(grpc) = grpc {
+            let req = proto_audit::RecordNameHistoryRequest {
+                guild_id: gid_str.clone(),
+                user_id: user_id.clone(),
+                old_name: old_label.to_string(),
+                new_name: new_label.to_string(),
+            };
+            if let Err(e) = crate::grpc_call!(@unit &grpc, audit, record_name_history, req) {
                 warn!(error = %e, "Failed to send name history update");
             }
         }

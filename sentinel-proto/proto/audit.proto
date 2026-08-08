@@ -24,7 +24,18 @@ service AuditService {
   // Retrouve le contenu d'un message a partir de son id Discord (fallback DB du
   // bot a l'edition, quand le cache RAM serenity n'a plus l'ancien contenu).
   rpc GetActivityByMessage(GetActivityByMessageRequest) returns (GetActivityByMessageResponse);
+  // Historise un changement de pseudo (le serveur decide event_type + details).
+  rpc RecordNameHistory(RecordNameHistoryRequest) returns (RecordNameHistoryResponse);
 }
+
+message RecordNameHistoryRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string old_name = 3;
+  string new_name = 4;
+}
+
+message RecordNameHistoryResponse {}
 
 message GetActivityByMessageRequest {
   string guild_id = 1;

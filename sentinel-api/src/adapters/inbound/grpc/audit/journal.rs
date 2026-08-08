@@ -228,4 +228,32 @@ impl AuditService for AuditGrpc {
             content: activity.and_then(|a| a.content),
         }))
     }
+
+    async fn record_name_history(
+        &self,
+        request: Request<proto::RecordNameHistoryRequest>,
+    ) -> Result<Response<proto::RecordNameHistoryResponse>, Status> {
+        use sentinel_core::domain::entities::audit::audit_log::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY;
+        let req = request.into_inner();
+        // Best-effort (comme le handler HTTP) : le mapping event_type/details
+        // reste server-side ; le bot ne fournit que les faits.
+        self.audit_logs_uc
+            .create(CreateAuditLogCommand {
+                guild_id: req.guild_id.into(),
+                event_type: AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.into(),
+                actor_id: None,
+                actor_name: None,
+                target_id: Some(req.user_id),
+                target_name: Some(req.new_name.clone()),
+                channel_id: None,
+                channel_name: None,
+                details: serde_json::json!({
+                    "old_name": req.old_name,
+                    "new_name": req.new_name,
+                }),
+            })
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::RecordNameHistoryResponse {}))
+    }
 }

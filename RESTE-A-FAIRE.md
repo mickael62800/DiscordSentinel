@@ -54,7 +54,7 @@ Les modules qui ont déjà un service proto sont terminés. Ce qui reste apparti
 **Nettoyage effectué** : `BaseApiClient::{get_json, post_json}` et leurs 4 helpers d'erreur HTTP supprimés — le bot n'émet plus **aucun** GET/POST-avec-réponse en HTTP.
 
 Restent en HTTP/reqwest brut (hors des helpers) :
-- `audit/handlers/member.rs` → `POST /api/name-history` (à migrer)
+- ~~`audit/handlers/member.rs` → `POST /api/name-history`~~ ✅ **FAIT** — +1 RPC `RecordNameHistory` sur `AuditService` (mapping event_type/details server-side).
 - `guild_backup/restore.rs` → `base.client()` (à auditer)
 - `automod/backend.rs` → `POST /api/ai/jobs` (soumission vision à l'ai-worker, hors périmètre)
 - `nasa_apod` → `base.client()` pour appeler NASA/DeepL (**API externes**, légitime, à garder)
