@@ -55,7 +55,7 @@ Les modules qui ont déjà un service proto sont terminés. Ce qui reste apparti
 
 Restent en HTTP/reqwest brut (hors des helpers) :
 - ~~`audit/handlers/member.rs` → `POST /api/name-history`~~ ✅ **FAIT** — +1 RPC `RecordNameHistory` sur `AuditService` (mapping event_type/details server-side).
-- `guild_backup/restore.rs` → `base.client()` (à auditer)
+- `guild_backup/restore.rs` → `base.client()` : **faux positif** — `download_bytes` télécharge une icône depuis le **CDN Discord** (URL externe), il emprunte juste le `reqwest::Client` partagé. Rien à migrer.
 - `automod/backend.rs` → `POST /api/ai/jobs` (soumission vision à l'ai-worker, hors périmètre)
 - `nasa_apod` → `base.client()` pour appeler NASA/DeepL (**API externes**, légitime, à garder)
 - config transverse : `get_guild_config_for` (lecture, 93 sites via 1 helper) + `post_fire_and_forget /api/bots/config` (écriture) → candidats `BotConfigService`.
