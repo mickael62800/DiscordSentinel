@@ -114,6 +114,7 @@ pub fn sanction_notice(
         "warn" => "Avertissement",
         "delete" => "Message supprimé",
         "mute" => "Exclusion temporaire (mute)",
+        "kick" => "Exclusion du serveur (kick)",
         "ban" => "Bannissement",
         _ => "Décision de modération",
     };
@@ -175,6 +176,7 @@ pub fn action_color(action: &str) -> u32 {
         "warn" => COLOR_WARNING,
         "delete" => COLOR_MODERATE,
         "mute" | "mute_temp" | "mute_permanent" => COLOR_MODERATE,
+        "kick" => COLOR_DANGER,
         "ban" | "ban_temp" => COLOR_DANGER,
         "ban_permanent" => COLOR_CRITICAL,
         "unmute" | "unban" => COLOR_SUCCESS,
@@ -188,6 +190,7 @@ pub fn action_emoji(action: &str) -> &'static str {
         "warn" => "⚠\u{fe0f}",
         "delete" => "🗑\u{fe0f}",
         "mute" | "mute_temp" | "mute_permanent" => "🔇",
+        "kick" => "👢",
         "ban" | "ban_temp" | "ban_permanent" => "🔨",
         "unmute" => "🔊",
         "unban" => "✅",

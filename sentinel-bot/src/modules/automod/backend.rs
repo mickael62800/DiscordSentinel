@@ -54,38 +54,6 @@ fn calming_kind(flags: &detectors::DetectionFlags) -> &'static str {
     }
 }
 
-/// Signale l'escalade dans le salon configure pour la tension. Si aucun salon
-/// n'est renseigne, le salon ou l'escalade a ete observee reste le fallback
-/// documente. Le message ne contient ni extrait ni identite de membre.
-async fn post_tension_warning(
-    ctx: &Context,
-    msg: &Message,
-    api: &crate::shared::api_client::BaseApiClient,
-    reason: &str,
-) {
-    let Some(guild_id) = msg.guild_id else { return };
-    let channel = match api
-        .get_guild_config_for(&guild_id.to_string(), super::MODULE_BOT_NAME)
-        .await
-    {
-        Ok(config) => config
-            .get("channel_tension_warning_channel_id")
-            .and_then(|id| id.parse::<u64>().ok())
-            .map(serenity::model::id::ChannelId::new)
-            .unwrap_or(msg.channel_id),
-        Err(error) => {
-            warn!(%error, "Lecture du salon de notification tension echouee");
-            msg.channel_id
-        }
-    };
-    let content = format!(
-        "⚠️ **Tension détectée** — {reason}\nLes modérateurs sont invités à surveiller la conversation et à apaiser les échanges."
-    );
-    if let Err(error) = channel.say(&ctx.http, content).await {
-        warn!(%error, channel_id = %channel, "Notification de tension non envoyee");
-    }
-}
-
 /// Poste une card de notification d'auto-mute (qui / pourquoi / combien de
 /// temps) quand l'auto-protection severe a mute SANS qu'une carte de review
 /// soit affichee (route None). Sinon l'admin ne voit nulle part la raison.
@@ -342,7 +310,6 @@ pub(super) async fn send_to_backend(
             // Signal collectif, sans contenu ni identite de membre. Atrium
             // applique son propre cooldown avant de publier le rappel.
             if effective_reason.contains("Tension de salon") {
-                post_tension_warning(ctx, msg, &base, &effective_reason).await;
                 base.publish_event(
                     "atrium_calming_requested",
                     serde_json::json!({
@@ -466,6 +433,16 @@ pub(super) async fn send_to_backend(
                     .await
                     {
                         error!(error = %e, "Erreur lors de l'execution de l'action");
+                    } else if notify_member {
+                        send_sanction_dm(
+                            ctx,
+                            msg.author.id,
+                            &response.action,
+                            &effective_reason,
+                            mute_duration_secs,
+                            appeal,
+                        )
+                        .await;
                     }
                 }
             }
@@ -638,6 +615,44 @@ pub(super) async fn execute_action(
     }
 
     Ok(())
+}
+
+/// Informe le membre, par DM et au mieux, d'une sanction effectivement
+/// appliquee. L'echec des MP Discord ne doit jamais annuler la sanction.
+pub(super) async fn send_sanction_dm(
+    ctx: &Context,
+    user_id: serenity::model::id::UserId,
+    action: &Action,
+    reason: &str,
+    mute_duration_secs: u64,
+    appeal: bool,
+) {
+    let kind = match action {
+        Action::Warn => "warn",
+        Action::Delete => "delete",
+        Action::Mute => "mute",
+        Action::Kick => "kick",
+        Action::Ban => "ban",
+        Action::None => return,
+    };
+    let duration = matches!(action, Action::Mute).then_some(mute_duration_secs / 60);
+    let embed = crate::shared::embeds::sanction_notice(kind, reason, duration, None, appeal);
+    match user_id.create_dm_channel(&ctx.http).await {
+        Ok(channel) => {
+            if let Err(error) = channel
+                .send_message(
+                    &ctx.http,
+                    serenity::builder::CreateMessage::new().embed(embed),
+                )
+                .await
+            {
+                warn!(%error, user_id = %user_id, "Echec envoi DM sanction AutoMod");
+            }
+        }
+        Err(error) => {
+            warn!(%error, user_id = %user_id, "Impossible d'ouvrir le DM sanction AutoMod")
+        }
+    }
 }
 
 /// Analyse les images attachees a un message via le ai-worker (async).

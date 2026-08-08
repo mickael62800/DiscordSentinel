@@ -166,7 +166,9 @@ pub(crate) async fn handle_finalize_button(
 
     // Notice membre (cohérence de ton avec les autres chemins) : on informe le
     // membre en DM de la sanction validée + droit d'appel. Best-effort.
-    if matches!(decided.as_str(), "prevention" | "warn" | "mute" | "ban") {
+    if BaseApiClient::config_bool(&config, "sanction_notify_member", true)
+        && matches!(decided.as_str(), "prevention" | "warn" | "mute" | "ban")
+    {
         let appeal = BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
         let mins = if decided == "mute" {
             Some(mute_secs / 60)

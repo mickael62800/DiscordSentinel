@@ -519,6 +519,7 @@ pub(super) async fn handle_review_button(
         BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
     let colors = build_embed_colors(&config);
     let appeal = BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
+    let notify_member = BaseApiClient::config_bool(&config, "sanction_notify_member", true);
 
     if action == Action::None {
         // Ignorer -- mettre a jour la carte
@@ -729,6 +730,18 @@ pub(super) async fn handle_review_button(
             }
         }
         Action::None => {}
+    }
+
+    if notify_member && action != Action::None {
+        super::backend::send_sanction_dm(
+            ctx,
+            component.user.id,
+            &action,
+            "Sanction validée par un modérateur",
+            mute_duration_secs,
+            appeal,
+        )
+        .await;
     }
 
     // Trace la sanction de membre (warn/mute/ban) dans le module moderation

@@ -114,8 +114,11 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     )
     .max(flood_max_messages as u64) as usize;
     // Notification DSA au membre (DM motif + droit d'appel) lors d'une action auto.
-    let auto_notify_member =
-        BaseApiClient::config_bool(&config, "auto_protect_notify_member", true);
+    let auto_notify_member = BaseApiClient::config_bool(
+        &config,
+        "sanction_notify_member",
+        BaseApiClient::config_bool(&config, "auto_protect_notify_member", true),
+    );
     // Mention systematique du droit d'appel sur les messages de sanction (membre).
     let sanction_appeal = BaseApiClient::config_bool(&config, "sanction_appeal_enabled", true);
 
