@@ -1,8 +1,10 @@
 use super::*;
-use std::collections::HashMap;
-use chrono::{DateTime, Utc};
 use crate::domain::entities::game::audit::{GameAuditAction, GameAuditEntry};
 use crate::domain::entities::game::template::PortProtocol as TemplatePortProtocol;
+use crate::domain::entities::system::bot_config::{BotDefinition, BotGuildConfig};
+use crate::ports::outbound::game::container_runtime::{
+    ContainerRuntime, ContainerSpec, ContainerStats, ContainerStatus, ManagedContainer,
+};
 use crate::ports::outbound::game::game_audit_repository::GameAuditRepository;
 use crate::ports::outbound::game::game_server_config_repository::GameServerConfigRepository;
 use crate::ports::outbound::game::game_server_repository::{GameServerRepository, TemplateUsage};
@@ -10,10 +12,8 @@ use crate::ports::outbound::game::game_template_repository::GameTemplateReposito
 use crate::ports::outbound::game::port_allocator::{PortAllocator, PortKind};
 use crate::ports::outbound::game::rcon_client::{RconClient, RconConnectionParams, RconResponse};
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::domain::entities::system::bot_config::{BotDefinition, BotGuildConfig};
-use crate::ports::outbound::game::container_runtime::{
-    ContainerRuntime, ContainerSpec, ContainerStats, ContainerStatus, ManagedContainer,
-};
+use chrono::{DateTime, Utc};
+use std::collections::HashMap;
 
 #[test]
 fn test_render_template_placeholders() {
@@ -191,8 +191,14 @@ fn test_palworld_public_port_and_user_spec() {
 
     let spec = dummy_service.build_spec(&server, &tmpl, &overrides, &cfg);
 
-    assert_eq!(spec.env.get("PUBLIC_PORT").map(|s| s.as_str()), Some("25505"));
-    assert_eq!(spec.env.get("NUMERIC_VAR").map(|s| s.as_str()), Some("8211"));
+    assert_eq!(
+        spec.env.get("PUBLIC_PORT").map(|s| s.as_str()),
+        Some("25505")
+    );
+    assert_eq!(
+        spec.env.get("NUMERIC_VAR").map(|s| s.as_str()),
+        Some("8211")
+    );
     assert_eq!(spec.env.get("BOOL_VAR").map(|s| s.as_str()), Some("true"));
     assert_eq!(spec.user, None);
 }
@@ -227,98 +233,240 @@ fn sample_command() -> CreateGameServerCommand {
 struct DummyServerRepo;
 #[async_trait::async_trait]
 impl GameServerRepository for DummyServerRepo {
-    async fn create(&self, _: NewGameServer) -> Result<GameServer, DomainError> { todo!() }
-    async fn find_by_id(&self, _: Uuid) -> Result<Option<GameServer>, DomainError> { Ok(None) }
-    async fn list_by_guild(&self, _: &str) -> Result<Vec<GameServer>, DomainError> { Ok(vec![]) }
-    async fn list_active(&self) -> Result<Vec<GameServer>, DomainError> { Ok(vec![]) }
-    async fn list_running(&self) -> Result<Vec<GameServer>, DomainError> { Ok(vec![]) }
-    async fn update_runtime(&self, _: Uuid, _: GameServerRuntimeUpdate) -> Result<(), DomainError> { Ok(()) }
-    async fn update_status(&self, _: Uuid, _: GameServerStatus, _: Option<&str>) -> Result<(), DomainError> { Ok(()) }
-    async fn try_transition_status(&self, _: Uuid, _: &[GameServerStatus], _: GameServerStatus) -> Result<bool, DomainError> { Ok(true) }
-    async fn record_restart_attempt(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
-    async fn reset_restart_attempts(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
-    async fn mark_ip_revealed(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
-    async fn update_player_activity(&self, _: Uuid, _: i32) -> Result<(), DomainError> { Ok(()) }
-    async fn soft_delete(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
-    async fn count_active_for_guild(&self, _: &str) -> Result<(i32, i32), DomainError> { Ok((0, 0)) }
+    async fn create(&self, _: NewGameServer) -> Result<GameServer, DomainError> {
+        todo!()
+    }
+    async fn find_by_id(&self, _: Uuid) -> Result<Option<GameServer>, DomainError> {
+        Ok(None)
+    }
+    async fn list_by_guild(&self, _: &str) -> Result<Vec<GameServer>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_active(&self) -> Result<Vec<GameServer>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_running(&self) -> Result<Vec<GameServer>, DomainError> {
+        Ok(vec![])
+    }
+    async fn update_runtime(&self, _: Uuid, _: GameServerRuntimeUpdate) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_status(
+        &self,
+        _: Uuid,
+        _: GameServerStatus,
+        _: Option<&str>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn try_transition_status(
+        &self,
+        _: Uuid,
+        _: &[GameServerStatus],
+        _: GameServerStatus,
+    ) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn record_restart_attempt(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn reset_restart_attempts(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn mark_ip_revealed(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn update_player_activity(&self, _: Uuid, _: i32) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn soft_delete(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn count_active_for_guild(&self, _: &str) -> Result<(i32, i32), DomainError> {
+        Ok((0, 0))
+    }
     async fn template_usage(&self, _: Uuid) -> Result<TemplateUsage, DomainError> {
         Ok(TemplateUsage {
             active_count: 0,
             last_activity_at: None,
         })
     }
-    async fn set_session_channels(&self, _: Uuid, _: Option<&str>, _: Option<&str>) -> Result<bool, DomainError> { Ok(true) }
-    async fn list_ip_reveal_due(&self) -> Result<Vec<GameServer>, DomainError> { Ok(vec![]) }
-    async fn list_awaiting_reveal_no_ping_today(&self) -> Result<Vec<GameServer>, DomainError> { Ok(vec![]) }
-    async fn mark_daily_ping(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
-    async fn set_ip_reveal_at(&self, _: Uuid, _: Option<DateTime<Utc>>) -> Result<(), DomainError> { Ok(()) }
+    async fn set_session_channels(
+        &self,
+        _: Uuid,
+        _: Option<&str>,
+        _: Option<&str>,
+    ) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn list_ip_reveal_due(&self) -> Result<Vec<GameServer>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_awaiting_reveal_no_ping_today(&self) -> Result<Vec<GameServer>, DomainError> {
+        Ok(vec![])
+    }
+    async fn mark_daily_ping(&self, _: Uuid) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn set_ip_reveal_at(&self, _: Uuid, _: Option<DateTime<Utc>>) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 struct DummyTemplateRepo;
 #[async_trait::async_trait]
 impl GameTemplateRepository for DummyTemplateRepo {
-    async fn find_by_id(&self, _: Uuid) -> Result<Option<GameTemplate>, DomainError> { Ok(None) }
-    async fn find_by_slug(&self, _: &str) -> Result<Option<GameTemplate>, DomainError> { Ok(None) }
-    async fn list(&self) -> Result<Vec<GameTemplate>, DomainError> { Ok(vec![]) }
+    async fn find_by_id(&self, _: Uuid) -> Result<Option<GameTemplate>, DomainError> {
+        Ok(None)
+    }
+    async fn find_by_slug(&self, _: &str) -> Result<Option<GameTemplate>, DomainError> {
+        Ok(None)
+    }
+    async fn list(&self) -> Result<Vec<GameTemplate>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 struct DummyConfigRepo;
 #[async_trait::async_trait]
 impl GameServerConfigRepository for DummyConfigRepo {
-    async fn get_all(&self, _: Uuid) -> Result<HashMap<String, String>, DomainError> { Ok(HashMap::new()) }
-    async fn upsert(&self, _: Uuid, _: &str, _: &str, _: Option<&str>) -> Result<(), DomainError> { Ok(()) }
-    async fn delete(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn replace_all(&self, _: Uuid, _: HashMap<String, String>, _: Option<&str>) -> Result<(), DomainError> { Ok(()) }
+    async fn get_all(&self, _: Uuid) -> Result<HashMap<String, String>, DomainError> {
+        Ok(HashMap::new())
+    }
+    async fn upsert(&self, _: Uuid, _: &str, _: &str, _: Option<&str>) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete(&self, _: Uuid, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn replace_all(
+        &self,
+        _: Uuid,
+        _: HashMap<String, String>,
+        _: Option<&str>,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
 }
 
 struct DummyAuditRepo;
 #[async_trait::async_trait]
 impl GameAuditRepository for DummyAuditRepo {
-    async fn log(&self, _: &str, _: Option<Uuid>, _: Option<&str>, _: GameAuditAction, _: serde_json::Value) -> Result<(), DomainError> { Ok(()) }
-    async fn list_for_server(&self, _: Uuid, _: i64) -> Result<Vec<GameAuditEntry>, DomainError> { Ok(vec![]) }
-    async fn list_for_guild(&self, _: &str, _: i64, _: i64) -> Result<Vec<GameAuditEntry>, DomainError> { Ok(vec![]) }
+    async fn log(
+        &self,
+        _: &str,
+        _: Option<Uuid>,
+        _: Option<&str>,
+        _: GameAuditAction,
+        _: serde_json::Value,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn list_for_server(&self, _: Uuid, _: i64) -> Result<Vec<GameAuditEntry>, DomainError> {
+        Ok(vec![])
+    }
+    async fn list_for_guild(
+        &self,
+        _: &str,
+        _: i64,
+        _: i64,
+    ) -> Result<Vec<GameAuditEntry>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 struct DummyPortAllocator;
 #[async_trait::async_trait]
 impl PortAllocator for DummyPortAllocator {
-    async fn allocate(&self, _: PortKind, _: u16, _: u16, _: &str) -> Result<u16, DomainError> { todo!() }
-    async fn release(&self, _: PortKind, _: u16) -> Result<(), DomainError> { Ok(()) }
-    async fn is_available(&self, _: PortKind, _: u16) -> Result<bool, DomainError> { todo!() }
+    async fn allocate(&self, _: PortKind, _: u16, _: u16, _: &str) -> Result<u16, DomainError> {
+        todo!()
+    }
+    async fn release(&self, _: PortKind, _: u16) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn is_available(&self, _: PortKind, _: u16) -> Result<bool, DomainError> {
+        todo!()
+    }
 }
 
 struct DummyContainerRuntime;
 #[async_trait::async_trait]
 impl ContainerRuntime for DummyContainerRuntime {
-    async fn pull_image_if_missing(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn create_container(&self, _: &ContainerSpec) -> Result<String, DomainError> { Ok("cid".to_string()) }
-    async fn start_container(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn stop_container(&self, _: &str, _: u32) -> Result<(), DomainError> { Ok(()) }
-    async fn restart_container(&self, _: &str, _: u32) -> Result<(), DomainError> { Ok(()) }
-    async fn remove_container(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn ensure_network(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn ensure_volume(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn remove_volume(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn remove_image(&self, _: &str, _: bool) -> Result<bool, DomainError> { Ok(true) }
-    async fn upload_file_to_container(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn inspect(&self, _: &str) -> Result<Option<ContainerStatus>, DomainError> { todo!() }
-    async fn list_managed_containers(&self) -> Result<Vec<ManagedContainer>, DomainError> { todo!() }
-    async fn stats(&self, _: &str) -> Result<ContainerStats, DomainError> { todo!() }
-    async fn logs(&self, _: &str, _: u32) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
+    async fn pull_image_if_missing(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn create_container(&self, _: &ContainerSpec) -> Result<String, DomainError> {
+        Ok("cid".to_string())
+    }
+    async fn start_container(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn stop_container(&self, _: &str, _: u32) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn restart_container(&self, _: &str, _: u32) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn remove_container(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn ensure_network(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn ensure_volume(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn remove_volume(&self, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn remove_image(&self, _: &str, _: bool) -> Result<bool, DomainError> {
+        Ok(true)
+    }
+    async fn upload_file_to_container(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn inspect(&self, _: &str) -> Result<Option<ContainerStatus>, DomainError> {
+        todo!()
+    }
+    async fn list_managed_containers(&self) -> Result<Vec<ManagedContainer>, DomainError> {
+        todo!()
+    }
+    async fn stats(&self, _: &str) -> Result<ContainerStats, DomainError> {
+        todo!()
+    }
+    async fn logs(&self, _: &str, _: u32) -> Result<Vec<String>, DomainError> {
+        Ok(vec![])
+    }
 }
 
 struct DummyRconClient;
 #[async_trait::async_trait]
 impl RconClient for DummyRconClient {
-    async fn execute(&self, _: &RconConnectionParams, _: &str) -> Result<RconResponse, DomainError> { todo!() }
+    async fn execute(
+        &self,
+        _: &RconConnectionParams,
+        _: &str,
+    ) -> Result<RconResponse, DomainError> {
+        todo!()
+    }
 }
 
 struct DummyBotConfig;
 #[async_trait::async_trait]
 impl BotConfigRepository for DummyBotConfig {
-    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { Ok(vec![]) }
-    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
-    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+        Ok(vec![])
+    }
+    async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
+        Ok(vec![])
+    }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        Ok(())
+    }
 }

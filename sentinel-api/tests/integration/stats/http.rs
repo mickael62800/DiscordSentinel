@@ -227,7 +227,12 @@ async fn get_user_stats_none_returns_null() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_user_stats_returns_dto() {
-    let uc = MockStatsUC::new().with_user(sample_user("111111111111111111", "222222222222222222", 100, 3600));
+    let uc = MockStatsUC::new().with_user(sample_user(
+        "111111111111111111",
+        "222222222222222222",
+        100,
+        3600,
+    ));
     let app = build_app(Arc::new(uc));
     let (status, json) = get(app, "/api/stats/111111111111111111/user/222222222222222222").await;
     assert_eq!(status, StatusCode::OK);

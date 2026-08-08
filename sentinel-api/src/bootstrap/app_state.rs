@@ -116,7 +116,8 @@ pub async fn build_app_state(
     );
 
     let deepseek_service = Arc::new(
-        crate::adapters::outbound::deepseek_moderation_service::DeepSeekModerationAdapter::from_env(),
+        crate::adapters::outbound::deepseek_moderation_service::DeepSeekModerationAdapter::from_env(
+        ),
     );
 
     let analyze_uc = Arc::new(

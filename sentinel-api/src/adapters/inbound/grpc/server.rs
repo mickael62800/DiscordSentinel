@@ -14,10 +14,9 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use sentinel_proto::age_gate::v1::age_gate_service_server::AgeGateServiceServer;
 use sentinel_proto::ai_dataset::v1::ai_dataset_service_server::AiDatasetServiceServer;
 use sentinel_proto::announcements::v1::announcements_service_server::AnnouncementsServiceServer;
-use sentinel_proto::age_gate::v1::age_gate_service_server::AgeGateServiceServer;
-use sentinel_proto::embeds::v1::embeds_service_server::EmbedsServiceServer;
 use sentinel_proto::audit::v1::audit_service_server::AuditServiceServer;
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
 use sentinel_proto::automod_review::v1::automod_review_service_server::AutomodReviewServiceServer;
@@ -25,6 +24,7 @@ use sentinel_proto::bump::v1::bump_service_server::BumpServiceServer;
 use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
 use sentinel_proto::confessions::v1::confessions_service_server::ConfessionsServiceServer;
 use sentinel_proto::discord_messages::v1::discord_action_messages_service_server::DiscordActionMessagesServiceServer;
+use sentinel_proto::embeds::v1::embeds_service_server::EmbedsServiceServer;
 use sentinel_proto::export::v1::export_service_server::ExportServiceServer;
 use sentinel_proto::guild_backup::v1::guild_backup_service_server::GuildBackupServiceServer;
 use sentinel_proto::ideas::v1::ideas_service_server::IdeasServiceServer;

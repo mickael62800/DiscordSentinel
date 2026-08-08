@@ -12,9 +12,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use sentinel_core::domain::services::audit::role_card::{
-    clamp_role_log_window, RoleMovement,
-};
+use sentinel_core::domain::services::audit::role_card::{clamp_role_log_window, RoleMovement};
 use serenity::all::{
     ChannelId, Context, CreateEmbed, CreateMessage, EditMessage, Member, MessageId, RoleId,
 };

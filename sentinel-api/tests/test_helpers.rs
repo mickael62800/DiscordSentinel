@@ -22,7 +22,6 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use sentinel_api::bootstrap::state::AppState;
 use sentinel_api::adapters::outbound::discord_api::DiscordApi;
 use sentinel_api::adapters::outbound::discord_api::DiscordApiService;
 use sentinel_api::adapters::outbound::discord_api::DiscordChannel;
@@ -31,6 +30,7 @@ use sentinel_api::adapters::outbound::discord_api::DiscordUser;
 use sentinel_api::adapters::outbound::discord_api::UserGuild;
 use sentinel_api::adapters::outbound::job_client::JobClient;
 use sentinel_api::adapters::outbound::ws::broadcaster::EventBroadcaster;
+use sentinel_api::bootstrap::state::AppState;
 use sentinel_core::domain::entities::ai::image_analysis::*;
 use sentinel_core::domain::entities::ai::message_analysis::*;
 use sentinel_core::domain::entities::audit::audit_log::*;

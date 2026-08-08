@@ -85,7 +85,10 @@ struct ChatResponseMessage {
 #[async_trait]
 impl DeepSeekModerationService for DeepSeekModerationAdapter {
     fn is_available(&self) -> bool {
-        self.api_key.as_ref().map(|k| !k.trim().is_empty()).unwrap_or(false)
+        self.api_key
+            .as_ref()
+            .map(|k| !k.trim().is_empty())
+            .unwrap_or(false)
     }
 
     async fn analyze_message(
