@@ -75,9 +75,27 @@ handler `grpc/audit/action_messages.rs`, `Register` + `ListForAction`). Le helpe
 tous les appelants (automod, tickets, voice) sont migrés. **Plus aucun appel HTTP
 `discord-messages` dans le bot.**
 
-### Volontairement laissé en HTTP
+### Config transverse `/api/bots/config` → `BotConfigService` (dernier vrai bloc HTTP↔API)
 
-`moderation::set_bot_config` — écriture d'une clé de config bot. C'est de la **config transverse**, pas de la modération : même nature que `get_guild_config_for`, que tous les modules appellent. Les deux mériteraient un service partagé (`BotConfigService`) plutôt qu'être greffés sur `ModerationService`. C'est le seul appel HTTP qui reste dans `moderation/api_client.rs`.
+C'est le **seul** appel bot↔API qui reste en HTTP. De la config transverse (lue/écrite par tous les modules), pas d'un domaine précis — d'où un service partagé plutôt qu'une greffe sur `ModerationService`.
+
+**Chiffrage (audit fait)** — taille **moyenne**, pas un gros chantier :
+
+- **Lectures : 51 sites, mais ils NE bougent PAS.** Tous passent par **un** helper `BaseApiClient::get_guild_config_for` (et son wrapper `discord_helpers::guild_config_or_default`). On migre l'**intérieur** du helper, pas les sites. Les `config_or`/`config_u64`/`config_bool` sont des helpers purs sur le `HashMap` retourné → aucun impact.
+- **Écritures : 3 sites** (`moderation::set_bot_config`, `confessions::persist_confession_setting`, `logs_setup`) via `post_fire_and_forget("/api/bots/config", …)`.
+
+**Travail réel :**
+1. `bot_config.proto` : 2 RPC (`GetGuildConfig(guild_id, bot_name) -> entries`, `SetConfig(guild_id, bot_name, key, value)`).
+2. Handler `BotConfigService` (wrappe `BotConfigRepository` — `get_config`/`set_config`, déjà dans l'état partout) + câblage server.
+3. `BaseApiClient` : +1 champ `grpc: Arc<SentinelGrpcClient>`, ajuster `new`, réécrire `get_guild_config_for` en délégation gRPC.
+4. `main.rs` : réordonner pour construire le client gRPC **avant** `BaseApiClient` (aujourd'hui l'inverse, l.39 vs l.44) et le lui passer. **1 seul site de construction**, aucun cycle.
+5. Les 3 écritures → `SetConfig`.
+
+**Point d'attention** : `BaseApiClient` détiendrait alors un client gRPC (devient hybride HTTP externe + gRPC config). Acceptable ; après ça il ne sert presque plus qu'à fournir le `reqwest::Client` partagé pour les téléchargements externes (CDN Discord, NASA/DeepL).
+
+**Choix de design à trancher avant de coder :**
+- **(A) Garder sur `BaseApiClient`** (délégation interne au gRPC) : churn minimal (51 lectures + 3 écritures quasi inchangées), mais `BaseApiClient` hybride.
+- **(B) Nouveau `BotConfigClient` dédié** (gRPC only) : plus propre, mais réécrit les ~51 sites de lecture (`base.get_guild_config_for` → nouvel appelant). Beaucoup plus de churn.
 
 ---
 
