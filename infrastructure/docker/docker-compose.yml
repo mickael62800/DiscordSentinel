@@ -286,6 +286,9 @@ services:
       WEB_FRONT_URL: ${WEB_FRONT_URL:-}
       SUPERADMIN_USER_IDS: ${SUPERADMIN_USER_IDS:-}
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
+      DEEPSEEK_MODERATION_API_KEY: ${DEEPSEEK_MODERATION_API_KEY:-}
+      DEEPSEEK_MODERATION_MODEL: ${DEEPSEEK_MODERATION_MODEL:-deepseek-chat}
+      DEEPSEEK_MODERATION_ENDPOINT: ${DEEPSEEK_MODERATION_ENDPOINT:-https://api.deepseek.com/chat/completions}
       VISION_MODEL_PATH: /models/vision/vision_sentinel.onnx
       TEXT_MODEL_PATH: /models/text/text_sentinel.onnx
       TEXT_TOKENIZER_PATH: /models/text/tokenizer.json
