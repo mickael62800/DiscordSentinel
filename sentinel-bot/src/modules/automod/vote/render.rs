@@ -7,7 +7,7 @@ use crate::shared::api_client::BaseApiClient;
 use super::super::api_client::{ReviewData, ReviewVote};
 use super::super::detectors;
 use super::labels::action_label;
-use super::{CLOSE_PREFIX, DISCUSSION_PREFIX, REOPEN_PREFIX, VOTE_PREFIX};
+use super::{CLOSE_PREFIX, DISCUSSION_PREFIX, REOPEN_PREFIX, UNMUTE_PREFIX, VOTE_PREFIX};
 
 /// Rangees de boutons de vote (6 actions -> 2 rangees car Discord limite a 5
 /// boutons par rangee). Ordre de severite : Prevention < Warn < Delete < Mute < Ban.
@@ -39,6 +39,9 @@ pub(super) fn vote_buttons(review_id: &str) -> Vec<serenity::builder::CreateActi
             CreateButton::new(format!("{CLOSE_PREFIX}{review_id}"))
                 .label("🚫 Clore (ignorer)")
                 .style(ButtonStyle::Danger),
+            CreateButton::new(format!("{UNMUTE_PREFIX}{review_id}"))
+                .label("🔊 Démute")
+                .style(ButtonStyle::Success),
         ]),
     ]
 }

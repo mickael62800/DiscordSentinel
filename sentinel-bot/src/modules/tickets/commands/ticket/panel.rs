@@ -502,6 +502,34 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     };
 
+    // Invariant de confidentialite : un ticket ne doit JAMAIS heriter de la
+    // visibilite de sa categorie. Certaines categories publiques et anciens
+    // panneaux Discord peuvent ecraser les overwrites transmis a la creation ;
+    // on reapplique donc explicitement le refus a @everyone apres creation.
+    let private_overwrite = PermissionOverwrite {
+        allow: Permissions::empty(),
+        deny: Permissions::VIEW_CHANNEL,
+        kind: PermissionOverwriteType::Role(everyone_role),
+    };
+    if let Err(e) = channel
+        .create_permission(&ctx.http, private_overwrite)
+        .await
+    {
+        error!(error = %e, channel_id = %channel.id, "CRITIQUE: ticket cree sans confirmation du verrou @everyone");
+        // Ne jamais laisser un ticket potentiellement expose : compensation
+        // immediate si Discord refuse l'overwrite de confidentialite.
+        let _ = channel.delete(&ctx.http).await;
+        let _ = modal
+            .edit_response(
+                &ctx.http,
+                serenity::builder::EditInteractionResponse::new().content(
+                    "Ouverture annulée : le verrou de confidentialité du ticket n'a pas pu être appliqué.",
+                ),
+            )
+            .await;
+        return;
+    }
+
     let guild_name = guild_id
         .to_partial_guild(&ctx.http)
         .await

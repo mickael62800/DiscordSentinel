@@ -184,6 +184,7 @@ pub fn handles_component(custom_id: &str) -> bool {
         || custom_id.starts_with(vote::FINALIZE_PREFIX)
         || custom_id.starts_with(vote::DISCUSSION_PREFIX)
         || custom_id.starts_with(vote::CLOSE_PREFIX)
+        || custom_id.starts_with(vote::UNMUTE_PREFIX)
         || custom_id.starts_with(vote::REOPEN_PREFIX)
 }
 
@@ -198,6 +199,8 @@ pub async fn on_component(
     let cid = component.data.custom_id.as_str();
     if cid.starts_with(vote::CLOSE_PREFIX) {
         vote::handle_close_button(ctx, component).await;
+    } else if cid.starts_with(vote::UNMUTE_PREFIX) {
+        vote::handle_unmute_button(ctx, component).await;
     } else if cid.starts_with(vote::REOPEN_PREFIX) {
         vote::handle_reopen_button(ctx, component).await;
     } else if cid.starts_with(vote::VOTE_PREFIX) {

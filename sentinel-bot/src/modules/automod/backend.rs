@@ -408,6 +408,7 @@ pub(super) async fn send_to_backend(
                         &effective_reason,
                         mute_duration_secs,
                         appeal,
+                        msg.guild_id.map(|id| id.to_string()).as_deref(),
                     )
                     .await;
                 }
@@ -471,6 +472,7 @@ pub(super) async fn send_to_backend(
                             &effective_reason,
                             mute_duration_secs,
                             appeal,
+                            msg.guild_id.map(|id| id.to_string()).as_deref(),
                         )
                         .await;
                     }
@@ -656,6 +658,7 @@ pub(super) async fn send_sanction_dm(
     reason: &str,
     mute_duration_secs: u64,
     appeal: bool,
+    guild_id: Option<&str>,
 ) {
     let kind = match action {
         Action::Warn => "warn",
@@ -669,13 +672,17 @@ pub(super) async fn send_sanction_dm(
     let embed = crate::shared::embeds::sanction_notice(kind, reason, duration, None, appeal);
     match user_id.create_dm_channel(&ctx.http).await {
         Ok(channel) => {
-            if let Err(error) = channel
-                .send_message(
-                    &ctx.http,
-                    serenity::builder::CreateMessage::new().embed(embed),
-                )
-                .await
-            {
+            let mut message = serenity::builder::CreateMessage::new().embed(embed);
+            if appeal {
+                if let Some(guild_id) = guild_id {
+                    message = message.components(vec![
+                        crate::modules::moderation::commands::appeal::build_appeal_button(
+                            guild_id, "latest",
+                        ),
+                    ]);
+                }
+            }
+            if let Err(error) = channel.send_message(&ctx.http, message).await {
                 warn!(%error, user_id = %user_id, "Echec envoi DM sanction AutoMod");
             }
         }

@@ -345,6 +345,10 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
         }
     }
 
+    // `latest` est employe par les sanctions AutoMod, qui ne possedent pas
+    // encore d'identifiant d'action individuel mais doivent rester contestables.
+    let action_id = (action_id != "latest").then_some(action_id);
+
     // Repond a l'interaction (differe : la creation du salon peut prendre du temps).
     let _ = component
         .create_response(
@@ -360,7 +364,7 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
         &found_guild,
         component.user.id.get(),
         &component.user.name,
-        Some(action_id),
+        action_id,
         |content| {
             let ctx = ctx.clone();
             async move {

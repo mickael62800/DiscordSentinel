@@ -30,12 +30,16 @@ pub(super) const FINALIZE_PREFIX: &str = "amf:";
 pub(super) const DISCUSSION_PREFIX: &str = "amdisc:";
 /// Bouton "Clore (ignorer)" -> clot immediatement le dossier (tout moderateur).
 pub(super) const CLOSE_PREFIX: &str = "amclose:";
+/// Bouton moderateur : leve le timeout du membre concerne par la carte.
+pub(super) const UNMUTE_PREFIX: &str = "amunmute:";
 /// Bouton "Rouvrir le dossier" -> repasse en vote (tout moderateur).
 pub(super) const REOPEN_PREFIX: &str = "amreopen:";
 
 // Re-exports : conservent les chemins publics `vote::ITEM` attendus par les
 // autres modules de l'automod (mod.rs, review.rs, backend.rs).
-pub(crate) use buttons::{handle_close_button, handle_reopen_button, handle_vote_button};
+pub(crate) use buttons::{
+    handle_close_button, handle_reopen_button, handle_unmute_button, handle_vote_button,
+};
 pub(crate) use cards::archive_discussion_channel;
 pub(crate) use discussion::handle_discussion_button;
 pub(crate) use events::{handle_card_expired_event, handle_decided_event};

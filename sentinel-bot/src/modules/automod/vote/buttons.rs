@@ -16,7 +16,79 @@ use super::render::{
     build_detail_url, moderator_facts, render_history_totals, render_votes, reopen_row,
     secondary_row, vote_buttons, vote_embed, VOTES_FIELD,
 };
-use super::{CLOSE_PREFIX, REOPEN_PREFIX, VOTE_PREFIX};
+use super::{CLOSE_PREFIX, REOPEN_PREFIX, UNMUTE_PREFIX, VOTE_PREFIX};
+
+/// Leve le timeout Discord depuis une carte AutoMod. Le bouton est reserve aux
+/// moderateurs et reste sans effet si le membre n'est deja plus timeout.
+pub(crate) async fn handle_unmute_button(
+    ctx: &Context,
+    component: &serenity::model::application::ComponentInteraction,
+) {
+    use serenity::all::UserId;
+
+    let review_id = match component.data.custom_id.strip_prefix(UNMUTE_PREFIX) {
+        Some(id) => id,
+        None => return,
+    };
+    let Some(guild_id) = component.guild_id else {
+        reply_ephemeral(
+            ctx,
+            component,
+            "Ce bouton est utilisable uniquement sur le serveur.",
+        )
+        .await;
+        return;
+    };
+    let (api, grpc) = {
+        let data = ctx.data.read().await;
+        match (data.get::<ApiClientKey>(), data.get::<GrpcClientKey>()) {
+            (Some(api), Some(grpc)) => (api.clone(), grpc.clone()),
+            _ => return,
+        }
+    };
+    let config = api
+        .get_guild_config_for(&guild_id.to_string(), super::super::MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
+    let mod_role_id = config
+        .get("vote_mod_role_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|id| *id > 0);
+    let (is_admin, has_moderate, _, has_mod_role, _) =
+        moderator_facts(component, mod_role_id, None);
+    if !is_admin && !has_moderate && !has_mod_role {
+        reply_ephemeral(ctx, component, "Réservé aux modérateurs.").await;
+        return;
+    }
+    let review = match ApiClient::new(grpc).get_review(review_id).await {
+        Ok(review) => review,
+        Err(error) => {
+            warn!(%error, review_id, "Démute impossible : review introuvable");
+            reply_ephemeral(ctx, component, "Dossier introuvable ou indisponible.").await;
+            return;
+        }
+    };
+    let Ok(user_id) = review.user_id.parse::<u64>() else {
+        reply_ephemeral(ctx, component, "Identifiant du membre invalide.").await;
+        return;
+    };
+    match guild_id.member(&ctx.http, UserId::new(user_id)).await {
+        Ok(mut member) => match member.enable_communication(&ctx.http).await {
+            Ok(()) => {
+                info!(review_id, user_id, moderator = %component.user.name, "Membre demute depuis carte AutoMod");
+                reply_ephemeral(ctx, component, "✅ Timeout levé.").await;
+            }
+            Err(error) => {
+                warn!(%error, review_id, user_id, "Echec demute depuis carte AutoMod");
+                reply_ephemeral(ctx, component, "Échec du démute : vérifie la hiérarchie des rôles et la permission Modérer les membres.").await;
+            }
+        },
+        Err(error) => {
+            warn!(%error, review_id, user_id, "Membre introuvable pour demute");
+            reply_ephemeral(ctx, component, "Membre introuvable sur le serveur.").await;
+        }
+    }
+}
 
 /// Handler du bouton de vote (`amv:<char>:<review_id>`).
 pub(crate) async fn handle_vote_button(

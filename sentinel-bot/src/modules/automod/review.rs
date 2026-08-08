@@ -740,6 +740,7 @@ pub(super) async fn handle_review_button(
             "Sanction validée par un modérateur",
             mute_duration_secs,
             appeal,
+            None,
         )
         .await;
     }
