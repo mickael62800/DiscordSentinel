@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 //! Implementation `RconClient` pour le protocole Source RCON (Minecraft Java).
 //!
 //! Format des paquets (little-endian) :
