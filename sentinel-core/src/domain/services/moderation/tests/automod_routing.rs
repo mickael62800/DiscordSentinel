@@ -160,7 +160,17 @@ fn decide_human_only_with_channel_cards() {
     let mut i = base(&f, "spam");
     i.human_only = true;
     i.log_channel_set = true;
+    i.score = 3.0;
     assert_eq!(decide(&i).route, Routing::Card);
+}
+
+#[test]
+fn decide_human_only_with_zero_score_does_not_create_an_empty_card() {
+    let f = flags(false, false, false, false);
+    let mut i = base(&f, "message normal");
+    i.human_only = true;
+    i.log_channel_set = true;
+    assert_eq!(decide(&i).route, Routing::None);
 }
 
 // ── decide : ai_review_mode + seuil ──────────────────────────────────────

@@ -95,9 +95,15 @@ pub fn decide(i: &RoutingInputs) -> RoutingDecision {
     // Sinon, le lien generique merite une carte (oeil humain).
     let link_needs_card = generic_link && !auto_delete_link;
 
-    let above_threshold = i.score >= i.review_min_score;
+    let above_threshold = i.score > 0.0 && i.score >= i.review_min_score;
+    // `human_only` choisit le destinataire (une carte) mais ne transforme pas
+    // chaque message normal en incident. Un score positif est indispensable :
+    // sinon une IA indisponible ou sous son seuil produit des cartes à 0.00.
     let should_card = i.log_channel_set
-        && (i.human_only || severe || link_needs_card || (i.ai_review_mode && above_threshold));
+        && ((i.human_only && i.score > 0.0)
+            || severe
+            || link_needs_card
+            || (i.ai_review_mode && above_threshold));
 
     let route = if auto_delete_link {
         // Le bot supprime via `auto_delete_link` ; pas d'autre action.

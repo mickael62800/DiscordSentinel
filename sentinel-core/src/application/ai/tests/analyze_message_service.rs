@@ -895,6 +895,47 @@ fn parse_tension_config_defaults_when_empty() {
 }
 
 #[test]
+fn deepseek_toxicity_is_weighted_with_the_detected_rule() {
+    use crate::ports::outbound::ai::deepseek_moderation_service::DeepSeekModerationAnalysis;
+
+    let analysis = DeepSeekModerationAnalysis {
+        toxicity_score: 0.8,
+        sentiment: "threat".to_string(),
+        flags: vec![],
+        recommended_action: "warn".to_string(),
+        reason: "Menace explicite".to_string(),
+    };
+
+    let (score, flags, _) = score_deepseek_analysis(&analysis, &[], 0.5, &ScoringConfig::default())
+        .expect("une menace DeepSeek doit produire un score");
+
+    assert_eq!(flags, vec![FlagType::Threat]);
+    assert!((score - 6.4).abs() < 0.01, "poids menace 8 × confiance 0.8");
+}
+
+#[test]
+fn deepseek_unknown_toxic_label_falls_back_to_weighted_harassment() {
+    use crate::ports::outbound::ai::deepseek_moderation_service::DeepSeekModerationAnalysis;
+
+    let analysis = DeepSeekModerationAnalysis {
+        toxicity_score: 0.9,
+        sentiment: "inappropriate".to_string(),
+        flags: vec![],
+        recommended_action: "warn".to_string(),
+        reason: "Contenu inapproprié détecté".to_string(),
+    };
+
+    let (score, flags, _) = score_deepseek_analysis(&analysis, &[], 0.5, &ScoringConfig::default())
+        .expect("un signal toxique inconnu ne doit jamais donner 0");
+
+    assert_eq!(flags, vec![FlagType::Harassment]);
+    assert!(
+        (score - 6.3).abs() < 0.01,
+        "poids harcelement 7 × confiance 0.9"
+    );
+}
+
+#[test]
 fn parse_tension_config_reads_all_keys() {
     let entries = vec![
         bot_entry("channel_tension_enabled", "true"),

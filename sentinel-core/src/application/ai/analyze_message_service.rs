@@ -40,7 +40,9 @@ pub struct AnalyzeMessageService {
     inference_limiter: Arc<InferenceRateLimiter>,
     inference: Option<Arc<dyn InferenceService>>,
     tokenizer: Option<Arc<dyn TextTokenizer>>,
-    deepseek_service: Option<Arc<dyn crate::ports::outbound::ai::deepseek_moderation_service::DeepSeekModerationService>>,
+    deepseek_service: Option<
+        Arc<dyn crate::ports::outbound::ai::deepseek_moderation_service::DeepSeekModerationService>,
+    >,
     /// Buffer in-memory pour la "tension de salon" (option : si None, la
     /// feature est desactivee quel que soit le contenu de la config).
     tension_buffer: Option<Arc<ChannelTensionBuffer>>,
@@ -70,7 +72,9 @@ impl AnalyzeMessageService {
     /// Ajoute le service DeepSeek Moderation au pipeline.
     pub fn with_deepseek(
         mut self,
-        deepseek: Arc<dyn crate::ports::outbound::ai::deepseek_moderation_service::DeepSeekModerationService>,
+        deepseek: Arc<
+            dyn crate::ports::outbound::ai::deepseek_moderation_service::DeepSeekModerationService,
+        >,
     ) -> Self {
         self.deepseek_service = Some(deepseek);
         self
@@ -547,23 +551,58 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                     match ds.analyze_message(&cmd.content, &context_texts).await {
                         Ok(ds_analysis) => {
                             info!(score = ds_analysis.toxicity_score, sentiment = %ds_analysis.sentiment, reason = %ds_analysis.reason, "Reponse DeepSeek Moderation recue");
-                            if ds_analysis.toxicity_score >= text_threshold as f64 {
-                                let ds_reason = format!("DeepSeek [{}]: {}", ds_analysis.sentiment, ds_analysis.reason);
-                                let combined_score = result.score + ds_analysis.toxicity_score;
-                                let action = match ds_analysis.recommended_action.as_str() {
-                                    "ban" => Action::Ban, "mute" => Action::Mute,
-                                    "delete" => Action::Delete, "warn" => Action::Warn,
-                                    _ => result.action.clone(),
-                                };
-                                let is_stronger = action_rank(&action) > action_rank(&result.action);
-                                if is_stronger || combined_score > result.score {
-                                    result.score = combined_score;
-                                    if is_stronger { result.action = action; }
-                                    result.reason = if result.reason.is_empty() { ds_reason } else { format!("{} | {}", result.reason, ds_reason) };
+                            if let Some((ia_score, ia_flags, ds_reason)) = score_deepseek_analysis(
+                                &ds_analysis,
+                                &rules,
+                                text_threshold,
+                                &scoring_config,
+                            ) {
+                                // `toxicity_score` est une confiance 0..1, pas un
+                                // poids de moderation. On la pondere donc avec les
+                                // memes regles par type que l'ONNX local : une menace
+                                // et une insulte ne peuvent pas valoir 0.90 point.
+                                let combined_score = result.score + ia_score;
+                                let mut fired = cmd.flags.active_flags();
+                                for flag in &ia_flags {
+                                    if !fired.contains(flag) {
+                                        fired.push(flag.clone());
+                                    }
                                 }
+                                let (t_warn, t_delete, t_mute, t_ban) =
+                                    resolve_thresholds(&rules, &fired, &scoring_config);
+                                let (action, duration) = if combined_score >= t_ban {
+                                    (Action::Ban, None)
+                                } else if combined_score >= t_mute {
+                                    (Action::Mute, Some(mute_duration_secs))
+                                } else if combined_score >= t_delete {
+                                    (Action::Delete, None)
+                                } else if combined_score >= t_warn {
+                                    (Action::Warn, None)
+                                } else {
+                                    (Action::None, None)
+                                };
+                                let (action, duration) = cap_ia_induced_ban(
+                                    action,
+                                    duration,
+                                    result.score,
+                                    t_ban,
+                                    mute_duration_secs,
+                                );
+
+                                result.score = combined_score;
+                                result.action = action;
+                                result.duration = duration;
+                                result.reason = if result.reason.is_empty() {
+                                    ds_reason
+                                } else {
+                                    format!("{} | {}", result.reason, ds_reason)
+                                };
+                                ia_score_individual = ia_score;
                             }
                         }
-                        Err(e) => warn!(error = %e, "Echec analyse DeepSeek Moderation, fallback ONNX/Regles"),
+                        Err(e) => {
+                            warn!(error = %e, "Echec analyse DeepSeek Moderation, fallback ONNX/Regles")
+                        }
                     }
                 }
             }
@@ -825,16 +864,6 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 
 // run_text_inference supprimee — remplacee par spawn_blocking + timeout dans analyze().
 
-fn action_rank(action: &Action) -> u8 {
-    match action {
-        Action::None => 0,
-        Action::Warn => 1,
-        Action::Delete => 2,
-        Action::Mute => 3,
-        Action::Ban => 4,
-    }
-}
-
 /// Fonction pure : transforme les classifications IA en score, flags et raison.
 /// Retourne None si aucun sentiment toxique n'est detecte au-dessus du seuil.
 pub fn score_classifications(
@@ -895,6 +924,79 @@ pub fn score_classifications(
         detected.into_iter().map(|(f, _)| f).collect(),
         reason,
     ))
+}
+
+/// Transforme la réponse DeepSeek en signal de modération pondéré.
+///
+/// DeepSeek retourne une confiance de toxicité entre 0 et 1. Cette confiance
+/// doit être multipliée par le poids de la règle correspondante, exactement
+/// comme les classifications ONNX locales ; l'ajouter directement au score
+/// rendrait les seuils configurés (2, 4, 6, 9…) inatteignables.
+pub fn score_deepseek_analysis(
+    analysis: &crate::ports::outbound::ai::deepseek_moderation_service::DeepSeekModerationAnalysis,
+    rules: &[crate::domain::entities::system::rule::Rule],
+    threshold: f32,
+    scoring_config: &ScoringConfig,
+) -> Option<(f64, Vec<FlagType>, String)> {
+    if analysis.toxicity_score < threshold as f64 {
+        return None;
+    }
+
+    let flag_for_label = |label: &str| match label.trim().to_ascii_lowercase().as_str() {
+        "anger" | "angry" | "colere" | "colère" => Some(FlagType::Anger),
+        "rage" | "aggressive" | "agressif" | "agression" => Some(FlagType::Rage),
+        "threat" | "threatening" | "menace" => Some(FlagType::Threat),
+        "harassment" | "hate" | "hate_speech" | "toxic" | "toxicity" | "harcelement"
+        | "harcèlement" => Some(FlagType::Harassment),
+        "insult" | "insulte" => Some(FlagType::Insult),
+        "profanity" | "profanite" | "profanité" => Some(FlagType::Profanity),
+        "spam" => Some(FlagType::Spam),
+        "nsfw" => Some(FlagType::Nsfw),
+        _ => None,
+    };
+
+    let mut detected = Vec::new();
+    if let Some(flag) = flag_for_label(&analysis.sentiment) {
+        detected.push(flag);
+    }
+    for label in &analysis.flags {
+        if let Some(flag) = flag_for_label(label) {
+            if !detected.contains(&flag) {
+                detected.push(flag);
+            }
+        }
+    }
+    // Une réponse IA explicitement toxique doit toujours produire un poids,
+    // même si le fournisseur a utilisé un libellé non encore connu.
+    if detected.is_empty() {
+        detected.push(FlagType::Harassment);
+    }
+
+    let confidence = analysis.toxicity_score.clamp(0.0, 1.0);
+    let score = detected
+        .iter()
+        .map(|flag| {
+            rules
+                .iter()
+                .find(|rule| rule.flag_type == *flag && rule.enabled)
+                .map(|rule| rule.weight)
+                .unwrap_or_else(|| scoring_config.weight_for(flag))
+                * confidence
+        })
+        .sum();
+    let labels = detected
+        .iter()
+        .map(FlagType::as_str)
+        .collect::<Vec<_>>()
+        .join(", ");
+    let reason = format!(
+        "DeepSeek [{} — {:.0}%] : {}",
+        labels,
+        confidence * 100.0,
+        analysis.reason
+    );
+
+    Some((score, detected, reason))
 }
 
 /// Construit un contenu enrichi avec le contexte conversationnel pour l'inference IA.
