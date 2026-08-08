@@ -38,6 +38,22 @@ fn build_fallback_reason(flags: &detectors::DetectionFlags) -> String {
     }
 }
 
+/// Categorie partagee avec Atrium lors d'une escalation de tension. Aucun
+/// contenu de message ni identifiant de membre ne traverse cette frontiere.
+fn calming_kind(flags: &detectors::DetectionFlags) -> &'static str {
+    if flags.phishing {
+        "phishing"
+    } else if flags.spam {
+        "flood"
+    } else if flags.insult || flags.profanity {
+        "toxicity"
+    } else if flags.link {
+        "unsafe_link"
+    } else {
+        "mixed"
+    }
+}
+
 /// Poste une card de notification d'auto-mute (qui / pourquoi / combien de
 /// temps) quand l'auto-protection severe a mute SANS qu'une carte de review
 /// soit affichee (route None). Sinon l'admin ne voit nulle part la raison.
@@ -290,6 +306,19 @@ pub(super) async fn send_to_backend(
                 .clone()
                 .filter(|s| !s.trim().is_empty())
                 .unwrap_or(fallback_reason);
+
+            // Signal collectif, sans contenu ni identite de membre. Atrium
+            // applique son propre cooldown avant de publier le rappel.
+            if effective_reason.contains("Tension de salon") {
+                base.publish_event(
+                    "atrium_calming_requested",
+                    serde_json::json!({
+                        "guild_id": request.guild_id,
+                        "reason": "channel_tension",
+                        "kind": calming_kind(&request.flags),
+                    }),
+                );
+            }
 
             if response.action != Action::None {
                 let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();

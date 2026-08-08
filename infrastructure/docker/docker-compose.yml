@@ -609,6 +609,8 @@ services:
       start_period: 20s
     environment:
       DISCORD_TOKEN: ${ATRIUM_DISCORD_TOKEN:-}
+      # Consomme les demandes d'apaisement publiees par Sentinel AutoMod.
+      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       ATRIUM_GRPC_URL: http://atrium-api:8091
       ATRIUM_GENERAL_CHANNEL_ID: ${ATRIUM_GENERAL_CHANNEL_ID:-}
       ATRIUM_SERVER_CONTEXT: ${ATRIUM_SERVER_CONTEXT:-}

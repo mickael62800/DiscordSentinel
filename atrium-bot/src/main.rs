@@ -1,10 +1,15 @@
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 
 use atrium_proto::welcome::v1::{
     bot_control_service_client::BotControlServiceClient,
     welcome_service_client::WelcomeServiceClient, BotStateRequest, ConversationScope,
     GenerateReplyRequest, SetBotStateRequest,
 };
+use platform_common::EventBus;
+use serde::Deserialize;
 use serenity::{
     all::{
         CommandInteraction, CommandOptionType, CreateCommand, CreateCommandOption,
@@ -21,6 +26,22 @@ mod logic;
 
 const DISCORD_DIRECTORY_MAX_CHARS: usize = 6_000;
 const MEMBERS_PER_ROLE: usize = 30;
+const SENTINEL_EVENTS: EventBus = EventBus::new("sentinel:events");
+const CALMING_COOLDOWN_SECS: u64 = 15 * 60;
+
+#[derive(Deserialize)]
+struct CalmingEvent {
+    event: String,
+    data: CalmingEventData,
+}
+
+#[derive(Deserialize)]
+struct CalmingEventData {
+    guild_id: String,
+    reason: String,
+    #[serde(default)]
+    kind: String,
+}
 
 #[derive(Clone)]
 struct Config {
@@ -51,9 +72,67 @@ struct Handler {
     config: Arc<Config>,
     channel: Channel,
     primary_guild: Arc<tokio::sync::RwLock<Option<GuildId>>>,
+    calming_consumer_started: Arc<AtomicBool>,
 }
 
 impl Handler {
+    async fn handle_calming_event(
+        ctx: Context,
+        config: Arc<Config>,
+        primary_guild: Arc<tokio::sync::RwLock<Option<GuildId>>>,
+        payload: String,
+    ) {
+        let Ok(event) = serde_json::from_str::<CalmingEvent>(&payload) else {
+            return;
+        };
+        if event.event != "atrium_calming_requested" || event.data.reason != "channel_tension" {
+            return;
+        }
+        if primary_guild
+            .read()
+            .await
+            .map(|id| id.to_string())
+            .as_deref()
+            != Some(event.data.guild_id.as_str())
+        {
+            return;
+        }
+
+        // Atomique et partage entre replicas : un rappel maximum par 15 min.
+        let Ok(client) = redis::Client::open(std::env::var("REDIS_URL").unwrap_or_default()) else {
+            tracing::warn!("Rappel Atrium ignore: REDIS_URL invalide");
+            return;
+        };
+        let Ok(mut conn) = client.get_multiplexed_async_connection().await else {
+            tracing::warn!("Rappel Atrium ignore: Redis indisponible");
+            return;
+        };
+        let key = format!("atrium:calming:cooldown:{}", event.data.guild_id);
+        let accepted: redis::RedisResult<Option<String>> = redis::cmd("SET")
+            .arg(&key)
+            .arg("1")
+            .arg("NX")
+            .arg("EX")
+            .arg(CALMING_COOLDOWN_SECS)
+            .query_async(&mut conn)
+            .await;
+        if !matches!(accepted, Ok(Some(_))) {
+            return;
+        }
+
+        let message = match event.data.kind.as_str() {
+            "flood" => "🕊️ Merci de ralentir un peu : évitez les envois successifs et laissez chacun participer.",
+            "toxicity" => "🕊️ Restons respectueux. Les attaques personnelles et les propos blessants n'ont pas leur place ici.",
+            "phishing" | "unsafe_link" => "⚠️ N'ouvrez pas les liens suspects. Signalez-les à la modération et respectez les règles de sécurité.",
+            _ => "🕊️ Le ton monte un peu. Merci de prendre une pause, de rester respectueux et de suivre le règlement.",
+        };
+        if let Err(error) = config.general_channel_id.say(&ctx.http, message).await {
+            tracing::warn!(%error, "rappel apaisant Atrium non envoye");
+        } else {
+            tracing::info!(guild_id = %event.data.guild_id, kind = %event.data.kind, "rappel apaisant Atrium envoye");
+        }
+    }
+
     async fn reply(
         &self,
         guild_id: String,
@@ -224,6 +303,23 @@ impl EventHandler for Handler {
                 tracing::warn!(%error, guild_id = %guild.id, "commande /atrium non enregistree");
             }
         }
+        if !self.calming_consumer_started.swap(true, Ordering::SeqCst) {
+            let consumer = platform_common::default_consumer_name();
+            let config = Arc::clone(&self.config);
+            let primary_guild = Arc::clone(&self.primary_guild);
+            tokio::spawn(async move {
+                SENTINEL_EVENTS
+                    .listen_stream_group("atrium-bot".to_string(), consumer, move |payload| {
+                        let ctx = ctx.clone();
+                        let config = Arc::clone(&config);
+                        let primary_guild = Arc::clone(&primary_guild);
+                        async move {
+                            Handler::handle_calming_event(ctx, config, primary_guild, payload).await
+                        }
+                    })
+                    .await;
+            });
+        }
         tracing::info!(user = %ready.user.name, "Atrium Bot pret");
     }
 
@@ -338,6 +434,7 @@ async fn main() {
             config,
             channel,
             primary_guild,
+            calming_consumer_started: Arc::new(AtomicBool::new(false)),
         })
         .await
         .expect("creation client Discord");

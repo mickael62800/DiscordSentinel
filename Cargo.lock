@@ -205,6 +205,10 @@ version = "0.1.0"
 dependencies = [
  "atrium-proto",
  "dotenvy",
+ "platform-common",
+ "redis",
+ "serde",
+ "serde_json",
  "serenity",
  "tokio",
  "tonic",
