@@ -44,7 +44,11 @@ static JURONS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
 static CIBLEES: LazyLock<Vec<Regex>> = LazyLock::new(|| {
     let raw = [
         // Français
-        r"(?i)\b(con(nard|nasse)?|encul[eé]|fdp|ntm|nique|batard|b[aâ]tard|pd|p[eé]d[eé]|salop(e|ard)?|ta\s*gueule|ferme[\s-]*la|d[eé]gage)\b",
+        r"(?i)\b(con(nard|nasse)?|encul[eé](r)?|fdp|ntm|nique|batard|b[aâ]tard|pd|p[eé]d[eé]|pute|salop(e|ard)?|ta\s*gueule|ferme[\s-]*la|d[eé]gage)\b",
+        // Formulations hostiles courantes. Elles restent dans le signal local
+        // cible : si l'IA est indisponible, une menace ne doit jamais produire
+        // un score nul et passer silencieusement.
+        r"(?i)\b(fils?\s+de\s+pute|sucer?\s+de\s+bite|mangeur\s+de\s+bite|je\s+vais\s+t['’]?arracher\s+la\s+t[eê]te|t['’]?es\s+un\s+homme\s+mort)\b",
         // Anglais
         r"(?i)\b(fuck(ing|er|ed)?|bitch|asshole|bastard|dick(head)?|cunt|stfu|idiot|moron|retard(ed)?|dumb(ass)?)\b",
         // Variantes avec astérisque (f*ck, b*tch…)
@@ -176,6 +180,17 @@ mod tests {
     #[test]
     fn fr_fdp() {
         assert!(detect("fdp va", &[]));
+    }
+    #[test]
+    fn fr_insultes_et_menaces_composees() {
+        for message in [
+            "fils de pute",
+            "mangeur de bite",
+            "je vais t'arracher la tete",
+            "t'es un homme mort",
+        ] {
+            assert!(detect(message, &[]), "{message}");
+        }
     }
     #[test]
     fn fr_ntm() {

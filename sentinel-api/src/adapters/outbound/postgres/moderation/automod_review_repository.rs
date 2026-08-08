@@ -160,6 +160,23 @@ pub struct PgAutomodReviewRepository {
     pool: PgPool,
 }
 
+/// Palier de suggestion d'une carte agregee. Les incidents d'une meme carte
+/// sont une escalation : conserver uniquement l'action du dernier message
+/// laisserait une carte a "warn" alors que son score cumule a deja atteint le
+/// seuil de mute. Ces valeurs correspondent aux seuils baseline exposes dans
+/// l'interface (warn=2, delete=4, mute=6, ban=9).
+fn action_for_cumulative_score(score: f64) -> &'static str {
+    if score >= 9.0 {
+        "ban"
+    } else if score >= 6.0 {
+        "mute"
+    } else if score >= 4.0 {
+        "delete"
+    } else {
+        "warn"
+    }
+}
+
 impl PgAutomodReviewRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
@@ -257,9 +274,13 @@ impl AutomodReviewRepository for PgAutomodReviewRepository {
                 let new_count = prev.incident_count + 1;
                 let new_cumulative = prev.cumulative_score + r.score;
                 let new_max_score = prev.score.max(r.score);
-                let new_action = sentinel_core::domain::entities::moderation::review::automod::more_severe_suggested(
+                let incident_action = sentinel_core::domain::entities::moderation::review::automod::more_severe_suggested(
                     &prev.suggested_action,
                     r.suggested_action.as_str(),
+                );
+                let new_action = sentinel_core::domain::entities::moderation::review::automod::more_severe_suggested(
+                    &incident_action,
+                    action_for_cumulative_score(new_cumulative),
                 );
                 // Plafond anti-troll : la deadline ne peut etre repoussee au-dela
                 // de created_at + 7 jours (un membre tres actif ne garde pas la
