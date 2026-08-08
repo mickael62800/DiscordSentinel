@@ -517,15 +517,15 @@ pub async fn run_reconciler(ctx: &JobContext) -> Result<JobReport, DomainError> 
                             .await;
                         errors += 1;
                     }
-                    // Stopping bloque : Stopped si le container est mort,
-                    // Running s'il tourne encore (le stop n'a pas pris).
-                    GameServerStatus::Stopping if stuck && exited => {
+                    // Stopping : Stopped immédiatement dès que le container est mort (exited),
+                    // pas besoin d'attendre le seuil de 10 minutes (stuck).
+                    GameServerStatus::Stopping if exited => {
                         let _ = ctx
                             .server_repo
                             .update_status(
                                 s.id,
                                 GameServerStatus::Stopped,
-                                Some("stopping bloque, container exited (reconciler)"),
+                                Some("container absent/exited suite a l'arret (reconciler)"),
                             )
                             .await;
                         let _ = ctx.session_repo.close_all_active(s.id).await;
