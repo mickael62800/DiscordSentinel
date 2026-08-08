@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::debug;
 use tracing::info;
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::domain::entities::ai::message_analysis::MessageAnalysis;
@@ -39,6 +40,7 @@ pub struct AnalyzeMessageService {
     inference_limiter: Arc<InferenceRateLimiter>,
     inference: Option<Arc<dyn InferenceService>>,
     tokenizer: Option<Arc<dyn TextTokenizer>>,
+    deepseek_service: Option<Arc<dyn crate::ports::outbound::ai::deepseek_moderation_service::DeepSeekModerationService>>,
     /// Buffer in-memory pour la "tension de salon" (option : si None, la
     /// feature est desactivee quel que soit le contenu de la config).
     tension_buffer: Option<Arc<ChannelTensionBuffer>>,
@@ -60,8 +62,18 @@ impl AnalyzeMessageService {
             inference_limiter,
             inference: None,
             tokenizer: None,
+            deepseek_service: None,
             tension_buffer: None,
         }
+    }
+
+    /// Ajoute le service DeepSeek Moderation au pipeline.
+    pub fn with_deepseek(
+        mut self,
+        deepseek: Arc<dyn crate::ports::outbound::ai::deepseek_moderation_service::DeepSeekModerationService>,
+    ) -> Self {
+        self.deepseek_service = Some(deepseek);
+        self
     }
 
     /// Ajoute l'inference text IA au service d'analyse.
@@ -518,6 +530,58 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 content_empty = cmd.content.is_empty(),
                 "Check inference conditions"
             );
+            // 1. Ingestion DeepSeek Moderation LLM (Prioritaire si disponible et configure)
+            if text_enabled && !cmd.content.is_empty() {
+                if let Some(ds) = &self.deepseek_service {
+                    if ds.is_available() {
+                        let _permit = self.inference_limiter.acquire().await?;
+                        debug!("Lancement analyse DeepSeek Moderation...");
+                        let context_texts: Vec<String> = cmd
+                            .context_messages
+                            .iter()
+                            .map(|c| format!("{}: {}", c.username, c.content))
+                            .collect();
+
+                        match ds.analyze_message(&cmd.content, &context_texts).await {
+                            Ok(ds_analysis) => {
+                                info!(
+                                    score = ds_analysis.toxicity_score,
+                                    sentiment = %ds_analysis.sentiment,
+                                    reason = %ds_analysis.reason,
+                                    "Reponse DeepSeek Moderation recue"
+                                );
+                                if ds_analysis.toxicity_score >= text_threshold as f64 {
+                                    let ds_reason = format!("DeepSeek [{}]: {}", ds_analysis.sentiment, ds_analysis.reason);
+                                    let combined_score = result.score + ds_analysis.toxicity_score;
+                                    let action = match ds_analysis.recommended_action.as_str() {
+                                        "ban" => Action::Ban,
+                                        "mute" => Action::Mute,
+                                        "delete" => Action::Delete,
+                                        "warn" => Action::Warn,
+                                        _ => result.action.clone(),
+                                    };
+                                    let is_stronger = action_rank(&action) > action_rank(&result.action);
+                                    if is_stronger || combined_score > result.score {
+                                        result.score = combined_score;
+                                        if is_stronger {
+                                            result.action = action;
+                                        }
+                                        result.reason = if result.reason.is_empty() {
+                                            ds_reason
+                                        } else {
+                                            format!("{} | {}", result.reason, ds_reason)
+                                        };
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "Echec analyse DeepSeek Moderation, fallback ONNX/Regles");
+                            }
+                        }
+                    }
+                }
+            }
+
             if text_enabled
                 && inference.text_available()
                 && tokenizer.available()
@@ -765,6 +829,16 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 }
 
 // run_text_inference supprimee — remplacee par spawn_blocking + timeout dans analyze().
+
+fn action_rank(action: &Action) -> u8 {
+    match action {
+        Action::None => 0,
+        Action::Warn => 1,
+        Action::Delete => 2,
+        Action::Mute => 3,
+        Action::Ban => 4,
+    }
+}
 
 /// Fonction pure : transforme les classifications IA en score, flags et raison.
 /// Retourne None si aucun sentiment toxique n'est detecte au-dessus du seuil.

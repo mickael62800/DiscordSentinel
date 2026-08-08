@@ -115,6 +115,10 @@ pub async fn build_app_state(
         sentinel_core::domain::services::moderation::channel_tension::ChannelTensionBuffer::new(),
     );
 
+    let deepseek_service = Arc::new(
+        crate::adapters::outbound::deepseek_moderation_service::DeepSeekModerationAdapter::from_env(),
+    );
+
     let analyze_uc = Arc::new(
         AnalyzeMessageService::new(
             rule_repo.clone(),
@@ -123,6 +127,7 @@ pub async fn build_app_state(
             bot_config_repo.clone(),
             inference_limiter.clone(),
         )
+        .with_deepseek(deepseek_service)
         .with_text_inference(inference.clone(), tokenizer)
         .with_channel_tension(channel_tension_buffer.clone()),
     );
