@@ -16,6 +16,8 @@ use std::sync::Arc;
 
 use sentinel_proto::ai_dataset::v1::ai_dataset_service_server::AiDatasetServiceServer;
 use sentinel_proto::announcements::v1::announcements_service_server::AnnouncementsServiceServer;
+use sentinel_proto::age_gate::v1::age_gate_service_server::AgeGateServiceServer;
+use sentinel_proto::embeds::v1::embeds_service_server::EmbedsServiceServer;
 use sentinel_proto::audit::v1::audit_service_server::AuditServiceServer;
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
 use sentinel_proto::automod_review::v1::automod_review_service_server::AutomodReviewServiceServer;
@@ -55,9 +57,11 @@ use crate::adapters::inbound::grpc::audit::action_messages::DiscordActionMessage
 use crate::adapters::inbound::grpc::audit::journal::AuditGrpc;
 use crate::adapters::inbound::grpc::audit::security::SecurityGrpc;
 use crate::adapters::inbound::grpc::audit::stats::StatsGrpc;
+use crate::adapters::inbound::grpc::community::age_gate::AgeGateGrpc;
 use crate::adapters::inbound::grpc::community::announcements::AnnouncementsGrpc;
 use crate::adapters::inbound::grpc::community::bump::BumpGrpc;
 use crate::adapters::inbound::grpc::community::confessions::ConfessionsGrpc;
+use crate::adapters::inbound::grpc::community::embeds::EmbedsGrpc;
 use crate::adapters::inbound::grpc::community::ideas::IdeasGrpc;
 use crate::adapters::inbound::grpc::community::members::MembersGrpc;
 use crate::adapters::inbound::grpc::community::progression::ProgressionGrpc;
@@ -171,6 +175,13 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let announcements = AnnouncementsGrpc {
         uc: state.community.announcements_uc.clone(),
     };
+    let age_gate = AgeGateGrpc {
+        age_check_uc: state.community.age_check_uc.clone(),
+        age_ban_repo: state.community.age_ban_repo.clone(),
+    };
+    let embeds = EmbedsGrpc {
+        uc: state.community.embeds_uc.clone(),
+    };
     let automod = AutomodGrpc {
         uc: state.ai.analyze_uc.clone(),
         broadcaster: state.broadcaster.clone(),
@@ -212,6 +223,8 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let bump_svc = svc!(BumpServiceServer, bump);
     let confessions_svc = svc!(ConfessionsServiceServer, confessions);
     let announcements_svc = svc!(AnnouncementsServiceServer, announcements);
+    let age_gate_svc = svc!(AgeGateServiceServer, age_gate);
+    let embeds_svc = svc!(EmbedsServiceServer, embeds);
     let automod_svc = svc!(AutomodServiceServer, automod);
     let voice_svc = svc!(VoiceChannelsServiceServer, voice);
     let images_svc = svc!(ImagesServiceServer, images);
@@ -269,6 +282,12 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .await;
     health_reporter
         .set_serving::<AnnouncementsServiceServer<AnnouncementsGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<AgeGateServiceServer<AgeGateGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<EmbedsServiceServer<EmbedsGrpc>>()
         .await;
     health_reporter
         .set_serving::<AutomodServiceServer<AutomodGrpc>>()
@@ -352,6 +371,8 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .add_service(bump_svc)
         .add_service(confessions_svc)
         .add_service(announcements_svc)
+        .add_service(age_gate_svc)
+        .add_service(embeds_svc)
         .add_service(automod_svc)
         .add_service(voice_svc)
         .add_service(images_svc)

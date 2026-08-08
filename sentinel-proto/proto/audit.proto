@@ -21,6 +21,19 @@ service AuditService {
   // Enregistre un evenement de moderation et decide s'il constitue une
   // anomalie. La DECISION est server-side : le bot n'affiche que l'alerte.
   rpc DetectModerationAnomaly(DetectAnomalyRequest) returns (DetectAnomalyResponse);
+  // Retrouve le contenu d'un message a partir de son id Discord (fallback DB du
+  // bot a l'edition, quand le cache RAM serenity n'a plus l'ancien contenu).
+  rpc GetActivityByMessage(GetActivityByMessageRequest) returns (GetActivityByMessageResponse);
+}
+
+message GetActivityByMessageRequest {
+  string guild_id = 1;
+  string message_id = 2;
+}
+
+message GetActivityByMessageResponse {
+  // Absent si aucune activite trouvee, ou si l'activite n'a pas de contenu.
+  optional string content = 1;
 }
 
 // Entree du journal, reduite aux champs que le bot affiche reellement.

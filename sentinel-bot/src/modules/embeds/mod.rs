@@ -16,7 +16,8 @@ use serenity::model::id::{ChannelId, MessageId};
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use crate::shared::heartbeat::ApiClientKey;
+use crate::shared::grpc_client::{grpc_err_to_string, GrpcClientKey};
+use sentinel_proto::embeds::v1 as proto_embeds;
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 struct EmbedField {
@@ -184,14 +185,17 @@ fn build_embed(p: &RenderedEmbedPost) -> CreateEmbed {
 }
 
 async fn report_posted(ctx: &Context, embed_id: &str, channel_id: &str, message_id: &str) {
-    let api = {
+    let grpc = {
         let data = ctx.data.read().await;
-        data.get::<ApiClientKey>().cloned()
+        data.get::<GrpcClientKey>().cloned()
     };
-    let Some(api) = api else { return };
-    let body = serde_json::json!({ "channel_id": channel_id, "message_id": message_id });
-    let path = format!("/api/embeds/by-id/{embed_id}/posted");
-    if let Err(e) = api.post_json::<_, serde_json::Value>(&path, &body).await {
+    let Some(grpc) = grpc else { return };
+    let req = proto_embeds::RecordPostedRequest {
+        embed_id: embed_id.to_string(),
+        channel_id: channel_id.to_string(),
+        message_id: message_id.to_string(),
+    };
+    if let Err(e) = crate::grpc_call!(@unit &grpc, embeds, record_posted, req) {
         warn!(embed_id, error = %e, "Echec report embed posted");
     }
 }

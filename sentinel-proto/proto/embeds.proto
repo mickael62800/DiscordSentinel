@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package sentinel.embeds.v1;
+
+// Service embeds : callback du bot apres publication d'un embed construit via
+// le back-office. Wrappe la partie « report » de `ManageEmbedsUseCase` (le
+// reste — create/update/list/prepare — est web/worker, hors bot).
+service EmbedsService {
+  // Enregistre les refs Discord (salon + message) d'un embed poste, pour
+  // permettre son edition ulterieure.
+  rpc RecordPosted(RecordPostedRequest) returns (EmbedsAck);
+}
+
+message EmbedsAck {}
+
+message RecordPostedRequest {
+  // UUID de l'embed.
+  string embed_id = 1;
+  string channel_id = 2;
+  string message_id = 3;
+}

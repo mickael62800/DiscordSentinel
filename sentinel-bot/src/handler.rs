@@ -15,9 +15,11 @@ use serenity::model::id::{ChannelId, GuildId, MessageId, RoleId};
 use serenity::model::user::User;
 use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
-use tracing::info;
+use tracing::{info, warn};
 
+use crate::shared::grpc_client::{grpc_err_to_string, GrpcClientKey};
 use crate::shared::heartbeat::{register_guilds, ApiClientKey};
+use sentinel_proto::members::v1 as proto_members;
 
 use crate::modules;
 
@@ -331,11 +333,12 @@ impl EventHandler for Handler {
         // peut rejouer (wallet repart de zero, gere cote serveur).
         let guild_id = new_member.guild_id.to_string();
         let user_id = new_member.user.id.to_string();
-        let api = ctx.data.read().await.get::<ApiClientKey>().cloned();
-        if let Some(api) = api {
-            let path = format!("/api/members/{guild_id}/{user_id}/rejoin");
-            api.post_fire_and_forget(&path, &serde_json::json!({}))
-                .await;
+        let grpc = ctx.data.read().await.get::<GrpcClientKey>().cloned();
+        if let Some(grpc) = grpc {
+            let req = proto_members::MemberLifecycleRequest { guild_id, user_id };
+            if let Err(e) = crate::grpc_call!(@unit &grpc, members, rejoin_member, req) {
+                warn!(error = %e, "Echec callback rejoin membre");
+            }
         }
     }
 
@@ -354,11 +357,15 @@ impl EventHandler for Handler {
         // non-jeu (infractions, audit, stats) sont conservees.
         let g = guild_id.to_string();
         let u = user.id.to_string();
-        let api = ctx.data.read().await.get::<ApiClientKey>().cloned();
-        if let Some(api) = api {
-            let path = format!("/api/members/{g}/{u}/leave");
-            api.post_fire_and_forget(&path, &serde_json::json!({}))
-                .await;
+        let grpc = ctx.data.read().await.get::<GrpcClientKey>().cloned();
+        if let Some(grpc) = grpc {
+            let req = proto_members::MemberLifecycleRequest {
+                guild_id: g,
+                user_id: u,
+            };
+            if let Err(e) = crate::grpc_call!(@unit &grpc, members, leave_member, req) {
+                warn!(error = %e, "Echec callback leave membre");
+            }
         }
     }
 

@@ -30,7 +30,7 @@ Les 7 crates Sentinel sont propres à clippy, tous targets compris. Mais **rien 
 
 ---
 
-## 3. Migration gRPC : ~12 appels HTTP restants dans le bot
+## 3. Migration gRPC : ~3 appels HTTP restants dans le bot (hors config transverse et API externes)
 
 > Note : le module `rotation` (administrateur tournant, 5 appels) n'a **pas** été migré mais **entièrement supprimé** (bot + API + core + web + tables `admin_rotation*`, migration `018`).
 
@@ -45,11 +45,20 @@ Les modules qui ont déjà un service proto sont terminés. Ce qui reste apparti
 | ~~`moderation/ban_sursis`~~ | ~~4~~ ✅ | **FAIT** — `SursisService` (proto `sursis`, handler `grpc/moderation/sursis.rs`) : Create / Get / Resolve. Le délai d'appel reste lu server-side dans la config guild. |
 | ~~`security` (5 fichiers)~~ | ~~6~~ ✅ | **FAIT** — nouveau `SecurityStateService` (proto `security_state`, handler `grpc/system/security_state.rs`). Quarantine/slowmode/lockdown migrés. |
 | ~~`announcements`~~ | ~~2~~ ✅ | **FAIT** — `AnnouncementsService` (proto `announcements`, handler `grpc/community/announcements.rs`) : RecordRunResult + RecordButtonClick. |
-| `welcome/handler` | 2 | |
-| `handler.rs`, `sync.rs`, `logs_setup.rs` | 4 | Hors module |
-| divers (`audit/handlers/message`, `embeds`, `tickets`, `voice`, `moderation/appeal`) | 5 | 1 appel chacun |
+| ~~`welcome/handler`~~ | ~~2~~ ✅ | **FAIT** — `AgeGateService` (proto `age_gate`, handler `grpc/community/age_gate.rs`) : CheckAge (décision seuil/ban server-side) + RecordAgeBan. |
+| ~~`handler.rs` (rejoin/leave)~~ | ~~2~~ ✅ | **FAIT** — 2 RPC ajoutés au `MembersService` existant : `LeaveMember` / `RejoinMember`. |
+| ~~`embeds`~~ | ~~1~~ ✅ | **FAIT** — `EmbedsService` (proto `embeds`) : `RecordPosted`. |
+| ~~`moderation/appeal`~~ | ~~1 (en fait 4)~~ ✅ | **FAIT** — réutilise `ModerationService` (GetHistory + CancelAction) et `TicketsService` (CreateTicket ×2). Zéro nouveau proto. |
+| ~~`audit/handlers/message`~~ | ~~1~~ ✅ | **FAIT** — 1 RPC ajouté à `AuditService` : `GetActivityByMessage` (fallback DB de l'ancien contenu à l'édition). |
 
-Estimation : ~6 nouveaux services proto restants (+ tranche 2 automod : discussions/discord-messages sur services existants).
+**Nettoyage effectué** : `BaseApiClient::{get_json, post_json}` et leurs 4 helpers d'erreur HTTP supprimés — le bot n'émet plus **aucun** GET/POST-avec-réponse en HTTP.
+
+Restent en HTTP/reqwest brut (hors des helpers) :
+- `audit/handlers/member.rs` → `POST /api/name-history` (à migrer)
+- `guild_backup/restore.rs` → `base.client()` (à auditer)
+- `automod/backend.rs` → `POST /api/ai/jobs` (soumission vision à l'ai-worker, hors périmètre)
+- `nasa_apod` → `base.client()` pour appeler NASA/DeepL (**API externes**, légitime, à garder)
+- config transverse : `get_guild_config_for` (lecture, 93 sites via 1 helper) + `post_fire_and_forget /api/bots/config` (écriture) → candidats `BotConfigService`.
 
 > **À nettoyer (suite security)** : les endpoints HTTP `POST/GET /api/security/quarantine`,
 > `/api/security/quarantine/active`, `DELETE .../{g}/{u}`, `POST /api/security/{slowmode,lockdown}`

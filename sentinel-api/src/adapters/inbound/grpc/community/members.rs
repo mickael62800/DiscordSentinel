@@ -118,6 +118,30 @@ impl MembersService for MembersGrpc {
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Empty {}))
     }
+
+    async fn leave_member(
+        &self,
+        request: Request<proto::MemberLifecycleRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        self.uc
+            .leave_member(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Empty {}))
+    }
+
+    async fn rejoin_member(
+        &self,
+        request: Request<proto::MemberLifecycleRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        self.uc
+            .rejoin_member(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Empty {}))
+    }
 }
 
 fn member_to_proto(m: GuildMember) -> Result<proto::GuildMember, Status> {

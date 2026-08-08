@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package sentinel.age_gate.v1;
+
+// Service age_gate : verification d'age au reglement. La DECISION (seuil
+// pass/ban + duree) est prise cote serveur ; le bot n'execute que l'action
+// Discord et enregistre le ban pour le deban automatique du worker.
+// Wrappe `EvaluateAgeDeclarationUseCase` + `AgeBanRepository`.
+service AgeGateService {
+  // Decide l'issue d'une declaration d'age (Grant ou Ban temporaire).
+  rpc CheckAge(CheckAgeRequest) returns (AgeCheckDecision);
+  // Enregistre un ban de verification d'age (source du deban auto par le worker).
+  rpc RecordAgeBan(RecordAgeBanRequest) returns (AgeGateAck);
+}
+
+message AgeGateAck {}
+
+message CheckAgeRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  int32 declared_age = 3;
+}
+
+message AgeCheckDecision {
+  // true = age suffisant (le bot assigne le role membre).
+  bool grant = 1;
+  // Champs renseignes uniquement si grant=false (ban temporaire) :
+  int32 years = 2;
+  // RFC3339 ; vide si grant.
+  string unban_at = 3;
+  string reason = 4;
+}
+
+message RecordAgeBanRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  int32 declared_age = 3;
+  // RFC3339 : date de deban automatique.
+  string unban_at = 4;
+}

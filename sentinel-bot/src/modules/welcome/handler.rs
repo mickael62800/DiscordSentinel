@@ -11,7 +11,9 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use crate::shared::discord_helpers::is_module_enabled;
+use crate::shared::grpc_client::{grpc_err_to_string, GrpcClientKey};
 use crate::shared::heartbeat::ApiClientKey;
+use sentinel_proto::age_gate::v1 as proto_age;
 
 use super::api_client::WelcomeApiClient;
 use super::template;
@@ -23,11 +25,10 @@ pub const AGE_MODAL_ID: &str = "sentinel_age_modal";
 /// custom_id du champ de saisie de l'age dans le modal.
 pub const AGE_INPUT_ID: &str = "age";
 
-/// Reponse de `POST /api/welcome/{guild}/age-check` : DECISION prise
-/// server-side (seuil pass/ban + duree du ban). Le bot n'execute que l'action
-/// Discord correspondante. Miroir de `AgeCheckDecisionDto` cote API.
-#[derive(Debug, serde::Deserialize)]
-#[serde(tag = "decision", rename_all = "snake_case")]
+/// Decision de la verification d'age, prise server-side (seuil pass/ban +
+/// duree). Le bot n'execute que l'action Discord correspondante. Reconstruite
+/// depuis `AgeGateService::CheckAge` (gRPC).
+#[derive(Debug)]
 enum AgeCheckDecisionResponse {
     /// Age suffisant -> assignation du role membre.
     Grant,
@@ -1028,12 +1029,12 @@ pub async fn handle_age_modal(
     // DECISION age-check server-side : le bot delegue la regle metier (seuil
     // pass/ban + duree du ban) a l'API et n'execute que l'action Discord.
     let decision = {
-        let base = {
+        let grpc = {
             let data = ctx.data.read().await;
-            data.get::<ApiClientKey>().map(Arc::clone)
+            data.get::<GrpcClientKey>().map(Arc::clone)
         };
-        let base = match base {
-            Some(b) => b,
+        let grpc = match grpc {
+            Some(g) => g,
             None => {
                 warn!(guild = %guild_id, "API indisponible pour la verification d'age");
                 reply_modal(
@@ -1045,16 +1046,18 @@ pub async fn handle_age_modal(
                 return;
             }
         };
-        let body = serde_json::json!({
-            "user_id": user_id.to_string(),
-            "declared_age": age,
-        });
-        let path = format!("/api/welcome/{guild_id}/age-check");
-        match base
-            .post_json::<_, AgeCheckDecisionResponse>(&path, &body)
-            .await
-        {
-            Ok(d) => d,
+        let req = proto_age::CheckAgeRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            declared_age: age,
+        };
+        match crate::grpc_call!(&grpc, age_gate, check_age, req) {
+            Ok(d) if d.grant => AgeCheckDecisionResponse::Grant,
+            Ok(d) => AgeCheckDecisionResponse::Ban {
+                years: d.years,
+                unban_at: d.unban_at,
+                reason: d.reason,
+            },
             Err(e) => {
                 warn!(error = %e, guild = %guild_id, "Echec decision age-check server-side");
                 reply_modal(
@@ -1100,19 +1103,17 @@ pub async fn handle_age_modal(
         }
 
         // Enregistre le ban (source de verite du deban automatique par le worker).
-        if let Some(base) = {
+        if let Some(grpc) = {
             let data = ctx.data.read().await;
-            data.get::<ApiClientKey>().map(Arc::clone)
+            data.get::<GrpcClientKey>().map(Arc::clone)
         } {
-            let body = serde_json::json!({
-                "guild_id": guild_id.to_string(),
-                "user_id": user_id.to_string(),
-                "declared_age": age,
-                "unban_at": unban_at.to_rfc3339(),
-            });
-            let res: Result<serde_json::Value, String> =
-                base.post_json("/api/age-bans", &body).await;
-            if let Err(e) = res {
+            let req = proto_age::RecordAgeBanRequest {
+                guild_id: guild_id.to_string(),
+                user_id: user_id.to_string(),
+                declared_age: age,
+                unban_at: unban_at.to_rfc3339(),
+            };
+            if let Err(e) = crate::grpc_call!(@unit &grpc, age_gate, record_age_ban, req) {
                 warn!(error = %e, "Echec enregistrement age-ban (deban auto compromis)");
             }
         }

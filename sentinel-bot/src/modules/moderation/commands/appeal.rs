@@ -10,7 +10,10 @@ use serenity::model::id::UserId;
 use tracing::{info, warn};
 
 use crate::shared::discord_helpers::reply_ephemeral;
+use crate::shared::grpc_client::{grpc_err_to_string, GrpcClientKey};
 use crate::shared::heartbeat::ApiClientKey;
+use sentinel_proto::moderation::v1 as proto_mod;
+use sentinel_proto::tickets::v1 as proto_tickets;
 
 pub const APPEAL_PREFIX: &str = "sentinel_mod_appeal_";
 /// Bouton modo « Voter pour annuler » : `mod_appeal_votecancel_{action_id}`.
@@ -86,9 +89,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
-        Some(b) => b,
+    let grpc = match ctx.data.read().await.get::<GrpcClientKey>().cloned() {
+        Some(g) => g,
         None => {
             reply_ephemeral(ctx, command, "Erreur interne.").await;
             return;
@@ -98,17 +100,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // MOD #9 (a) — verifier que l'appelant a bien une sanction a contester.
     // En cas d'erreur reseau on reste permissif (on n'empeche pas un appel
     // legitime), mais une absence confirmee de sanction stoppe la creation.
-    match base
-        .get_json::<serde_json::Value>(&format!("/api/moderation/history/{}/{}", guild_id, user_id))
-        .await
-    {
+    let hist_req = proto_mod::GetHistoryRequest {
+        guild_id: guild_id.to_string(),
+        user_id: user_id.clone(),
+    };
+    match crate::grpc_call!(&grpc, moderation, get_history, hist_req) {
         Ok(history) => {
-            let has_sanction = history
-                .get("actions")
-                .and_then(|a| a.as_array())
-                .map(|a| !a.is_empty())
-                .unwrap_or(false);
-            if !has_sanction {
+            if history.actions.is_empty() {
                 reply_ephemeral(
                     ctx,
                     command,
@@ -124,19 +122,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Ticket dashboard (best-effort, pour le suivi cote web).
-    let req = base
-        .client()
-        .post(format!("{}/api/tickets", base.base_url()))
-        .json(&serde_json::json!({
-            "title": format!("Appel de sanction — {}", command.user.name),
-            "priority": "medium",
-            "author_id": command.user.id.to_string(),
-            "author_name": command.user.name,
-            "server": guild_id.to_string(),
-            "category": "appel_sanction",
-            "ticket_type": "appel_sanction",
-        }));
-    if let Err(e) = base.auth(req).send().await {
+    let ticket_req = proto_tickets::CreateTicketRequest {
+        title: format!("Appel de sanction — {}", command.user.name),
+        priority: "medium".to_string(),
+        author_id: command.user.id.to_string(),
+        author_name: command.user.name.clone(),
+        server: guild_id.to_string(),
+        category: "appel_sanction".to_string(),
+        ticket_type: "appel_sanction".to_string(),
+        channel_id: None,
+        guild_id: Some(guild_id.to_string()),
+    };
+    if let Err(e) = crate::grpc_call!(@unit &grpc, tickets, create_ticket, ticket_req) {
         warn!(error = %e, "Ticket appel (dashboard) non cree — on continue");
     }
 
@@ -327,24 +324,24 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
     };
 
     // Ticket dashboard (best-effort). On lit le client puis on relache le lock.
-    {
-        let data = ctx.data.read().await;
-        if let Some(base) = data.get::<ApiClientKey>() {
-            let req = base
-                .client()
-                .post(format!("{}/api/tickets", base.base_url()))
-                .json(&serde_json::json!({
-                    "title": format!("Appel de sanction — {} (action: {})", component.user.name, &action_id[..8.min(action_id.len())]),
-                    "priority": "medium",
-                    "author_id": component.user.id.to_string(),
-                    "author_name": component.user.name,
-                    "server": found_guild,
-                    "category": "appel_sanction",
-                    "ticket_type": "appel_sanction",
-                }));
-            if let Err(e) = base.auth(req).send().await {
-                warn!(error = %e, "Ticket appel (dashboard) non cree — on continue");
-            }
+    if let Some(grpc) = ctx.data.read().await.get::<GrpcClientKey>().cloned() {
+        let ticket_req = proto_tickets::CreateTicketRequest {
+            title: format!(
+                "Appel de sanction — {} (action: {})",
+                component.user.name,
+                &action_id[..8.min(action_id.len())]
+            ),
+            priority: "medium".to_string(),
+            author_id: component.user.id.to_string(),
+            author_name: component.user.name.clone(),
+            server: found_guild.clone(),
+            category: "appel_sanction".to_string(),
+            ticket_type: "appel_sanction".to_string(),
+            channel_id: None,
+            guild_id: Some(found_guild.clone()),
+        };
+        if let Err(e) = crate::grpc_call!(@unit &grpc, tickets, create_ticket, ticket_req) {
+            warn!(error = %e, "Ticket appel (dashboard) non cree — on continue");
         }
     }
 
@@ -500,17 +497,21 @@ async fn ensure_admin(ctx: &Context, component: &ComponentInteraction) -> bool {
 /// Appelle DELETE /api/moderation/actions/{id} (leve la sanction : unban/unmute,
 /// annule les rappels, retire l'action). Renvoie Ok si succes.
 async fn do_cancel_action(ctx: &Context, action_id: &str) -> Result<(), String> {
-    let data = ctx.data.read().await;
-    let base = data.get::<ApiClientKey>().ok_or("api indisponible")?;
-    let req = base.client().delete(format!(
-        "{}/api/moderation/actions/{action_id}",
-        base.base_url()
-    ));
-    let resp = base.auth(req).send().await.map_err(|e| e.to_string())?;
-    if resp.status().is_success() {
+    let grpc = ctx
+        .data
+        .read()
+        .await
+        .get::<GrpcClientKey>()
+        .cloned()
+        .ok_or("api indisponible")?;
+    let req = proto_mod::CancelActionRequest {
+        action_id: action_id.to_string(),
+    };
+    let resp = crate::grpc_call!(&grpc, moderation, cancel_action, req)?;
+    if resp.cancelled {
         Ok(())
     } else {
-        Err(format!("HTTP {}", resp.status()))
+        Err("annulation refusee (introuvable ou deja levee)".to_string())
     }
 }
 

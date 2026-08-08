@@ -11,6 +11,16 @@ service MembersService {
   rpc RegisterMember(RegisterMemberRequest) returns (Empty);
   rpc RemoveMember(RemoveMemberRequest) returns (Empty);
   rpc UpdateMember(UpdateMemberRequest) returns (Empty);
+
+  // Cycle de vie : depart (set left_at + reset wallet) et retour (clear left_at
+  // + reset joined_at). Appeles par le bot sur guild_member_removal/addition.
+  rpc LeaveMember(MemberLifecycleRequest) returns (Empty);
+  rpc RejoinMember(MemberLifecycleRequest) returns (Empty);
+}
+
+message MemberLifecycleRequest {
+  string guild_id = 1;
+  string user_id = 2;
 }
 
 message Empty {}

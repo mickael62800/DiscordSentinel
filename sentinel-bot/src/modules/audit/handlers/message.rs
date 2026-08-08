@@ -4,6 +4,8 @@ use serenity::model::id::{ChannelId, GuildId, MessageId};
 use serenity::prelude::*;
 
 use crate::shared::embeds::{critical_embed, info_embed, moderate_embed};
+use crate::shared::grpc_client::{grpc_err_to_string, GrpcClientKey};
+use sentinel_proto::audit::v1 as proto_audit;
 
 use super::MessageCacheKey;
 use super::{audit_event, watched_users};
@@ -276,22 +278,20 @@ pub async fn handle_update(
     // Permet de retrouver l'ancien contenu meme apres restart du bot ou
     // pour les messages anciens hors cache.
     if old_content.is_empty() {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<crate::shared::heartbeat::ApiClientKey>() {
-            #[derive(serde::Deserialize)]
-            struct ActivityHit {
-                content: Option<String>,
-            }
-            let url = format!("/api/user-activity/{}/by-message/{}", gid, event.id);
-            match api.get_json::<Option<ActivityHit>>(&url).await {
-                Ok(Some(hit)) => {
-                    if let Some(c) = hit.content {
+        let grpc = ctx.data.read().await.get::<GrpcClientKey>().cloned();
+        if let Some(grpc) = grpc {
+            let req = proto_audit::GetActivityByMessageRequest {
+                guild_id: gid.to_string(),
+                message_id: event.id.to_string(),
+            };
+            match crate::grpc_call!(&grpc, audit, get_activity_by_message, req) {
+                Ok(resp) => {
+                    if let Some(c) = resp.content {
                         if !c.is_empty() {
                             old_content = c;
                         }
                     }
                 }
-                Ok(None) => {} // pas trouve, on garde vide
                 Err(e) => tracing::warn!(
                     error = %e,
                     message_id = %event.id,

@@ -481,50 +481,12 @@ impl BaseApiClient {
     }
 
     // ── HTTP Helpers ──
-    // Eliminent le boilerplate repete dans chaque api_client de bot.
-
-    /// GET JSON vers l'API. Retourne le body deserialise.
-    pub async fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, String> {
-        let req = self.client.get(format!("{}{}", self.base_url, path));
-        let resp = self
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| network_error_message("GET", path, &e.to_string()))?;
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(friendly_api_error("GET", path, status, &body));
-        }
-        resp.json::<T>()
-            .await
-            .map_err(|e| parse_error_message("GET", path, &e.to_string()))
-    }
-
-    /// POST JSON vers l'API. Retourne le body deserialise.
-    pub async fn post_json<B: serde::Serialize, T: serde::de::DeserializeOwned>(
-        &self,
-        path: &str,
-        body: &B,
-    ) -> Result<T, String> {
-        let req = self
-            .client
-            .post(format!("{}{}", self.base_url, path))
-            .json(body);
-        let resp = self
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| network_error_message("POST", path, &e.to_string()))?;
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let text = resp.text().await.unwrap_or_default();
-            return Err(friendly_api_error("POST", path, status, &text));
-        }
-        resp.json::<T>()
-            .await
-            .map_err(|e| parse_error_message("POST", path, &e.to_string()))
-    }
+    //
+    // `get_json` / `post_json` ont ete supprimes : le bot n'emet plus AUCUN
+    // GET/POST-avec-reponse en HTTP (tout est passe en gRPC). Seuls subsistent
+    // `post_fire_and_forget` (ecriture de config transverse `/api/bots/config`)
+    // et `get_guild_config_for` (lecture de config transverse) — candidats a un
+    // futur `BotConfigService`.
 
     /// POST fire-and-forget vers l'API. Log l'erreur mais ne la propage pas.
     pub async fn post_fire_and_forget<B: serde::Serialize>(&self, path: &str, body: &B) {
@@ -580,66 +542,7 @@ impl BaseApiClient {
 // message generique sinon. La version technique est loggee via tracing
 // pour le debug.
 
-/// Construit un message d'erreur lisible a partir d'une reponse HTTP non-2xx.
-/// - 4xx : tente de parser `{"error": "..."}` et retourne juste le message.
-/// - 5xx : retourne un message generique "service indisponible".
-/// - autre : fallback generique.
-fn friendly_api_error(method: &str, path: &str, status: reqwest::StatusCode, body: &str) -> String {
-    tracing::warn!(
-        method,
-        path,
-        status = %status,
-        body,
-        "Erreur API"
-    );
-
-    if status.is_client_error() {
-        if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
-            if let Some(msg) = v.get("error").and_then(|e| e.as_str()) {
-                return strip_error_prefix(msg).to_string();
-            }
-            if let Some(msg) = v.get("message").and_then(|e| e.as_str()) {
-                return strip_error_prefix(msg).to_string();
-            }
-        }
-        if !body.is_empty() && body.len() < 300 {
-            return strip_error_prefix(body).to_string();
-        }
-        return "Requete refusee.".to_string();
-    }
-
-    if status.is_server_error() {
-        return "Service temporairement indisponible. Reessaie dans un instant.".to_string();
-    }
-
-    "Une erreur est survenue.".to_string()
-}
-
-/// Retire les prefixes techniques courants (`Donnees invalides : `, etc.)
-/// pour ne garder que le message metier.
-fn strip_error_prefix(msg: &str) -> &str {
-    const PREFIXES: &[&str] = &[
-        "Donnees invalides : ",
-        "Donnees invalides: ",
-        "Données invalides : ",
-        "Données invalides: ",
-        "Validation : ",
-        "Validation: ",
-    ];
-    for p in PREFIXES {
-        if let Some(rest) = msg.strip_prefix(p) {
-            return rest;
-        }
-    }
-    msg
-}
-
-fn network_error_message(method: &str, path: &str, detail: &str) -> String {
-    tracing::warn!(method, path, detail, "Erreur reseau API");
-    "Connexion a l'API impossible. Reessaie dans un instant.".to_string()
-}
-
-fn parse_error_message(method: &str, path: &str, detail: &str) -> String {
-    tracing::warn!(method, path, detail, "Erreur parsing reponse API");
-    "Reponse de l'API illisible. Reessaie dans un instant.".to_string()
-}
+// Les helpers de mise en forme des erreurs HTTP (`friendly_api_error`,
+// `strip_error_prefix`, `network_error_message`, `parse_error_message`) ont ete
+// supprimes avec `get_json`/`post_json` : plus aucun appel HTTP avec reponse
+// n'en a besoin. Les erreurs gRPC sont mises en forme par `grpc_err_to_string`.

@@ -46,6 +46,8 @@ use sentinel_proto::bump::v1::bump_service_client::BumpServiceClient;
 use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
 use sentinel_proto::confessions::v1::confessions_service_client::ConfessionsServiceClient;
 use sentinel_proto::announcements::v1::announcements_service_client::AnnouncementsServiceClient;
+use sentinel_proto::age_gate::v1::age_gate_service_client::AgeGateServiceClient;
+use sentinel_proto::embeds::v1::embeds_service_client::EmbedsServiceClient;
 use sentinel_proto::discord_messages::v1::discord_action_messages_service_client::DiscordActionMessagesServiceClient;
 use sentinel_proto::guild_backup::v1::guild_backup_service_client::GuildBackupServiceClient;
 use sentinel_proto::ideas::v1::ideas_service_client::IdeasServiceClient;
@@ -363,6 +365,20 @@ impl SentinelGrpcClient {
         )
         .send_compressed(CompressionEncoding::Gzip)
         .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `EmbedsService` (callback embed posté).
+    pub fn embeds(&self) -> EmbedsServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        EmbedsServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Retourne un client `AgeGateService` (verification d'age au reglement).
+    pub fn age_gate(&self) -> AgeGateServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        AgeGateServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
     }
 
     /// Retourne un client `AnnouncementsService` (callbacks d'annonces).

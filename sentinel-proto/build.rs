@@ -22,6 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_client(true)
         .compile_protos(
             &[
+                "proto/age_gate.proto",
                 "proto/ai_dataset.proto",
                 "proto/announcements.proto",
                 "proto/audit.proto",
@@ -32,6 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "proto/community.proto",
                 "proto/confessions.proto",
                 "proto/discord_messages.proto",
+                "proto/embeds.proto",
                 "proto/export.proto",
                 "proto/guild_backup.proto",
                 "proto/ideas.proto",

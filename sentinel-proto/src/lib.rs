@@ -130,6 +130,18 @@ pub mod announcements {
     }
 }
 
+pub mod age_gate {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.age_gate.v1");
+    }
+}
+
+pub mod embeds {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.embeds.v1");
+    }
+}
+
 pub mod voice {
     pub mod v1 {
         tonic::include_proto!("sentinel.voice.v1");

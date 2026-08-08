@@ -213,4 +213,19 @@ impl AuditService for AuditGrpc {
             }),
         }))
     }
+
+    async fn get_activity_by_message(
+        &self,
+        request: Request<proto::GetActivityByMessageRequest>,
+    ) -> Result<Response<proto::GetActivityByMessageResponse>, Status> {
+        let req = request.into_inner();
+        let activity = self
+            .user_activity_repo
+            .find_by_message_id(&req.guild_id, &req.message_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::GetActivityByMessageResponse {
+            content: activity.and_then(|a| a.content),
+        }))
+    }
 }
