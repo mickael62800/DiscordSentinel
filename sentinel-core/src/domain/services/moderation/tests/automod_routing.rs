@@ -199,7 +199,41 @@ fn decide_approved_auto_action_is_applied() {
     i.score = 6.0;
     i.selective_auto_actions = true;
     i.auto_mute = true;
-    assert_eq!(decide(&i).route, Routing::Auto);
+    let decision = decide(&i);
+    assert_eq!(decision.route, Routing::Auto);
+    assert!(decision.auto_action);
+}
+
+#[test]
+fn selective_auto_action_keeps_a_review_card_when_review_is_enabled() {
+    let f = flags(false, true, false, false);
+    let mut i = base(&f, "insulte");
+    i.action = Action::Mute;
+    i.score = 6.0;
+    i.log_channel_set = true;
+    i.ai_review_mode = true;
+    i.selective_auto_actions = true;
+    i.auto_mute = true;
+
+    let decision = decide(&i);
+    assert_eq!(decision.route, Routing::Card);
+    assert!(decision.auto_action);
+}
+
+#[test]
+fn cap_ban_to_mute_when_mute_is_the_only_allowed_auto_action() {
+    assert_eq!(
+        cap_to_allowed_auto_action(&Action::Ban, true, false, false, true, false, false),
+        Action::Mute
+    );
+}
+
+#[test]
+fn cap_never_escalates_a_lower_unapproved_action() {
+    assert_eq!(
+        cap_to_allowed_auto_action(&Action::Warn, true, false, false, true, false, false),
+        Action::Warn
+    );
 }
 
 // ── decide : ai_review_mode + seuil ──────────────────────────────────────

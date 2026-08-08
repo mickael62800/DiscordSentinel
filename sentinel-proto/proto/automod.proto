@@ -135,6 +135,8 @@ message AnalyzeMessageResponse {
   bool severe = 6;
   // Lien non autorise HORS image : suppression automatique immediate.
   bool auto_delete_link = 7;
+  // Execute l'action en plus d'une eventuelle carte de review.
+  bool auto_action = 8;
 }
 
 // ── Slowmode adaptatif ──

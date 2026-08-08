@@ -803,7 +803,9 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         // 3bis. Decision de routage (DECIDE = API) : on connait ici la config
         // guild + le score + les flags. Le bot n'aura qu'a EXECUTER.
         let routing = {
-            use crate::domain::services::moderation::automod_routing::{decide, RoutingInputs};
+            use crate::domain::services::moderation::automod_routing::{
+                cap_to_allowed_auto_action, decide, RoutingInputs,
+            };
             let cfg_str = |k: &str| {
                 automod_entries
                     .iter()
@@ -819,16 +821,31 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 |k: &str, d: f64| cfg_str(k).and_then(|v| v.parse::<f64>().ok()).unwrap_or(d);
             let cfg_u64 =
                 |k: &str, d: u64| cfg_str(k).and_then(|v| v.parse::<u64>().ok()).unwrap_or(d);
-            // Un kick est le repli explicite d'un ban non autorise. Il ne
-            // peut jamais apparaitre sans que l'admin ait active ce toggle.
-            if matches!(result.action, Action::Ban)
-                && cfg_bool("auto_actions_selective_enabled", false)
-                && !cfg_bool("auto_ban_enabled", false)
-                && cfg_bool("auto_kick_enabled", false)
-                && !cfg_bool("human_only_enabled", false)
-            {
-                result.action = Action::Kick;
-                result.reason = format!("{} | Ban converti en kick autorise", result.reason);
+            let selective_auto_actions = cfg_bool("auto_actions_selective_enabled", false);
+            let auto_warn = cfg_bool("auto_warn_enabled", true);
+            let auto_delete = cfg_bool("auto_delete_enabled", true);
+            let auto_mute = cfg_bool("auto_mute_enabled", true);
+            let auto_kick = cfg_bool("auto_kick_enabled", false);
+            let auto_ban = cfg_bool("auto_ban_enabled", false);
+            let capped_action = cap_to_allowed_auto_action(
+                &result.action,
+                selective_auto_actions,
+                auto_warn,
+                auto_delete,
+                auto_mute,
+                auto_kick,
+                auto_ban,
+            );
+            if capped_action != result.action {
+                result.reason = format!(
+                    "{} | Sanction automatique ramenee a {} par la configuration",
+                    result.reason,
+                    capped_action.as_str()
+                );
+                result.action = capped_action;
+                if matches!(result.action, Action::Mute) {
+                    result.duration = Some(mute_duration_secs);
+                }
             }
             decide(&RoutingInputs {
                 flags: &cmd.flags,
@@ -838,12 +855,12 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 human_only: cfg_bool("human_only_enabled", false),
                 auto_protect: cfg_bool("auto_protect_enabled", true),
                 auto_delete_links: cfg_bool("auto_delete_links_enabled", false),
-                selective_auto_actions: cfg_bool("auto_actions_selective_enabled", false),
-                auto_warn: cfg_bool("auto_warn_enabled", true),
-                auto_delete: cfg_bool("auto_delete_enabled", true),
-                auto_mute: cfg_bool("auto_mute_enabled", true),
-                auto_kick: cfg_bool("auto_kick_enabled", false),
-                auto_ban: cfg_bool("auto_ban_enabled", false),
+                selective_auto_actions,
+                auto_warn,
+                auto_delete,
+                auto_mute,
+                auto_kick,
+                auto_ban,
                 ai_review_mode: cfg_bool("ai_review_mode", true),
                 review_min_score: cfg_f64("review_min_score", 0.0),
                 log_channel_set: cfg_u64("log_channel_id", 0) != 0,
@@ -877,6 +894,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
             score: result.score,
             duration: result.duration,
             route: routing.route,
+            auto_action: routing.auto_action,
             severe: routing.severe,
             auto_delete_link: routing.auto_delete_link,
         })

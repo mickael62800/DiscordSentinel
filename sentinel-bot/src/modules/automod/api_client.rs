@@ -218,6 +218,8 @@ pub struct AnalyzeResponse {
     pub severe: bool,
     /// Lien non autorise hors image -> suppression auto immediate.
     pub auto_delete_link: bool,
+    /// Executer la sanction, y compris quand une carte est aussi creee.
+    pub auto_action: bool,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -284,6 +286,7 @@ impl ApiClient {
             route: proto_routing_to_routing(resp.route),
             severe: resp.severe,
             auto_delete_link: resp.auto_delete_link,
+            auto_action: resp.auto_action,
         })
     }
 

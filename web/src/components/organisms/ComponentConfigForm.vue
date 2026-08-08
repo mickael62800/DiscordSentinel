@@ -200,7 +200,7 @@ function isFieldModified(key: string): boolean {
 function isFieldDisabled(field: ConfigField, visited: Set<string> = new Set()): boolean {
   if (
     isAutomod.value
-    && ["auto_warn_enabled", "auto_delete_enabled", "auto_mute_enabled", "auto_ban_enabled"].includes(field.key)
+    && ["auto_warn_enabled", "auto_delete_enabled", "auto_mute_enabled", "auto_kick_enabled", "auto_ban_enabled"].includes(field.key)
     && !parseBoolConfig(formValues.value.auto_actions_selective_enabled)
   ) return true;
   if (

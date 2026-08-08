@@ -269,6 +269,7 @@ fn analysis_to_proto(a: MessageAnalysis) -> proto::AnalyzeMessageResponse {
         route: routing_to_proto(a.route),
         severe: a.severe,
         auto_delete_link: a.auto_delete_link,
+        auto_action: a.auto_action,
     }
 }
 

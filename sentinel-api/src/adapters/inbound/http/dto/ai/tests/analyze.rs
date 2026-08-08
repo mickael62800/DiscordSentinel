@@ -105,6 +105,7 @@ fn response_dto_empty_reason_becomes_none() {
         duration: None,
         score: 0.0,
         route: sentinel_core::domain::services::moderation::automod_routing::Routing::Card,
+        auto_action: false,
         severe: false,
         auto_delete_link: false,
     };
@@ -123,6 +124,7 @@ fn response_dto_non_empty_reason_is_some() {
         duration: Some(60),
         score: 8.5,
         route: sentinel_core::domain::services::moderation::automod_routing::Routing::Card,
+        auto_action: false,
         severe: false,
         auto_delete_link: false,
     };

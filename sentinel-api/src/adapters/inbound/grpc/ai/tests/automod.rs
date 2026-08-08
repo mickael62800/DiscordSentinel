@@ -49,6 +49,7 @@ fn analysis_to_proto_full_mapping() {
         score: 0.65,
         duration: Some(300),
         route: sentinel_core::domain::services::moderation::automod_routing::Routing::Card,
+        auto_action: false,
         severe: false,
         auto_delete_link: false,
     };
@@ -67,6 +68,7 @@ fn analysis_to_proto_no_action() {
         score: 0.0,
         duration: None,
         route: sentinel_core::domain::services::moderation::automod_routing::Routing::None,
+        auto_action: false,
         severe: false,
         auto_delete_link: false,
     };
@@ -99,6 +101,7 @@ impl AnalyzeMessageUseCase for MockAnalyzeUc {
             score: 0.75,
             duration: None,
             route: sentinel_core::domain::services::moderation::automod_routing::Routing::Card,
+            auto_action: false,
             severe: false,
             auto_delete_link: false,
         })

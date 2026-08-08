@@ -10,6 +10,8 @@ pub struct MessageAnalysis {
     pub duration: Option<u64>,
     /// Décision de routage calculée côté serveur (decide = API).
     pub route: Routing,
+    /// Exécuter la sanction même lorsqu'une carte est aussi créée.
+    pub auto_action: bool,
     /// Cas sévère (phishing / invitation Discord) → protection auto.
     pub severe: bool,
     /// Lien non autorisé hors image → suppression auto.

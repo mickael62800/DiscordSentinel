@@ -185,6 +185,7 @@ impl AnalyzeMessageUseCase for MockAnalyzeMessage {
             score: if cmd.flags.spam { 0.85 } else { 0.0 },
             duration: None,
             route: sentinel_core::domain::services::moderation::automod_routing::Routing::None,
+            auto_action: false,
             severe: false,
             auto_delete_link: false,
         })

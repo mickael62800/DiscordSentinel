@@ -385,6 +385,33 @@ pub(super) async fn send_to_backend(
             }
 
             use super::api_client::Routing;
+            // La protection severe a deja applique un mute reversible ; ne pas
+            // executer deux fois la meme sanction sur ce meme message.
+            if response.auto_action && !auto_sanctioned {
+                if let Err(e) = execute_action(
+                    ctx,
+                    msg,
+                    &response.action,
+                    Some(effective_reason.as_str()),
+                    mute_duration_secs,
+                    colors,
+                    appeal,
+                )
+                .await
+                {
+                    error!(error = %e, "Erreur lors de l'execution de l'action automatique");
+                } else if notify_member {
+                    send_sanction_dm(
+                        ctx,
+                        msg.author.id,
+                        &response.action,
+                        &effective_reason,
+                        mute_duration_secs,
+                        appeal,
+                    )
+                    .await;
+                }
+            }
             match response.route {
                 Routing::Card => {
                     send_review_card(
@@ -421,6 +448,9 @@ pub(super) async fn send_to_backend(
                     // Sinon : human_only sans salon, ou rien a faire.
                 }
                 Routing::Auto => {
+                    if response.auto_action {
+                        return;
+                    }
                     if let Err(e) = execute_action(
                         ctx,
                         msg,

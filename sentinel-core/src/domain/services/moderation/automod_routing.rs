@@ -22,10 +22,43 @@ pub enum Routing {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RoutingDecision {
     pub route: Routing,
+    /// Applique la sanction en plus de la carte de review. Cela permet de
+    /// garder une trace et les boutons de moderation apres une action auto.
+    pub auto_action: bool,
     /// Cas severe (phishing / invitation Discord) : protection auto immediate.
     pub severe: bool,
     /// Lien non autorise HORS image : suppression auto immediate.
     pub auto_delete_link: bool,
+}
+
+/// Reduit une sanction au niveau le plus severe explicitement autorise pour
+/// l'automatisation. Une action plus faible n'est jamais augmentee : elle
+/// reste donc soumise a la review si sa case n'est pas cochee.
+pub fn cap_to_allowed_auto_action(
+    action: &Action,
+    selective: bool,
+    auto_warn: bool,
+    auto_delete: bool,
+    auto_mute: bool,
+    auto_kick: bool,
+    auto_ban: bool,
+) -> Action {
+    if !selective || matches!(action, Action::None) {
+        return action.clone();
+    }
+
+    [
+        (Action::Warn, auto_warn),
+        (Action::Delete, auto_delete),
+        (Action::Mute, auto_mute),
+        (Action::Kick, auto_kick),
+        (Action::Ban, auto_ban),
+    ]
+    .into_iter()
+    .filter(|(candidate, enabled)| *enabled && candidate <= action)
+    .map(|(candidate, _)| candidate)
+    .max()
+    .unwrap_or_else(|| action.clone())
 }
 
 /// Entrees de la decision (faits + config guild deja resolue par l'API).
@@ -115,10 +148,6 @@ pub fn decide(i: &RoutingInputs) -> RoutingDecision {
         // jamais un vrai bannissement automatique.
         Action::Ban => i.selective_auto_actions && i.auto_ban,
     };
-    // Dans ce mode, une action explicitement autorisee est executee sans
-    // attendre une carte, meme si la review IA globale reste activee.
-    let force_authorized_auto =
-        i.selective_auto_actions && action_is_authorized && i.action != Action::None;
     // `human_only` choisit le destinataire (une carte) mais ne transforme pas
     // chaque message normal en incident. Un score positif est indispensable :
     // sinon une IA indisponible ou sous son seuil produit des cartes à 0.00.
@@ -126,7 +155,7 @@ pub fn decide(i: &RoutingInputs) -> RoutingDecision {
         && ((i.human_only && i.score > 0.0)
             || severe
             || link_needs_card
-            || (i.ai_review_mode && above_threshold && !force_authorized_auto)
+            || (i.ai_review_mode && above_threshold)
             // Une sanction non autorisee n'est jamais appliquee en silence :
             // elle attend la decision des moderateurs dans la carte.
             || (!action_is_authorized && i.action != Action::None));
@@ -147,6 +176,10 @@ pub fn decide(i: &RoutingInputs) -> RoutingDecision {
 
     RoutingDecision {
         route,
+        auto_action: !auto_delete_link
+            && !i.human_only
+            && action_is_authorized
+            && i.action != Action::None,
         severe,
         auto_delete_link,
     }
