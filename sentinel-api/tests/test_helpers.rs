@@ -22,7 +22,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use sentinel_api::adapters::inbound::http::state::AppState;
+use sentinel_api::bootstrap::state::AppState;
 use sentinel_api::adapters::outbound::discord_api::DiscordApi;
 use sentinel_api::adapters::outbound::discord_api::DiscordApiService;
 use sentinel_api::adapters::outbound::discord_api::DiscordChannel;
