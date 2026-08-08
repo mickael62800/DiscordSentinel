@@ -65,6 +65,14 @@ const configFields = computed<ConfigField[]>(() => {
 
 const booleanFields = computed(() => configFields.value.filter((f) => f.type === "boolean"));
 const isAutomod = computed(() => props.definition.bot_name === "automod-bot");
+// En mode IA texte exclusif, ces détecteurs restent visibles (pour expliquer
+// ce qui est suspendu) mais ne sont plus modifiables. Les protections contre
+// phishing et fichiers dangereux restent volontairement disponibles.
+const AI_ONLY_LOCAL_FIELDS = new Set([
+  "spam_detection_enabled", "caps_warning_enabled", "insult_detection_enabled",
+  "link_detection_enabled", "emoji_spam_enabled", "mentions_enabled",
+  "unicode_detection_enabled", "flood_review_mode", "caps_review_mode",
+]);
 
 /**
  * AutoMod comporte maintenant plusieurs niveaux de decision (detecteurs,
@@ -190,6 +198,11 @@ function isFieldModified(key: string): boolean {
  * depends_on. Detection des cycles via un Set de cles deja visitees.
  */
 function isFieldDisabled(field: ConfigField, visited: Set<string> = new Set()): boolean {
+  if (
+    isAutomod.value
+    && parseBoolConfig(formValues.value.ai_only_enabled)
+    && AI_ONLY_LOCAL_FIELDS.has(field.key)
+  ) return true;
   const dep = field.depends_on as { key: string; equals: string } | undefined;
   if (!dep) return false;
   if (visited.has(field.key)) return false; // garde-fou cycle

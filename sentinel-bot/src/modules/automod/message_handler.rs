@@ -69,6 +69,20 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
 
     let mut detector_config = build_detector_config(&config);
+    let ai_only = BaseApiClient::config_bool(&config, "ai_only_enabled", false)
+        && BaseApiClient::config_bool(&config, "text_enabled", true);
+    if ai_only {
+        // L'IA devient l'autorite pour les comportements conversationnels.
+        // On ne coupe pas le phishing ni les fichiers suspects : ce sont des
+        // protections de securite qui ne doivent pas attendre un modele.
+        detector_config.spam_enabled = false;
+        detector_config.caps_enabled = false;
+        detector_config.insult_enabled = false;
+        detector_config.link_enabled = false;
+        detector_config.emoji_spam_enabled = false;
+        detector_config.mentions_enabled = false;
+        detector_config.unicode_enabled = false;
+    }
 
     let night_mode_enabled = BaseApiClient::config_bool(&config, "night_mode_enabled", false);
     if night_mode_enabled {
@@ -220,8 +234,10 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
         }
     }
 
-    // Detection flood (clone le tracker pour eviter deadlock sur le RwLock)
-    {
+    // Detection flood (clone le tracker pour eviter deadlock sur le RwLock).
+    // En mode IA texte exclusif, ce detecteur de cadence est suspendu avec
+    // les autres heuristiques comportementales locales.
+    if !ai_only {
         let flood_tracker = {
             let data = ctx.data.read().await;
             data.get::<FloodTrackerKey>().cloned()
