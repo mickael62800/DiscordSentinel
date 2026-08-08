@@ -360,7 +360,7 @@ services:
       # API_URL : utilise pour valider les tokens WS via /api/auth/check-access.
       # Sans ca, fallback localhost:3000 -> appel vers gateway lui-meme -> WS rejete 401.
       API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
+      API_KEY: ${SENTINEL_API_KEY:-${API_KEY:-}}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       HOST: 0.0.0.0
       PORT: "3001"
@@ -465,7 +465,7 @@ services:
       WEB_FRONT_URL: ${WEB_FRONT_URL:-}
       GRPC_API_URL: http://api:50051
       GRPC_TLS_DIR: /grpc-certs
-      API_KEY: ${API_KEY:-}
+      API_KEY: ${SENTINEL_API_KEY:-${API_KEY:-}}
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       REDIS_CHANNEL: sentinel:events
       VOICE_GUILD_ID: ${VOICE_GUILD_ID:-}
