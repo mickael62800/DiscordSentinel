@@ -6,8 +6,6 @@ use crate::domain::entities::game::template::PortProtocol as TemplatePortProtoco
 use crate::ports::outbound::game::game_audit_repository::GameAuditRepository;
 use crate::ports::outbound::game::game_server_config_repository::GameServerConfigRepository;
 use crate::ports::outbound::game::game_server_repository::{GameServerRepository, TemplateUsage};
-use crate::ports::outbound::game::player_session_repository::PlayerSessionRepository;
-use crate::domain::entities::game::player_session::PlayerSession;
 use crate::ports::outbound::game::game_template_repository::GameTemplateRepository;
 use crate::ports::outbound::game::port_allocator::{PortAllocator, PortKind};
 use crate::ports::outbound::game::rcon_client::{RconClient, RconConnectionParams, RconResponse};
